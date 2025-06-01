@@ -57,7 +57,7 @@ impl RpcMuxSession {
                         .entry(stream_id)
                         .or_insert_with(RpcStreamDecoder::new);
 
-                    match rpc_stream_decoder.decode_frame(&frame) {
+                    match rpc_stream_decoder.decode_rpc_frame(&frame) {
                         Ok(events) => {
                             for event in events {
                                 if matches!(event, RpcStreamEvent::End { .. }) {
