@@ -1,0 +1,18 @@
+[package]
+name = "muxio"
+version = "0.0.1-alpha"
+edition = "2024"
+publish = false
+
+[dev-dependencies]
+rand = "0.9.1"
+bitcode = "0.6.6"
+
+[dependencies]
+wasm-bindgen = { version = "0.2", optional = true }
+js-sys = { version = "0.3", optional = true }
+web-sys = { version = "0.3", features = ["Performance"], optional = true }
+xxhash-rust = { version = "0.8.15", features = ["xxh3"] }
+
+[features]
+wasm-bindgen-support = ["wasm-bindgen", "js-sys", "web-sys"]
