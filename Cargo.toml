@@ -1,8 +1,11 @@
 [package]
 name = "muxio"
+authors = ["Jeremy Harris <jeremy.harris@zenosmosis.com>"]
 version = "0.0.1-alpha"
 edition = "2024"
-publish = false
+description = "Toolkit for layered stream multiplexing and schema-less RPC communication"
+repository = "https://github.com/jzombie/rust-muxio"
+license = "Apache-2.0"
 
 [dev-dependencies]
 rand = "0.9.1"
