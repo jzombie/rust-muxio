@@ -49,6 +49,13 @@ impl<'a> RpcClient<'a> {
             .map_err(|_| FrameDecodeError::CorruptFrame)
     }
 
+    pub fn set_request_handler<F>(&mut self, rpc_id: u32, handler: F)
+    where
+        F: FnMut(RpcStreamEvent) + 'a,
+    {
+        self.response_handlers.insert(rpc_id, Box::new(handler));
+    }
+
     pub fn receive_bytes(&mut self, bytes: &[u8]) -> Result<(), FrameDecodeError> {
         self.mux_session.receive_bytes(bytes, |evt| {
             let id = match &evt {
