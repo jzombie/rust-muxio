@@ -5,7 +5,8 @@ use std::rc::Rc;
 
 #[test]
 fn rpc_client_response_callbacks_work() {
-    let mut client_rpc = RpcClient::new();
+    let client_mux = RpcMuxSession::new();
+    let mut client_rpc = RpcClient::new(client_mux);
     let mut server_mux = RpcMuxSession::new();
 
     let client_outbox = Rc::new(RefCell::new(VecDeque::<Vec<u8>>::new()));
@@ -16,7 +17,7 @@ fn rpc_client_response_callbacks_work() {
         msg_type: RpcMessageType::Call,
         id: 99,
         method_id: 0xCAFECAFE12345678,
-        metadata_bytes: b"test-meta".to_vec(),
+        metadata_bytes: b"test-meta-request".to_vec(),
     });
 
     {
@@ -35,6 +36,8 @@ fn rpc_client_response_callbacks_work() {
                         rpc_header_id,
                         rpc_header,
                     } => {
+                        assert_eq!(rpc_header.msg_type, RpcMessageType::Response);
+
                         assert_eq!(rpc_header_id, hdr.id);
                         metadata
                             .borrow_mut()
@@ -53,8 +56,19 @@ fn rpc_client_response_callbacks_work() {
     // Pipe client->server
     while let Some(chunk) = client_outbox.borrow_mut().pop_front() {
         server_mux
-            .receive_bytes(&chunk, |_evt| {
+            .receive_bytes(&chunk, |evt| {
                 // server-side event sink — not needed in this test
+                match evt {
+                    RpcStreamEvent::Header {
+                        rpc_header_id,
+                        rpc_header,
+                    } => {
+                        assert_eq!(rpc_header.msg_type, RpcMessageType::Call);
+                        assert_eq!(rpc_header_id, call_header.id);
+                        assert_eq!(rpc_header.metadata_bytes, b"test-meta-request")
+                    }
+                    _ => {}
+                }
             })
             .unwrap();
     }
@@ -63,7 +77,7 @@ fn rpc_client_response_callbacks_work() {
         msg_type: RpcMessageType::Response,
         id: 99,
         method_id: call_header.method_id,
-        metadata_bytes: b"test-meta".to_vec(),
+        metadata_bytes: b"test-meta-response".to_vec(),
     };
 
     let server_outbox = Rc::new(RefCell::new(Vec::new()));
@@ -87,6 +101,6 @@ fn rpc_client_response_callbacks_work() {
     assert_eq!(client_received_payload.borrow().as_slice(), b"reply");
     assert_eq!(
         client_received_metadata.borrow().get(&99).unwrap(),
-        &b"test-meta".to_vec()
+        &b"test-meta-response".to_vec()
     );
 }
