@@ -1,7 +1,7 @@
 use muxio::rpc::{RpcClient, RpcHeader, RpcMessageType, RpcMuxSession, RpcStreamEvent};
 use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
-use std::rc::{Rc, Weak};
+use std::rc::Rc;
 
 #[test]
 fn rpc_client_stream_and_reply_roundtrip() {
