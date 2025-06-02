@@ -85,8 +85,15 @@ impl<'a> RpcRespondableSession<'a> {
             let id = match &evt {
                 RpcStreamEvent::Header { rpc_header_id, .. } => Some(*rpc_header_id),
                 RpcStreamEvent::PayloadChunk { rpc_header_id, .. } => Some(*rpc_header_id),
-                RpcStreamEvent::End { rpc_header_id } => Some(*rpc_header_id),
+                RpcStreamEvent::End { rpc_header_id, .. } => Some(*rpc_header_id),
                 RpcStreamEvent::Error { rpc_header_id, .. } => *rpc_header_id,
+            };
+
+            let method_id = match &evt {
+                RpcStreamEvent::Header { rpc_method_id, .. } => Some(*rpc_method_id),
+                RpcStreamEvent::PayloadChunk { rpc_method_id, .. } => Some(*rpc_method_id),
+                RpcStreamEvent::End { rpc_method_id, .. } => Some(*rpc_method_id),
+                RpcStreamEvent::Error { rpc_method_id, .. } => *rpc_method_id,
             };
 
             let mut handled = false;
@@ -119,6 +126,7 @@ impl<'a> RpcRespondableSession<'a> {
                             if let Some(cb) = self.response_handlers.get_mut(&rpc_id) {
                                 let rpc_payload_event = RpcStreamEvent::PayloadChunk {
                                     rpc_header_id: rpc_id,
+                                    rpc_method_id: method_id.unwrap(), // TODO: Don't use unwrap here
                                     bytes: buffer.clone(),
                                 };
 

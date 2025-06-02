@@ -39,7 +39,10 @@ fn rpc_respondable_session_stream_and_reply_roundtrip() {
                     RpcStreamEvent::PayloadChunk { bytes, .. } => {
                         recv_buf.borrow_mut().extend(bytes);
                     }
-                    RpcStreamEvent::End { rpc_header_id } => {
+                    RpcStreamEvent::End {
+                        rpc_header_id,
+                        rpc_method_id,
+                    } => {
                         let reply_bytes = match recv_buf.borrow().as_slice() {
                             b"ping" => b"pong".as_ref(),
                             _ => b"fail".as_ref(),
@@ -74,6 +77,7 @@ fn rpc_respondable_session_stream_and_reply_roundtrip() {
                 Some(move |event| match event {
                     RpcStreamEvent::Header {
                         rpc_header_id,
+                        rpc_method_id,
                         rpc_header,
                     } => {
                         assert_eq!(rpc_header_id, call_header.id);

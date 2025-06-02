@@ -11,6 +11,7 @@ pub struct RpcStreamDecoder {
     state: RpcDecoderState,
     header: Option<RpcHeader>,
     rpc_header_id: Option<u32>,
+    rpc_method_id: Option<u64>,
     buffer: Vec<u8>,
     meta_len: usize,
 }
@@ -27,6 +28,7 @@ impl RpcStreamDecoder {
             state: RpcDecoderState::AwaitHeader,
             header: None,
             rpc_header_id: None,
+            rpc_method_id: None,
             buffer: Vec::new(),
             meta_len: 0,
         }
@@ -34,6 +36,10 @@ impl RpcStreamDecoder {
 
     pub fn rpc_header_id(&self) -> Option<u32> {
         self.rpc_header_id
+    }
+
+    pub fn rpc_method_id(&self) -> Option<u64> {
+        self.rpc_method_id
     }
 
     // Decoding the frame with fixed metadata length
@@ -67,6 +73,7 @@ impl RpcStreamDecoder {
                         .try_into()
                         .unwrap(),
                 );
+                self.rpc_method_id = Some(method_id);
 
                 // Read the metadata length and check if we have enough data
                 let meta_len = u16::from_le_bytes(
@@ -110,6 +117,7 @@ impl RpcStreamDecoder {
                 // Push the header event
                 events.push(RpcStreamEvent::Header {
                     rpc_header_id: self.rpc_header_id.unwrap(),
+                    rpc_method_id: self.rpc_method_id.unwrap(),
                     rpc_header,
                 });
 
@@ -117,6 +125,7 @@ impl RpcStreamDecoder {
                 if !self.buffer.is_empty() {
                     events.push(RpcStreamEvent::PayloadChunk {
                         rpc_header_id: self.rpc_header_id.unwrap(),
+                        rpc_method_id: self.rpc_method_id.unwrap(),
                         bytes: self.buffer.split_off(0),
                     });
                 }
@@ -127,6 +136,7 @@ impl RpcStreamDecoder {
                     self.state = RpcDecoderState::Done;
                     events.push(RpcStreamEvent::End {
                         rpc_header_id: self.rpc_header_id.unwrap(),
+                        rpc_method_id: self.rpc_method_id.unwrap(),
                     });
                 } else if frame.inner.kind == FrameKind::Cancel {
                     return Err(FrameDecodeError::ReadAfterCancel); // Stop processing further frames
@@ -134,6 +144,7 @@ impl RpcStreamDecoder {
                     // If there's a payload chunk, append it to the events
                     events.push(RpcStreamEvent::PayloadChunk {
                         rpc_header_id: self.rpc_header_id.unwrap(),
+                        rpc_method_id: self.rpc_method_id.unwrap(),
                         bytes: frame.inner.payload.clone(),
                     });
                 }

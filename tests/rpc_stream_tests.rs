@@ -18,6 +18,7 @@ fn rpc_parallel_streams_roundtrip() {
             .receive_bytes(bytes, |evt| match evt {
                 RpcStreamEvent::Header {
                     rpc_header_id,
+                    rpc_method_id,
                     ref rpc_header,
                 } => {
                     // Validate headers and store the header with its msg ID
@@ -38,11 +39,15 @@ fn rpc_parallel_streams_roundtrip() {
                 }
                 RpcStreamEvent::PayloadChunk {
                     rpc_header_id,
+                    rpc_method_id,
                     bytes,
                 } => {
                     decoded.entry(rpc_header_id).or_default().1.extend(bytes);
                 }
-                RpcStreamEvent::End { rpc_header_id } => {
+                RpcStreamEvent::End {
+                    rpc_header_id,
+                    rpc_method_id,
+                } => {
                     assert!(decoded.contains_key(&rpc_header_id))
                 }
                 _ => {}
@@ -203,17 +208,22 @@ fn rpc_stream_with_multiple_metadata_entries() {
             .receive_bytes(&chunk, |evt| match evt {
                 RpcStreamEvent::Header {
                     rpc_header_id,
+                    rpc_method_id,
                     ref rpc_header,
                 } => {
                     decoded.entry(rpc_header_id).or_default().0 = Some(rpc_header.clone());
                 }
                 RpcStreamEvent::PayloadChunk {
                     rpc_header_id,
+                    rpc_method_id,
                     bytes,
                 } => {
                     decoded.entry(rpc_header_id).or_default().1.extend(bytes);
                 }
-                RpcStreamEvent::End { rpc_header_id: _ } => {}
+                RpcStreamEvent::End {
+                    rpc_header_id,
+                    rpc_method_id,
+                } => {}
                 _ => {}
             })
             .unwrap();
@@ -334,17 +344,22 @@ fn rpc_complex_shuffled_stream() {
                 .receive_bytes(&chunk, |evt| match evt {
                     RpcStreamEvent::Header {
                         rpc_header_id,
+                        rpc_method_id,
                         ref rpc_header,
                     } => {
                         decoded.entry(rpc_header_id).or_default().0 = Some(rpc_header.clone());
                     }
                     RpcStreamEvent::PayloadChunk {
                         rpc_header_id,
+                        rpc_method_id,
                         bytes,
                     } => {
                         decoded.entry(rpc_header_id).or_default().1.extend(bytes);
                     }
-                    RpcStreamEvent::End { rpc_header_id: _ } => {}
+                    RpcStreamEvent::End {
+                        rpc_header_id,
+                        rpc_method_id,
+                    } => {}
                     _ => {}
                 })
                 .unwrap();
@@ -454,6 +469,7 @@ fn rpc_session_bidirectional_roundtrip() {
             .receive_bytes(chunk, |evt| match evt {
                 RpcStreamEvent::Header {
                     rpc_header_id: _,
+                    rpc_method_id,
                     rpc_header,
                 } => {
                     assert_eq!(rpc_header.metadata_bytes, b"foo-bar");
@@ -461,6 +477,7 @@ fn rpc_session_bidirectional_roundtrip() {
                 }
                 RpcStreamEvent::PayloadChunk {
                     rpc_header_id: _,
+                    rpc_method_id,
                     bytes,
                 } => {
                     req_buf.extend(bytes);
@@ -505,6 +522,7 @@ fn rpc_session_bidirectional_roundtrip() {
             .receive_bytes(chunk, |evt| match evt {
                 RpcStreamEvent::Header {
                     rpc_header_id: _,
+                    rpc_method_id,
                     rpc_header,
                 } => {
                     assert_eq!(rpc_header.metadata_bytes, b"baz-qux");
@@ -512,6 +530,7 @@ fn rpc_session_bidirectional_roundtrip() {
                 }
                 RpcStreamEvent::PayloadChunk {
                     rpc_header_id: _,
+                    rpc_method_id,
                     bytes,
                 } => {
                     reply_buf.extend(bytes);

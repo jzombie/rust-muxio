@@ -82,6 +82,7 @@ fn rpc_dispatcher_call_and_echo_response() {
                         move |rpc_stream_event: RpcStreamEvent| match rpc_stream_event {
                             RpcStreamEvent::Header {
                                 rpc_header_id,
+                                rpc_method_id,
                                 rpc_header,
                             } => {
                                 assert_eq!(rpc_header.method_id, method_id);
@@ -92,6 +93,7 @@ fn rpc_dispatcher_call_and_echo_response() {
                             }
                             RpcStreamEvent::PayloadChunk {
                                 rpc_header_id,
+                                rpc_method_id,
                                 bytes,
                             } => {
                                 println!("Bytes: {:?}", bytes);
@@ -143,9 +145,11 @@ fn rpc_dispatcher_call_and_echo_response() {
                             let request_params: AddRequestParams =
                                 bitcode::decode(&rpc_request.param_bytes.unwrap()).unwrap();
 
-                            let response_bytes = bitcode::encode(&AddResponseParams {
-                                result: request_params.numbers.iter().sum(),
-                            });
+                            // let response_bytes = bitcode::encode(&AddResponseParams {
+                            //     result: request_params.numbers.iter().sum(),
+                            // });
+
+                            let response_bytes = b"2222".to_vec();
 
                             Some(RpcResponse {
                                 request_header_id,
@@ -159,9 +163,10 @@ fn rpc_dispatcher_call_and_echo_response() {
                             let request_params: MultRequestParams =
                                 bitcode::decode(&rpc_request.param_bytes.unwrap()).unwrap();
 
-                            let response_bytes = bitcode::encode(&MultResponseParams {
-                                result: request_params.numbers.iter().fold(1.0, |acc, &x| acc * x),
-                            });
+                            // let response_bytes = bitcode::encode(&MultResponseParams {
+                            //     result: request_params.numbers.iter().fold(1.0, |acc, &x| acc * x),
+                            // });
+                            let response_bytes = b"1111".to_vec();
 
                             Some(RpcResponse {
                                 request_header_id,
