@@ -34,7 +34,7 @@ impl<'a> RpcDispatcher<'a> {
         args: Vec<u8>, // TODO: Accept real args and convert internally to use metadata
         // TODO: Accept optional payload
         max_chunk_size: usize,
-        mut on_emit: G,
+        mut on_emit: G, // TODO: Can this be moved to a "global" emit?
     ) -> Result<(), FrameEncodeError>
     where
         G: FnMut(&[u8]) + 'a,
