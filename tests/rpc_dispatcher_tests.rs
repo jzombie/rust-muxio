@@ -20,37 +20,64 @@ fn rpc_dispatcher_call_and_echo_response() {
 
     {
         // Move the `outgoing_buf` into the closure, ensuring it lives as long as needed
-        let mut client_encoder = client_dispatcher
-            .call(rpc_request, 4, {
-                // Move the outgoing_buf into the closure to extend its lifetime
-                let outgoing_buf = Rc::clone(&outgoing_buf);
+        client_dispatcher
+            .call(
+                rpc_request,
+                4,
+                {
+                    // Move the outgoing_buf into the closure to extend its lifetime
+                    let outgoing_buf = Rc::clone(&outgoing_buf);
 
-                // The closure captures `outgoing_buf` and borrows it while executing
-                move |bytes| {
-                    println!("Server processing: {:?}", bytes);
+                    // The closure captures `outgoing_buf` and borrows it while executing
+                    move |bytes| {
+                        println!("Server processing: {:?}", bytes);
 
-                    // Collect bytes into the buffer
-                    outgoing_buf.borrow_mut().extend(bytes);
+                        // Collect bytes into the buffer
+                        outgoing_buf.borrow_mut().extend(bytes);
 
-                    // Simulate echoing back the received payload
-                    // The following lines would normally simulate a server echoing back the payload
-                    // let reply_bytes = if bytes == b"ping" {
-                    //     b"pong".to_vec() // Echo response "pong"
-                    // } else {
-                    //     b"fail".to_vec() // Error message if something else is received
-                    // };
+                        // Simulate echoing back the received payload
+                        // The following lines would normally simulate a server echoing back the payload
+                        // let reply_bytes = if bytes == b"ping" {
+                        //     b"pong".to_vec() // Echo response "pong"
+                        // } else {
+                        //     b"fail".to_vec() // Error message if something else is received
+                        // };
 
-                    // Instead of responding to the client dispatcher, we're appending the reply to the buffer
-                    //  outgoing_buf.borrow_mut().extend(reply_bytes);
-                }
-            })
+                        // Instead of responding to the client dispatcher, we're appending the reply to the buffer
+                        //  outgoing_buf.borrow_mut().extend(reply_bytes);
+                    }
+                },
+                Some(|rpc_stream_event: RpcStreamEvent| {
+                    println!("Received response: {:?}", rpc_stream_event)
+                }),
+            )
             .expect("Server call failed");
     }
 
     {
+        let incoming_buf = outgoing_buf.clone();
+
         server_dispatcher
-            .receive_bytes(outgoing_buf.borrow().as_slice())
+            .receive_bytes(incoming_buf.borrow().as_slice())
             .expect("Failed to receive bytes on server");
+
+        println!("{:?}", server_dispatcher.response_queue);
+        server_dispatcher
+            .start_reply_stream(
+                RpcHeader {
+                    msg_type: RpcMessageType::Response,
+                    id: 1,
+                    method_id: 0,
+                    metadata_bytes: b"proto".to_vec(),
+                },
+                4,
+                |bytes: &[u8]| {
+                    // println!("Emitting: {:?}", &bytes);
+
+                    client_dispatcher.receive_bytes(bytes);
+                },
+            )
+            .unwrap();
     }
 
     // Now check if the response was properly echoed
