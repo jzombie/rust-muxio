@@ -1,6 +1,6 @@
 use muxio::{
     frame::{FrameDecodeError, FrameEncodeError, FrameMuxStreamDecoder, FrameStreamEncoder},
-    rpc::{RpcHeader, RpcMessageType, RpcMuxSession},
+    rpc::{RpcHeader, RpcMessageType, RpcSession},
 };
 use std::cell::RefCell;
 
@@ -56,8 +56,8 @@ fn cancel_stream_does_not_process_after_cancellation() {
 
 #[test]
 fn rpc_stream_aborts_on_cancel_frame() {
-    let mut client = RpcMuxSession::new();
-    let mut server = RpcMuxSession::new();
+    let mut client = RpcSession::new();
+    let mut server = RpcSession::new();
 
     let hdr = RpcHeader {
         msg_type: RpcMessageType::Call,
@@ -106,8 +106,8 @@ fn rpc_stream_aborts_on_cancel_frame() {
 
 #[test]
 fn rpc_stream_aborts_on_end_frame() {
-    let mut client = RpcMuxSession::new();
-    let mut server = RpcMuxSession::new();
+    let mut client = RpcSession::new();
+    let mut server = RpcSession::new();
 
     let hdr = RpcHeader {
         msg_type: RpcMessageType::Call,

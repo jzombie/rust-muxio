@@ -1,13 +1,13 @@
 use bitcode::{Decode, Encode};
-use muxio::rpc::{RpcHeader, RpcMessageType, RpcMuxSession, RpcStreamEvent};
+use muxio::rpc::{RpcHeader, RpcMessageType, RpcSession, RpcStreamEvent};
 use rand::prelude::SliceRandom;
 use std::cell::RefCell;
 use std::collections::HashMap;
 
 #[test]
 fn rpc_parallel_streams_roundtrip() {
-    let mut client = RpcMuxSession::new();
-    let mut server = RpcMuxSession::new();
+    let mut client = RpcSession::new();
+    let mut server = RpcSession::new();
 
     // The final validation logic for payload correctness and metadata integrity
     let mut decoded: HashMap<u32, (Option<RpcHeader>, Vec<u8>)> = HashMap::new();
@@ -145,8 +145,8 @@ fn rpc_parallel_streams_roundtrip() {
 
 #[test]
 fn rpc_stream_with_multiple_metadata_entries() {
-    let mut client = RpcMuxSession::new();
-    let mut server = RpcMuxSession::new();
+    let mut client = RpcSession::new();
+    let mut server = RpcSession::new();
 
     let mut outbound: Vec<u8> = Vec::new();
 
@@ -239,8 +239,8 @@ fn rpc_stream_with_multiple_metadata_entries() {
 
 #[test]
 fn rpc_complex_shuffled_stream() {
-    let mut client = RpcMuxSession::new();
-    let mut server = RpcMuxSession::new();
+    let mut client = RpcSession::new();
+    let mut server = RpcSession::new();
 
     // Grouped by chunks so that they can be shuffled
     let outbound_chunks: RefCell<Vec<Vec<u8>>> = RefCell::new(vec![]);
@@ -421,8 +421,8 @@ fn rpc_complex_shuffled_stream() {
 
 #[test]
 fn rpc_session_bidirectional_roundtrip() {
-    let mut client = RpcMuxSession::new();
-    let mut server = RpcMuxSession::new();
+    let mut client = RpcSession::new();
+    let mut server = RpcSession::new();
 
     let hdr = RpcHeader {
         msg_type: RpcMessageType::Call,

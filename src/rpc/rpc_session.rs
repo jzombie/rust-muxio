@@ -4,13 +4,13 @@ use crate::{
 };
 use std::collections::HashMap;
 
-pub struct RpcMuxSession {
+pub struct RpcSession {
     next_stream_id: u32,                             // Counter for the next stream ID
     frame_mux_stream_decoder: FrameMuxStreamDecoder, // Decoder that processes frames
     rpc_stream_decoders: HashMap<u32, RpcStreamDecoder>, // Maps stream ID to decoders for individual streams
 }
 
-impl RpcMuxSession {
+impl RpcSession {
     pub fn new() -> Self {
         Self {
             next_stream_id: 1,
