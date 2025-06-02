@@ -1,6 +1,6 @@
 use crate::{
     frame::{FrameDecodeError, FrameEncodeError, FrameKind, FrameMuxStreamDecoder},
-    rpc::{RpcHeader, RpcStreamDecoder, RpcStreamEncoder, RpcStreamEvent},
+    rpc::rpc_internals::{RpcHeader, RpcStreamDecoder, RpcStreamEncoder, RpcStreamEvent},
 };
 use std::collections::HashMap;
 
@@ -77,6 +77,7 @@ impl RpcSession {
 
                             let error_event = RpcStreamEvent::Error {
                                 rpc_header_id: None,
+                                rpc_method_id: None,
                                 frame_decode_error: e.clone(),
                             };
 
@@ -94,6 +95,7 @@ impl RpcSession {
                 Err(e) => {
                     let error_event = RpcStreamEvent::Error {
                         rpc_header_id: None,
+                        rpc_method_id: None,
                         frame_decode_error: e.clone(),
                     };
 

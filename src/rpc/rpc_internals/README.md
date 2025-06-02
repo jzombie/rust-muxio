@@ -1,6 +1,6 @@
-# `rpc` Directory
+# `rpc_internals` Directory
 
-The `rpc` directory provides the implementation for Remote Procedure Call (RPC) functionality, including the management of RPC messages, headers, and metadata. It defines the structure and behavior of messages exchanged between clients and servers, providing an abstraction for remote procedure invocation.
+The `rpc_internals` directory provides the implementation for Remote Procedure Call (RPC) functionality, including the management of RPC messages, headers, and metadata. It defines the structure and behavior of messages exchanged between clients and servers, providing an abstraction for remote procedure invocation.
 
 ## Modules:
 

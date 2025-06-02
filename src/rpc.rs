@@ -1,15 +1,6 @@
-mod rpc_header;
-mod rpc_message_type;
-mod rpc_session;
-mod rpc_session_node;
-mod rpc_stream_decoder;
-mod rpc_stream_encoder;
-mod rpc_stream_event;
+mod rpc_dispatcher;
+pub mod rpc_internals;
+mod rpc_request_response;
 
-pub use rpc_header::RpcHeader;
-pub use rpc_message_type::RpcMessageType;
-pub use rpc_session::RpcSession;
-pub use rpc_session_node::RpcSessionNode;
-pub use rpc_stream_decoder::{RpcDecoderState, RpcStreamDecoder};
-pub use rpc_stream_encoder::RpcStreamEncoder;
-pub use rpc_stream_event::RpcStreamEvent;
+pub use rpc_dispatcher::RpcDispatcher;
+pub use rpc_request_response::{RpcRequest, RpcResponse};

@@ -1,5 +1,5 @@
 use bitcode::{Decode, Encode};
-use muxio::rpc::{RpcHeader, RpcMessageType, RpcSession, RpcStreamEvent};
+use muxio::rpc::rpc_internals::{RpcHeader, RpcMessageType, RpcSession, RpcStreamEvent};
 use rand::prelude::SliceRandom;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -19,6 +19,7 @@ fn rpc_parallel_streams_roundtrip() {
                 RpcStreamEvent::Header {
                     rpc_header_id,
                     ref rpc_header,
+                    ..
                 } => {
                     // Validate headers and store the header with its msg ID
                     match rpc_header.id {
@@ -39,10 +40,11 @@ fn rpc_parallel_streams_roundtrip() {
                 RpcStreamEvent::PayloadChunk {
                     rpc_header_id,
                     bytes,
+                    ..
                 } => {
                     decoded.entry(rpc_header_id).or_default().1.extend(bytes);
                 }
-                RpcStreamEvent::End { rpc_header_id } => {
+                RpcStreamEvent::End { rpc_header_id, .. } => {
                     assert!(decoded.contains_key(&rpc_header_id))
                 }
                 _ => {}
@@ -204,16 +206,18 @@ fn rpc_stream_with_multiple_metadata_entries() {
                 RpcStreamEvent::Header {
                     rpc_header_id,
                     ref rpc_header,
+                    ..
                 } => {
                     decoded.entry(rpc_header_id).or_default().0 = Some(rpc_header.clone());
                 }
                 RpcStreamEvent::PayloadChunk {
                     rpc_header_id,
                     bytes,
+                    ..
                 } => {
                     decoded.entry(rpc_header_id).or_default().1.extend(bytes);
                 }
-                RpcStreamEvent::End { rpc_header_id: _ } => {}
+                RpcStreamEvent::End { .. } => {}
                 _ => {}
             })
             .unwrap();
@@ -335,16 +339,18 @@ fn rpc_complex_shuffled_stream() {
                     RpcStreamEvent::Header {
                         rpc_header_id,
                         ref rpc_header,
+                        ..
                     } => {
                         decoded.entry(rpc_header_id).or_default().0 = Some(rpc_header.clone());
                     }
                     RpcStreamEvent::PayloadChunk {
                         rpc_header_id,
                         bytes,
+                        ..
                     } => {
                         decoded.entry(rpc_header_id).or_default().1.extend(bytes);
                     }
-                    RpcStreamEvent::End { rpc_header_id: _ } => {}
+                    RpcStreamEvent::End { .. } => {}
                     _ => {}
                 })
                 .unwrap();
@@ -455,6 +461,7 @@ fn rpc_session_bidirectional_roundtrip() {
                 RpcStreamEvent::Header {
                     rpc_header_id: _,
                     rpc_header,
+                    ..
                 } => {
                     assert_eq!(rpc_header.metadata_bytes, b"foo-bar");
                     seen_hdr = Some(rpc_header);
@@ -462,6 +469,7 @@ fn rpc_session_bidirectional_roundtrip() {
                 RpcStreamEvent::PayloadChunk {
                     rpc_header_id: _,
                     bytes,
+                    ..
                 } => {
                     req_buf.extend(bytes);
                 }
@@ -506,6 +514,7 @@ fn rpc_session_bidirectional_roundtrip() {
                 RpcStreamEvent::Header {
                     rpc_header_id: _,
                     rpc_header,
+                    ..
                 } => {
                     assert_eq!(rpc_header.metadata_bytes, b"baz-qux");
                     reply_hdr_seen = Some(rpc_header);
@@ -513,6 +522,7 @@ fn rpc_session_bidirectional_roundtrip() {
                 RpcStreamEvent::PayloadChunk {
                     rpc_header_id: _,
                     bytes,
+                    ..
                 } => {
                     reply_buf.extend(bytes);
                 }
