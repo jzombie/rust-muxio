@@ -2,13 +2,13 @@ use crate::frame::FrameDecodeError;
 use crate::rpc::{RpcHeader, RpcMuxSession, RpcStreamEncoder, RpcStreamEvent};
 use std::collections::HashMap;
 
-pub struct RpcClient<'a> {
+pub struct RpcNode<'a> {
     mux_session: RpcMuxSession,
     response_handlers: HashMap<u32, Box<dyn FnMut(RpcStreamEvent) + 'a>>,
     global_response_handler: Option<Box<dyn FnMut(RpcStreamEvent) + 'a>>,
 }
 
-impl<'a> RpcClient<'a> {
+impl<'a> RpcNode<'a> {
     pub fn new(mux_session: RpcMuxSession) -> Self {
         Self {
             mux_session,
