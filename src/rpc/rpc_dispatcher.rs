@@ -1,6 +1,6 @@
 use crate::frame::{FrameDecodeError, FrameEncodeError};
 use crate::rpc::{
-    RpcHeader, RpcMessageType, RpcRequest, RpcResponse, RpcSessionNode, RpcStreamEncoder,
+    RpcHeader, RpcMessageType, RpcRequest, RpcRespondableSession, RpcResponse, RpcStreamEncoder,
     RpcStreamEvent,
 };
 use std::cell::Ref;
@@ -9,14 +9,14 @@ use std::collections::VecDeque;
 use std::rc::Rc;
 
 pub struct RpcDispatcher<'a> {
-    rpc_session: RpcSessionNode<'a>,
+    rpc_session: RpcRespondableSession<'a>,
     next_header_id: u32,
     rpc_request_queue: Rc<RefCell<VecDeque<(u32, RpcRequest)>>>,
 }
 
 impl<'a> RpcDispatcher<'a> {
     pub fn new() -> Self {
-        let rpc_session = RpcSessionNode::new();
+        let rpc_session = RpcRespondableSession::new();
 
         let mut instance = Self {
             rpc_session,

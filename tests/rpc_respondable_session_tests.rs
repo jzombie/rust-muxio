@@ -1,12 +1,12 @@
-use muxio::rpc::{RpcHeader, RpcMessageType, RpcSessionNode, RpcStreamEvent};
+use muxio::rpc::{RpcHeader, RpcMessageType, RpcRespondableSession, RpcStreamEvent};
 use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
 use std::rc::Rc;
 
 #[test]
-fn rpc_session_node_stream_and_reply_roundtrip() {
-    let client = Rc::new(RefCell::new(RpcSessionNode::new()));
-    let server = Rc::new(RefCell::new(RpcSessionNode::new()));
+fn rpc_respondable_session_stream_and_reply_roundtrip() {
+    let client = Rc::new(RefCell::new(RpcRespondableSession::new()));
+    let server = Rc::new(RefCell::new(RpcRespondableSession::new()));
 
     let mut server_inbox = Vec::new();
     let client_inbox = Rc::new(RefCell::new(Vec::new()));

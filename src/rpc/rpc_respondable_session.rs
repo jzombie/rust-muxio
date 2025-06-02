@@ -9,14 +9,14 @@ use std::collections::HashMap;
 /// for unmatched or unsolicited events.
 ///
 /// Suitable for simple scenarios where dispatch logic is externally managed.
-pub struct RpcSessionNode<'a> {
+pub struct RpcRespondableSession<'a> {
     rpc_session: RpcSession,
     // TODO: Make these names less vague
     response_handlers: HashMap<u32, Box<dyn FnMut(RpcStreamEvent) + 'a>>,
     catch_all_response_handler: Option<Box<dyn FnMut(RpcStreamEvent) + 'a>>,
 }
 
-impl<'a> RpcSessionNode<'a> {
+impl<'a> RpcRespondableSession<'a> {
     pub fn new() -> Self {
         Self {
             rpc_session: RpcSession::new(),
