@@ -181,6 +181,9 @@ impl<'a> RpcDispatcher<'a> {
 
         let resp = self.rpc_session.borrow_mut().receive_bytes(bytes);
 
+        // Capture all events in a vector
+        // let captured_events: Vec<RpcStreamEvent> = self.response_queue.borrow_mut().drain(..).collect();
+
         // TODO: Remove
         println!("AFTER RECEIVE BYTES QUEUE: {:?}", self.response_queue);
 
