@@ -33,7 +33,7 @@ fn rpc_dispatcher_call_and_echo_response() {
     {
         // Prepare a mock RPC request
         let rpc_request_1 = RpcRequest {
-            method_id: 0x01,
+            method_id: 0x1A,
             param_bytes: Some(b"ping".to_vec()),
             pre_buffered_payload_bytes: None,
             is_finalized: true,
@@ -41,7 +41,7 @@ fn rpc_dispatcher_call_and_echo_response() {
 
         // Prepare a mock RPC request
         let rpc_request_2 = RpcRequest {
-            method_id: 0x02,
+            method_id: 0x2B,
             param_bytes: Some(b"ping2".to_vec()),
             pre_buffered_payload_bytes: None,
             is_finalized: true,
@@ -123,30 +123,30 @@ fn rpc_dispatcher_call_and_echo_response() {
                     continue;
                 }
 
-                println!("Server received request header ID: {:?}", request_header_id);
-                println!(
-                    "\t{:?}: {:?}",
-                    request_header_id,
-                    server_dispatcher.delete_rpc_request(request_header_id)
-                );
+                let rpc_request = server_dispatcher.delete_rpc_request(request_header_id);
 
-                // TODO: Don't hardcode this, but rather process the request intent and formulate a response
-                // println!("{:?}", server_dispatcher.response_queue);
-                server_dispatcher
-                    .respond(
-                        RpcResponse {
-                            request_header_id,
-                            pre_buffered_payload_bytes: Some(b"response response".to_vec()),
-                            is_finalized: true,
-                        },
-                        4,
-                        |bytes: &[u8]| {
-                            // println!("Emitting: {:?}", &bytes);
+                if let Some(rpc_request) = rpc_request {
+                    println!("Server received request header ID: {:?}", request_header_id);
+                    println!("\t{:?}: {:?}", request_header_id, rpc_request);
 
-                            client_dispatcher.receive_bytes(bytes).unwrap();
-                        },
-                    )
-                    .unwrap();
+                    // TODO: Don't hardcode this, but rather process the request intent and formulate a response
+                    // println!("{:?}", server_dispatcher.response_queue);
+                    server_dispatcher
+                        .respond(
+                            RpcResponse {
+                                request_header_id,
+                                pre_buffered_payload_bytes: Some(b"response response".to_vec()),
+                                is_finalized: true,
+                            },
+                            4,
+                            |bytes: &[u8]| {
+                                // println!("Emitting: {:?}", &bytes);
+
+                                client_dispatcher.receive_bytes(bytes).unwrap();
+                            },
+                        )
+                        .unwrap();
+                }
             }
         }
     }
