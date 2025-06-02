@@ -53,7 +53,17 @@ fn rpc_dispatcher_call_and_echo_response() {
             is_finalized: true,
         };
 
-        let rpc_requests = vec![rpc_request_1, rpc_request_2];
+        // Prepare a mock RPC request
+        let rpc_request_3 = RpcRequest {
+            method_id: RpcRequest::to_method_id("mult"),
+            param_bytes: Some(bitcode::encode(&MultRequestParams {
+                numbers: vec![10.0, 5.0, 6.0, 3.14],
+            })),
+            pre_buffered_payload_bytes: None,
+            is_finalized: true,
+        };
+
+        let rpc_requests = vec![rpc_request_1, rpc_request_2, rpc_request_3];
 
         for rpc_request in rpc_requests {
             let method_id = rpc_request.method_id;
