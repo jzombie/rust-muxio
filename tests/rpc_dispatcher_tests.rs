@@ -1,6 +1,27 @@
+use bitcode::{Decode, Encode};
 use muxio::rpc::{RpcDispatcher, RpcRequest, RpcResponse, rpc_internals::RpcStreamEvent};
 use std::cell::RefCell;
 use std::rc::Rc;
+
+#[derive(Encode, Decode, PartialEq, Debug)]
+struct AddRequestParams {
+    numbers: Vec<f64>,
+}
+
+#[derive(Encode, Decode, PartialEq, Debug)]
+struct AddResponseParams {
+    result: f64,
+}
+
+#[derive(Encode, Decode, PartialEq, Debug)]
+struct MultRequestParams {
+    numbers: Vec<f64>,
+}
+
+#[derive(Encode, Decode, PartialEq, Debug)]
+struct MultResponseParams {
+    result: f64,
+}
 
 #[test]
 fn rpc_dispatcher_call_and_echo_response() {
@@ -33,16 +54,20 @@ fn rpc_dispatcher_call_and_echo_response() {
     {
         // Prepare a mock RPC request
         let rpc_request_1 = RpcRequest {
-            method_id: RpcRequest::to_method_id("ping"),
-            param_bytes: Some(b"ping".to_vec()),
+            method_id: RpcRequest::to_method_id("add"),
+            param_bytes: Some(bitcode::encode(&AddRequestParams {
+                numbers: vec![1.0, 2.0, 3.0],
+            })),
             pre_buffered_payload_bytes: None,
             is_finalized: true,
         };
 
         // Prepare a mock RPC request
         let rpc_request_2 = RpcRequest {
-            method_id: RpcRequest::to_method_id("ping2"),
-            param_bytes: Some(b"ping2".to_vec()),
+            method_id: RpcRequest::to_method_id("mult"),
+            param_bytes: Some(bitcode::encode(&MultRequestParams {
+                numbers: vec![1.0, 2.0, 3.0],
+            })),
             pre_buffered_payload_bytes: None,
             is_finalized: true,
         };
@@ -115,25 +140,40 @@ fn rpc_dispatcher_call_and_echo_response() {
                     println!("Server received request header ID: {:?}", request_header_id);
                     println!("\t{:?}: {:?}", request_header_id, rpc_request);
 
-                    // let method_id = rpc_request.method_id;
-                    let ping_id = RpcRequest::to_method_id("ping");
-                    let ping2_id = RpcRequest::to_method_id("ping2");
-
                     let rpc_response = match rpc_request.method_id {
-                        id if id == ping_id => Some(RpcResponse {
-                            request_header_id,
-                            method_id: rpc_request.method_id,
-                            pre_buffered_payload_bytes: Some(b"response response".to_vec()),
-                            is_finalized: true,
-                        }),
-                        id if id == ping2_id => Some(RpcResponse {
-                            request_header_id,
-                            method_id: rpc_request.method_id,
-                            pre_buffered_payload_bytes: Some(
-                                b"response response a b c d e f g h i j".to_vec(),
-                            ),
-                            is_finalized: true,
-                        }),
+                        id if id == RpcRequest::to_method_id("add") => {
+                            let request_params: AddRequestParams =
+                                bitcode::decode(&rpc_request.param_bytes.unwrap()).unwrap();
+
+                            let response_bytes = bitcode::encode(&AddResponseParams {
+                                result: request_params.numbers.iter().sum(),
+                            });
+
+                            // TODO: Handle
+
+                            Some(RpcResponse {
+                                request_header_id,
+                                method_id: rpc_request.method_id,
+                                pre_buffered_payload_bytes: Some(response_bytes),
+                                is_finalized: true,
+                            })
+                        }
+
+                        id if id == RpcRequest::to_method_id("mult") => {
+                            let request_params: MultRequestParams =
+                                bitcode::decode(&rpc_request.param_bytes.unwrap()).unwrap();
+
+                            let response_bytes = bitcode::encode(&MultResponseParams {
+                                result: request_params.numbers.iter().fold(1.0, |acc, &x| acc * x),
+                            });
+
+                            Some(RpcResponse {
+                                request_header_id,
+                                method_id: rpc_request.method_id,
+                                pre_buffered_payload_bytes: Some(response_bytes),
+                                is_finalized: true,
+                            })
+                        }
                         _ => None,
                     };
 
