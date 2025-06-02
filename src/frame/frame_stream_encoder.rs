@@ -1,7 +1,5 @@
-use crate::{
-    frame::{Frame, FrameCodec, FrameEncodeError, FrameKind},
-    utils::now,
-};
+use crate::frame::{Frame, FrameCodec, FrameEncodeError, FrameKind};
+use crate::utils::now;
 
 // TODO: Add optional `UDP mode` which ensures frames have been received on remote
 
