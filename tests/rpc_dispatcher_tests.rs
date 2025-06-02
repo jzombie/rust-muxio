@@ -47,7 +47,7 @@ fn rpc_dispatcher_call_and_echo_response() {
         let rpc_request_2 = RpcRequest {
             method_id: RpcRequest::to_method_id("mult"),
             param_bytes: Some(bitcode::encode(&MultRequestParams {
-                numbers: vec![1.0, 2.0, 3.0],
+                numbers: vec![4.0, 5.0, 6.0],
             })),
             pre_buffered_payload_bytes: None,
             is_finalized: true,
@@ -134,8 +134,10 @@ fn rpc_dispatcher_call_and_echo_response() {
 
                     let rpc_response = match rpc_request.method_id {
                         id if id == RpcRequest::to_method_id("add") => {
-                            let _request_params: AddRequestParams =
+                            let request_params: AddRequestParams =
                                 bitcode::decode(&rpc_request.param_bytes.unwrap()).unwrap();
+
+                            println!("Server received request params: {:?}", request_params);
 
                             // let response_bytes = bitcode::encode(&AddResponseParams {
                             //     result: request_params.numbers.iter().sum(),
@@ -152,8 +154,10 @@ fn rpc_dispatcher_call_and_echo_response() {
                         }
 
                         id if id == RpcRequest::to_method_id("mult") => {
-                            let _request_params: MultRequestParams =
+                            let request_params: MultRequestParams =
                                 bitcode::decode(&rpc_request.param_bytes.unwrap()).unwrap();
+
+                            println!("Server received request params: {:?}", request_params);
 
                             // let response_bytes = bitcode::encode(&MultResponseParams {
                             //     result: request_params.numbers.iter().fold(1.0, |acc, &x| acc * x),
