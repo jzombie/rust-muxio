@@ -1,4 +1,6 @@
-use muxio::rpc::{RpcDispatcher, RpcHeader, RpcMessageType, RpcRequest, RpcStreamEvent};
+use muxio::rpc::{
+    RpcDispatcher, RpcHeader, RpcMessageType, RpcRequest, RpcResponse, RpcStreamEvent,
+};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -78,7 +80,7 @@ fn rpc_dispatcher_call_and_echo_response() {
                             }
                             _ => {
                                 // Handle other event types if necessary
-                                println!("Not a Header event");
+                                // println!("Not a Header event");
                             }
                         }
                     }),
@@ -106,12 +108,17 @@ fn rpc_dispatcher_call_and_echo_response() {
             // println!("{:?}", server_dispatcher.response_queue);
             server_dispatcher
                 .start_reply_stream(
-                    RpcHeader {
-                        msg_type: RpcMessageType::Response,
-                        id: request_header_id,
-                        method_id: 0, // TODO: Don't hardcode
-                        metadata_bytes: b"proto".to_vec(),
+                    RpcResponse {
+                        request_header_id,
+                        pre_buffered_payload_bytes: Some(b"response response".to_vec()),
+                        is_finalized: true,
                     },
+                    // RpcHeader {
+                    //     msg_type: RpcMessageType::Response,
+                    //     id: request_header_id,
+                    //     method_id: 0, // TODO: Don't hardcode
+                    //     metadata_bytes: b"proto".to_vec(),
+                    // },
                     4,
                     |bytes: &[u8]| {
                         // println!("Emitting: {:?}", &bytes);

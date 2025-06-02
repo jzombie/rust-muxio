@@ -53,13 +53,13 @@ impl<'a> RpcSessionNode<'a> {
         hdr: RpcHeader,
         max_chunk_size: usize,
         on_emit: F,
-    ) -> Result<RpcStreamEncoder<F>, FrameDecodeError>
+    ) -> Result<RpcStreamEncoder<F>, FrameEncodeError>
     where
         F: FnMut(&[u8]),
     {
         self.rpc_session
             .init_request(hdr, max_chunk_size, on_emit)
-            .map_err(|_| FrameDecodeError::CorruptFrame)
+            .map_err(|_| FrameEncodeError::CorruptFrame)
     }
 
     // TODO: Document

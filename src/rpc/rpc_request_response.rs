@@ -6,8 +6,9 @@ pub struct RpcRequest {
     pub is_finalized: bool,
 }
 
-// TODO: Remove?
-// #[derive(PartialEq, Debug)]
-// pub struct RpcResponse {
-//     pub result: Vec<u8>,
-// }
+#[derive(PartialEq, Debug)]
+pub struct RpcResponse {
+    pub request_header_id: u32,
+    pub pre_buffered_payload_bytes: Option<Vec<u8>>,
+    pub is_finalized: bool,
+}
