@@ -84,6 +84,7 @@ impl<'a> RpcDispatcher<'a> {
                         rpc_header_id,
                         frame_decode_error,
                     } => {
+                        // TODO: Handle errors
                         println!(
                             "Error in stream {:?}: {:?}",
                             rpc_header_id, frame_decode_error
@@ -150,13 +151,12 @@ impl<'a> RpcDispatcher<'a> {
         Ok(encoder)
     }
 
-    // TODO: Return tasks to perform
     pub fn receive_bytes(&mut self, bytes: &[u8]) -> Result<Vec<u32>, FrameDecodeError> {
         // Process the incoming bytes
         self.rpc_session.receive_bytes(bytes)?;
 
-        // Capture the list of header IDs currently in the queue
-        let request_header_ids: Vec<u32> = self
+        // List of request header IDs which are currently in progress
+        let active_request_header_ids: Vec<u32> = self
             .rpc_request_queue
             .borrow_mut()
             .iter()
@@ -164,8 +164,7 @@ impl<'a> RpcDispatcher<'a> {
             .map(|(header_id, _)| *header_id)
             .collect();
 
-        // Return the list of header IDs
-        Ok(request_header_ids)
+        Ok(active_request_header_ids)
     }
 
     pub fn get_rpc_request(&self, header_id: u32) -> Option<Ref<RpcRequest>> {
