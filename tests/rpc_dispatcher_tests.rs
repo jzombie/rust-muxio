@@ -62,7 +62,7 @@ fn rpc_dispatcher_call_and_echo_response() {
             .receive_bytes(incoming_buf.borrow().as_slice())
             .expect("Failed to receive bytes on server");
 
-        println!("{:?}", server_dispatcher.response_queue);
+        // println!("{:?}", server_dispatcher.response_queue);
         server_dispatcher
             .start_reply_stream(
                 RpcHeader {

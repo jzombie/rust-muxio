@@ -36,6 +36,8 @@ impl<'a> RpcDispatcher<'a> {
         self.rpc_session
             .borrow_mut()
             .set_catch_all_response_handler(Box::new(move |event: RpcStreamEvent| {
+                let mut queue = rpc_request_queue_ref.borrow_mut(); // Borrow once
+
                 match event {
                     RpcStreamEvent::Header {
                         rpc_header_id,
@@ -52,9 +54,7 @@ impl<'a> RpcDispatcher<'a> {
 
                         // Push the RpcRequest into the queue
                         println!("Received Header: {} - {:?}", rpc_header_id, rpc_header);
-                        rpc_request_queue_ref
-                            .borrow_mut()
-                            .push_back((rpc_header_id, rpc_request));
+                        queue.push_back((rpc_header_id, rpc_request));
                     }
 
                     RpcStreamEvent::PayloadChunk {
@@ -62,9 +62,7 @@ impl<'a> RpcDispatcher<'a> {
                         bytes,
                     } => {
                         // If we have an existing RpcRequest in the queue, we append the payload
-                        if let Some((header_id, mut rpc_request)) =
-                            rpc_request_queue_ref.borrow_mut().pop_back()
-                        {
+                        if let Some((header_id, mut rpc_request)) = queue.pop_back() {
                             if header_id == rpc_header_id {
                                 // Append bytes to the payload
                                 let payload =
@@ -72,9 +70,7 @@ impl<'a> RpcDispatcher<'a> {
                                 payload.extend_from_slice(&bytes);
 
                                 // Push the updated RpcRequest back into the queue
-                                rpc_request_queue_ref
-                                    .borrow_mut()
-                                    .push_back((header_id, rpc_request));
+                                queue.push_back((header_id, rpc_request));
                             }
                         } else {
                             // Handle the case where there's no corresponding header in the queue
@@ -84,9 +80,7 @@ impl<'a> RpcDispatcher<'a> {
 
                     RpcStreamEvent::End { rpc_header_id } => {
                         // Finalize and process the full message when the stream ends
-                        if let Some((header_id, rpc_request)) =
-                            rpc_request_queue_ref.borrow_mut().pop_back()
-                        {
+                        if let Some((header_id, rpc_request)) = queue.pop_back() {
                             if header_id == rpc_header_id {
                                 // Now we have the full message (header + payload)
                                 println!("Stream End: {} with complete payload", rpc_header_id);
