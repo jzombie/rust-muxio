@@ -9,7 +9,7 @@ use std::collections::VecDeque;
 use std::rc::Rc;
 
 pub struct RpcDispatcher<'a> {
-    rpc_session: Rc<RefCell<RpcSessionNode<'a>>>,
+    rpc_session: RpcSessionNode<'a>,
     next_header_id: u32, // TODO: Use parent?
     rpc_method_registry: RpcMethodRegistry<'a>,
     rpc_request_queue: Rc<RefCell<VecDeque<(u32, RpcRequest)>>>,
@@ -17,9 +17,9 @@ pub struct RpcDispatcher<'a> {
 
 impl<'a> RpcDispatcher<'a> {
     pub fn new() -> Self {
-        let rpc_session = Rc::new(RefCell::new(RpcSessionNode::new()));
+        let rpc_session = RpcSessionNode::new();
 
-        let instance = Self {
+        let mut instance = Self {
             rpc_session,
             next_header_id: 1, // TODO: Use parent?
             rpc_method_registry: RpcMethodRegistry::new(),
@@ -31,11 +31,10 @@ impl<'a> RpcDispatcher<'a> {
         instance
     }
 
-    fn init_catch_all_response_handler(&self) {
+    fn init_catch_all_response_handler(&mut self) {
         let rpc_request_queue_ref = Rc::clone(&self.rpc_request_queue);
 
         self.rpc_session
-            .borrow_mut()
             .set_catch_all_response_handler(Box::new(move |event: RpcStreamEvent| {
                 let mut queue = rpc_request_queue_ref.borrow_mut(); // Borrow once
 
@@ -104,7 +103,6 @@ impl<'a> RpcDispatcher<'a> {
         F: FnMut(&[u8]),
     {
         self.rpc_session
-            .borrow_mut()
             .start_reply_stream(hdr, max_chunk_size, on_emit)
     }
 
@@ -134,12 +132,9 @@ impl<'a> RpcDispatcher<'a> {
         };
 
         // Directly pass the closure as `on_emit` without borrowing it
-        let mut encoder = self.rpc_session.borrow_mut().init_request(
-            hdr,
-            max_chunk_size,
-            on_emit,
-            on_response,
-        )?;
+        let mut encoder =
+            self.rpc_session
+                .init_request(hdr, max_chunk_size, on_emit, on_response)?;
 
         // If the RPC request has a buffered payload, send it here
         if let Some(payload) = rpc_request.payload_bytes {
@@ -158,7 +153,7 @@ impl<'a> RpcDispatcher<'a> {
     // TODO: Return tasks to perform
     pub fn receive_bytes(&mut self, bytes: &[u8]) -> Result<Vec<u32>, FrameDecodeError> {
         // Process the incoming bytes
-        self.rpc_session.borrow_mut().receive_bytes(bytes)?;
+        self.rpc_session.receive_bytes(bytes)?;
 
         // Capture the list of header IDs currently in the queue
         let request_header_ids: Vec<u32> = self
