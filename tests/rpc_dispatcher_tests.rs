@@ -1,5 +1,4 @@
 use bitcode::{Decode, Encode};
-use muxio::rpc;
 use muxio::rpc::{RpcDispatcher, RpcRequest, RpcResponse, rpc_internals::RpcStreamEvent};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -106,7 +105,9 @@ fn rpc_dispatcher_call_and_echo_response() {
                                         bitcode::decode::<MultResponseParams>(&bytes)
                                     );
                                 }
-                                _ => {}
+                                _ => {
+                                    unreachable!("Unhandled response");
+                                }
                             },
                             _ => {}
                         }
