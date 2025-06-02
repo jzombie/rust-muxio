@@ -105,17 +105,26 @@ impl<'a> RpcRespondableSession<'a> {
                         .or_insert_with(|| Vec::new());
 
                     match &evt {
+                        RpcStreamEvent::Header { .. } => {
+                            if let Some(cb) = self.response_handlers.get_mut(&rpc_id) {
+                                cb(evt.clone());
+                            }
+                        }
+
                         RpcStreamEvent::PayloadChunk { bytes, .. } => {
                             buffer.extend_from_slice(bytes);
                         }
                         RpcStreamEvent::End { .. } => {
                             // When the end of the stream is reached, call the response handler
                             if let Some(cb) = self.response_handlers.get_mut(&rpc_id) {
-                                let rpc_event = RpcStreamEvent::PayloadChunk {
+                                let rpc_payload_event = RpcStreamEvent::PayloadChunk {
                                     rpc_header_id: rpc_id,
                                     bytes: buffer.clone(),
                                 };
-                                cb(rpc_event);
+
+                                cb(rpc_payload_event);
+                                cb(evt.clone());
+
                                 self.pre_buffered_responses.remove(&rpc_id); // Clear the buffer after calling
                             }
                         }
