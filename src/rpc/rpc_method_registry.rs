@@ -3,7 +3,7 @@ use bitcode::{Decode, Encode};
 use std::collections::HashMap;
 use xxhash_rust::xxh3::xxh3_64;
 
-#[derive(Encode, Decode, PartialEq, Debug)]
+#[derive(Encode, Decode, PartialEq, Debug, Clone)]
 pub struct RpcRequest {
     pub method_name: String,
     pub param_bytes: Vec<u8>,

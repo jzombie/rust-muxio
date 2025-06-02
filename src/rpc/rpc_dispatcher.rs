@@ -52,9 +52,10 @@ impl<'a> RpcDispatcher<'a> {
                             payload_bytes: None, // No payload yet
                         };
 
-                        // Push the RpcRequest into the queue
-                        println!("Received Header: {} - {:?}", rpc_header_id, rpc_header);
+                        // Debug: Print the queue's state before and after adding to the queue
+                        println!("Before adding to queue: {:?}", queue);
                         queue.push_back((rpc_header_id, rpc_request));
+                        println!("After adding to queue: {:?}", queue);
                     }
 
                     RpcStreamEvent::PayloadChunk {
@@ -69,8 +70,10 @@ impl<'a> RpcDispatcher<'a> {
                                     rpc_request.payload_bytes.get_or_insert_with(Vec::new);
                                 payload.extend_from_slice(&bytes);
 
-                                // Push the updated RpcRequest back into the queue
+                                // Debug: Print the queue's state before and after updating
+                                println!("Before updating queue: {:?}", queue);
                                 queue.push_back((header_id, rpc_request));
+                                println!("After updating queue: {:?}", queue);
                             }
                         } else {
                             // Handle the case where there's no corresponding header in the queue
@@ -189,18 +192,22 @@ impl<'a> RpcDispatcher<'a> {
     }
 
     // TODO: Return tasks to perform
-    pub fn receive_bytes(&mut self, bytes: &[u8]) -> Result<(), FrameDecodeError> {
-        // TODO: Remove
-        // println!("BEFORE RECEIVE BYTES QUEUE: {:?}", self.response_queue);
-
-        let resp = self.rpc_session.borrow_mut().receive_bytes(bytes);
-
-        // Capture all events in a vector
-        // let captured_events: Vec<RpcStreamEvent> = self.response_queue.borrow_mut().drain(..).collect();
+    pub fn receive_bytes(&mut self, bytes: &[u8]) -> Result<Vec<u32>, FrameDecodeError> {
+        // Process the incoming bytes
+        self.rpc_session.borrow_mut().receive_bytes(bytes)?;
 
         // TODO: Remove
-        // println!("AFTER RECEIVE BYTES QUEUE: {:?}", self.response_queue);
+        println!("RPC request queue {:?}", self.rpc_request_queue);
 
-        resp
+        // Capture the list of header IDs currently in the queue
+        let header_ids: Vec<u32> = self
+            .rpc_request_queue
+            .borrow_mut()
+            .iter()
+            .map(|(header_id, _)| *header_id)
+            .collect();
+
+        // Return the list of header IDs
+        Ok(header_ids)
     }
 }
