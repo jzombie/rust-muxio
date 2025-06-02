@@ -31,26 +31,3 @@ impl<'a> RpcMethodRegistry<'a> {
         self.handlers.get_mut(&method_id)
     }
 }
-
-// // Example handler for Echo method
-// fn echo_handler(params: Vec<u8>) -> Result<String, String> {
-//     let params: EchoParams = deserialize(&params).map_err(|e| e.to_string())?;
-//     Ok(params.text)
-// }
-
-// // Dispatcher calling the handler with params
-// pub fn dispatch_rpc(req: RpcRequest) -> RpcResponse {
-//     let result = match req.method.as_str() {
-//         "echo" => {
-//             // Deserialize parameters for the echo method
-//             let response = echo_handler(req.params);
-//             response.unwrap_or_else(|e| serde_json::json!({ "error": e }).to_string())
-//         }
-//         _ => "Unknown method".to_string(),
-//     };
-
-//     RpcResponse {
-//         result: result.into(),
-//         id: req.id,
-//     }
-// }

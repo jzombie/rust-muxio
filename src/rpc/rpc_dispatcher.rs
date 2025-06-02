@@ -141,6 +141,12 @@ impl<'a> RpcDispatcher<'a> {
             on_response,
         )?;
 
+        // If the RPC request has a buffered payload, send it here
+        if let Some(payload) = rpc_request.payload_bytes {
+            encoder.push_bytes(&payload)?;
+        }
+
+        // If the RPC request is pre-finalized, close the stream
         if rpc_request.is_finalized {
             encoder.flush()?;
             encoder.end_stream()?;
