@@ -65,17 +65,6 @@ fn rpc_dispatcher_call_and_echo_response() {
                         move |bytes: &[u8]| {
                             // Collect bytes into the buffer
                             outgoing_buf.borrow_mut().extend(bytes);
-
-                            // Simulate echoing back the received payload
-                            // The following lines would normally simulate a server echoing back the payload
-                            // let reply_bytes = if bytes == b"ping" {
-                            //     b"pong".to_vec() // Echo response "pong"
-                            // } else {
-                            //     b"fail".to_vec() // Error message if something else is received
-                            // };
-
-                            // Instead of responding to the client dispatcher, we're appending the reply to the buffer
-                            //  outgoing_buf.borrow_mut().extend(reply_bytes);
                         }
                     },
                     Some(|rpc_stream_event: RpcStreamEvent| {
