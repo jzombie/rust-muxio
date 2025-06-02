@@ -7,8 +7,9 @@ use std::rc::Rc;
 fn rpc_dispatcher_call_and_echo_response() {
     // Prepare a mock RPC request
     let rpc_request = RpcRequest {
-        method: "ping".to_string(),
+        method_name: "ping".to_string(),
         param_bytes: b"ping".to_vec(),
+        payload_bytes: None,
     };
 
     // Shared buffer for the outgoing response

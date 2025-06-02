@@ -5,9 +5,9 @@ use xxhash_rust::xxh3::xxh3_64;
 
 #[derive(Encode, Decode, PartialEq, Debug)]
 pub struct RpcRequest {
-    pub method: String,
-    pub param_bytes: Vec<u8>, // The serialized params
-                              // pub id: Option<u64>,
+    pub method_name: String,
+    pub param_bytes: Vec<u8>,
+    pub payload_bytes: Option<Vec<u8>>,
 }
 
 #[derive(Encode, Decode, PartialEq, Debug)]

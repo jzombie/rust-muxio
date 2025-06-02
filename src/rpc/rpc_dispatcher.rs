@@ -11,8 +11,7 @@ pub struct RpcDispatcher<'a> {
     rpc_session: Rc<RefCell<RpcSessionNode<'a>>>,
     next_id: u32, // TODO: Use parent?
     rpc_method_registry: RpcMethodRegistry<'a>,
-    // TODO: Integrate (and not public)
-    pub response_queue: Rc<RefCell<VecDeque<u8>>>,
+    rpc_request_queue: Rc<RefCell<VecDeque<(u32, RpcRequest)>>>,
 }
 
 impl<'a> RpcDispatcher<'a> {
@@ -23,7 +22,7 @@ impl<'a> RpcDispatcher<'a> {
             rpc_session,
             next_id: 1, // TODO: Use parent?
             rpc_method_registry: RpcMethodRegistry::new(),
-            response_queue: Rc::new(RefCell::new(VecDeque::new())),
+            rpc_request_queue: Rc::new(RefCell::new(VecDeque::new())),
         };
 
         instance.init_catch_all_response_handler();
@@ -32,49 +31,70 @@ impl<'a> RpcDispatcher<'a> {
     }
 
     fn init_catch_all_response_handler(&self) {
-        // Use a clone of the Rc to move it into the closure, allowing mutable access
-        // let session_ref = Rc::clone(&self.session);
-
-        let reponse_queue_ref = Rc::clone(&self.response_queue);
+        let rpc_request_queue_ref = Rc::clone(&self.rpc_request_queue);
 
         self.rpc_session
             .borrow_mut()
             .set_catch_all_response_handler(Box::new(move |event: RpcStreamEvent| {
-                // Handle the event here
                 match event {
                     RpcStreamEvent::Header {
                         rpc_header_id,
                         rpc_header,
                     } => {
+                        // Create a new RpcRequest with the header's method name and metadata
+                        let method_name =
+                            String::from_utf8_lossy(&rpc_header.metadata_bytes).to_string();
+                        let rpc_request = RpcRequest {
+                            method_name,
+                            param_bytes: rpc_header.metadata_bytes.clone(),
+                            payload_bytes: None, // No payload yet
+                        };
+
+                        // Push the RpcRequest into the queue
                         println!("Received Header: {} - {:?}", rpc_header_id, rpc_header);
+                        rpc_request_queue_ref
+                            .borrow_mut()
+                            .push_back((rpc_header_id, rpc_request));
                     }
+
                     RpcStreamEvent::PayloadChunk {
                         rpc_header_id,
                         bytes,
                     } => {
-                        println!("Received Payload: {} - {:?}", rpc_header_id, bytes);
+                        // If we have an existing RpcRequest in the queue, we append the payload
+                        if let Some((header_id, mut rpc_request)) =
+                            rpc_request_queue_ref.borrow_mut().pop_back()
+                        {
+                            if header_id == rpc_header_id {
+                                // Append bytes to the payload
+                                let payload =
+                                    rpc_request.payload_bytes.get_or_insert_with(Vec::new);
+                                payload.extend_from_slice(&bytes);
+
+                                // Push the updated RpcRequest back into the queue
+                                rpc_request_queue_ref
+                                    .borrow_mut()
+                                    .push_back((header_id, rpc_request));
+                            }
+                        } else {
+                            // Handle the case where there's no corresponding header in the queue
+                            eprintln!("No header found for payload with ID: {}", rpc_header_id);
+                        }
                     }
+
                     RpcStreamEvent::End { rpc_header_id } => {
-                        println!("Stream End: {}", rpc_header_id);
-
-                        // TODO: Push methods to a queue
-                        reponse_queue_ref.borrow_mut().push_back(1);
-
-                        // Borrow mutably and use session to start reply stream
-                        // RpcDispatcher::start_reply_stream(
-                        //     RpcHeader {
-                        //         msg_type: RpcMessageType::Response,
-                        //         id: rpc_header_id,
-                        //         method_id: 0,
-                        //         metadata_bytes: vec![],
-                        //     },
-                        //     4,
-                        //     |bytes: &[u8]| {
-                        //         // Handle reply bytes here
-                        //         println!("Reply bytes: {:?}", bytes);
-                        //     },
-                        // )
+                        // Finalize and process the full message when the stream ends
+                        if let Some((header_id, rpc_request)) =
+                            rpc_request_queue_ref.borrow_mut().pop_back()
+                        {
+                            if header_id == rpc_header_id {
+                                // Now we have the full message (header + payload)
+                                println!("Stream End: {} with complete payload", rpc_header_id);
+                                println!("Complete message: {:?}", rpc_request);
+                            }
+                        }
                     }
+
                     RpcStreamEvent::Error {
                         rpc_header_id,
                         frame_decode_error,
@@ -177,7 +197,7 @@ impl<'a> RpcDispatcher<'a> {
     // TODO: Return tasks to perform
     pub fn receive_bytes(&mut self, bytes: &[u8]) -> Result<(), FrameDecodeError> {
         // TODO: Remove
-        println!("BEFORE RECEIVE BYTES QUEUE: {:?}", self.response_queue);
+        // println!("BEFORE RECEIVE BYTES QUEUE: {:?}", self.response_queue);
 
         let resp = self.rpc_session.borrow_mut().receive_bytes(bytes);
 
@@ -185,7 +205,7 @@ impl<'a> RpcDispatcher<'a> {
         // let captured_events: Vec<RpcStreamEvent> = self.response_queue.borrow_mut().drain(..).collect();
 
         // TODO: Remove
-        println!("AFTER RECEIVE BYTES QUEUE: {:?}", self.response_queue);
+        // println!("AFTER RECEIVE BYTES QUEUE: {:?}", self.response_queue);
 
         resp
     }
