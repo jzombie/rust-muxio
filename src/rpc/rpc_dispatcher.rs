@@ -162,7 +162,7 @@ impl<'a> RpcDispatcher<'a> {
         let rpc_response_header = RpcHeader {
             id: rpc_response.request_header_id,
             msg_type: RpcMessageType::Response,
-            method_id: 0x00, // This is not used in the response
+            method_id: rpc_response.method_id,
             metadata_bytes: vec![],
         };
 

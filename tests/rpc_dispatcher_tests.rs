@@ -50,6 +50,8 @@ fn rpc_dispatcher_call_and_echo_response() {
         let rpc_requests = vec![rpc_request_1, rpc_request_2];
 
         for rpc_request in rpc_requests {
+            // let method_id: u64 = rpc_request.method_id;
+
             // Move the `outgoing_buf` into the closure, ensuring it lives as long as needed
             client_dispatcher
                 .call(
@@ -87,6 +89,8 @@ fn rpc_dispatcher_call_and_echo_response() {
                                 rpc_header_id,
                                 rpc_header,
                             } => {
+                                // assert_eq!(rpc_header.method_id, method_id);
+
                                 // This is a Header event, handle it here
                                 println!(
                                     "Client received header: ID = {}, Header = {:?}",
@@ -135,6 +139,7 @@ fn rpc_dispatcher_call_and_echo_response() {
                         .respond(
                             RpcResponse {
                                 request_header_id,
+                                method_id: rpc_request.method_id,
                                 pre_buffered_payload_bytes: Some(b"response response".to_vec()),
                                 is_finalized: true,
                             },
