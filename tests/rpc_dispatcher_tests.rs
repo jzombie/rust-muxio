@@ -71,7 +71,7 @@ fn rpc_dispatcher_call_and_echo_response() {
             client_dispatcher
                 .call(
                     rpc_request,
-                    2048,
+                    4,
                     {
                         let outgoing_buf = Rc::clone(&outgoing_buf);
                         move |bytes: &[u8]| {
@@ -94,6 +94,8 @@ fn rpc_dispatcher_call_and_echo_response() {
                                 rpc_header_id,
                                 bytes,
                             } => {
+                                println!("Bytes: {:?}", bytes);
+
                                 // Look up the correct buffer for this request and append the data
                                 // if let Some(buffer) = request_buffers.get(&rpc_header_id) {
                                 //     buffer.borrow_mut().extend_from_slice(&bytes);
@@ -106,7 +108,7 @@ fn rpc_dispatcher_call_and_echo_response() {
                             _ => {}
                         }
                     }),
-                    false,
+                    true,
                 )
                 .expect("Server call failed");
         }
@@ -174,7 +176,7 @@ fn rpc_dispatcher_call_and_echo_response() {
                     if let Some(rpc_response) = rpc_response {
                         // TODO: Don't hardcode this, but rather process the request intent and formulate a response
                         server_dispatcher
-                            .respond(rpc_response, 2048, |bytes: &[u8]| {
+                            .respond(rpc_response, 4, |bytes: &[u8]| {
                                 client_dispatcher.receive_bytes(bytes).unwrap();
                             })
                             .unwrap();
