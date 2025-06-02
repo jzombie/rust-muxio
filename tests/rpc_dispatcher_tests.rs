@@ -1,4 +1,4 @@
-use muxio::rpc::{RpcDispatcher, RpcRequest, RpcResponse, RpcStreamEvent};
+use muxio::rpc::{RpcDispatcher, RpcHeader, RpcRequest, RpcResponse, RpcStreamEvent};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -11,10 +11,29 @@ fn rpc_dispatcher_call_and_echo_response() {
     let mut client_dispatcher = RpcDispatcher::new();
     let mut server_dispatcher = RpcDispatcher::new();
 
+    // TODO: Finish prototyping
+    server_dispatcher.register(
+        "test-method",
+        Box::new(
+            |header: RpcHeader, params: Vec<u8>, mut emit_event: Box<dyn FnMut(RpcStreamEvent)>| {
+                println!(
+                    "TEST METHOD CALLED with header: {:?} and params: {:?}",
+                    header, params
+                );
+
+                // You can call the event handler to send back an event if necessary
+                emit_event(RpcStreamEvent::Header {
+                    rpc_header_id: header.id,
+                    rpc_header: header,
+                });
+            },
+        ),
+    );
+
     {
         // Prepare a mock RPC request
         let rpc_request_1 = RpcRequest {
-            method_name: "ping".to_string(),
+            method_id: 0x01,
             param_bytes: Some(b"ping".to_vec()),
             pre_buffered_payload_bytes: None,
             is_finalized: true,
@@ -22,7 +41,7 @@ fn rpc_dispatcher_call_and_echo_response() {
 
         // Prepare a mock RPC request
         let rpc_request_2 = RpcRequest {
-            method_name: "ping2".to_string(),
+            method_id: 0x02,
             param_bytes: Some(b"ping2".to_vec()),
             pre_buffered_payload_bytes: None,
             is_finalized: true,

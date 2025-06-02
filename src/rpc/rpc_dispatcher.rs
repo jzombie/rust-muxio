@@ -45,8 +45,8 @@ impl<'a> RpcDispatcher<'a> {
                     } => {
                         // TODO: Replace! This isn't correct.  It should be looked up from the registry instead
                         // Create a new RpcRequest with the header's method name and metadata
-                        let method_name =
-                            String::from_utf8_lossy(&rpc_header.metadata_bytes).to_string();
+                        // let method_name =
+                        //     String::from_utf8_lossy(&rpc_header.metadata_bytes).to_string();
 
                         let param_bytes = match rpc_header.metadata_bytes.len() {
                             0 => None,
@@ -54,7 +54,7 @@ impl<'a> RpcDispatcher<'a> {
                         };
 
                         let rpc_request = RpcRequest {
-                            method_name,
+                            method_id: rpc_header.method_id,
                             param_bytes,
                             pre_buffered_payload_bytes: None, // No payload yet
                             is_finalized: false,
@@ -150,7 +150,7 @@ impl<'a> RpcDispatcher<'a> {
         G: FnMut(&[u8]), // Ensuring that `G` is FnMut(&[u8])
         F: FnMut(RpcStreamEvent) + 'a,
     {
-        let method_id = rpc_request.to_method_id();
+        let method_id = rpc_request.method_id;
         let header_id: u32 = self.next_header_id;
         self.next_header_id += 1;
 
