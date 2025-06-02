@@ -15,7 +15,7 @@ fn rpc_dispatcher_call_and_echo_response() {
         // Prepare a mock RPC request
         let rpc_request_1 = RpcRequest {
             method_name: "ping".to_string(),
-            param_bytes: b"ping".to_vec(),
+            param_bytes: Some(b"ping".to_vec()),
             pre_buffered_payload_bytes: None,
             is_finalized: true,
         };
@@ -23,7 +23,7 @@ fn rpc_dispatcher_call_and_echo_response() {
         // Prepare a mock RPC request
         let rpc_request_2 = RpcRequest {
             method_name: "ping2".to_string(),
-            param_bytes: b"ping2".to_vec(),
+            param_bytes: Some(b"ping2".to_vec()),
             pre_buffered_payload_bytes: None,
             is_finalized: true,
         };

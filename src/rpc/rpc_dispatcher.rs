@@ -46,9 +46,15 @@ impl<'a> RpcDispatcher<'a> {
                         // Create a new RpcRequest with the header's method name and metadata
                         let method_name =
                             String::from_utf8_lossy(&rpc_header.metadata_bytes).to_string();
+
+                        let param_bytes = match rpc_header.metadata_bytes.len() {
+                            0 => None,
+                            _ => Some(rpc_header.metadata_bytes),
+                        };
+
                         let rpc_request = RpcRequest {
                             method_name,
-                            param_bytes: rpc_header.metadata_bytes,
+                            param_bytes,
                             pre_buffered_payload_bytes: None, // No payload yet
                             is_finalized: false,
                         };
@@ -146,11 +152,16 @@ impl<'a> RpcDispatcher<'a> {
         let header_id: u32 = self.next_header_id;
         self.next_header_id += 1;
 
+        let metadata_bytes = match rpc_request.param_bytes {
+            Some(param_bytes) => param_bytes,
+            None => vec![],
+        };
+
         let hdr = RpcHeader {
             msg_type: RpcMessageType::Call,
             id: header_id,
             method_id: 0, // Placeholder method_id, should be computed or set
-            metadata_bytes: rpc_request.param_bytes,
+            metadata_bytes,
         };
 
         // Directly pass the closure as `on_emit` without borrowing it
