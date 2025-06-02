@@ -1,4 +1,4 @@
-use crate::frame::FrameDecodeError;
+use crate::frame::{FrameDecodeError, FrameEncodeError};
 use crate::rpc::{RpcHeader, RpcMuxSession, RpcStreamEncoder, RpcStreamEvent};
 use std::collections::HashMap;
 
@@ -17,25 +17,27 @@ impl<'a> RpcNode<'a> {
         }
     }
 
-    // TODO: Allow responses to be optional
     pub fn init_request<G, F>(
         &mut self,
         hdr: RpcHeader,
         max_payload: usize,
         on_emit: G,
-        on_response: F,
-    ) -> Result<RpcStreamEncoder<G>, FrameDecodeError>
+        on_response: Option<F>,
+    ) -> Result<RpcStreamEncoder<G>, FrameEncodeError>
     where
         G: FnMut(&[u8]),
         F: FnMut(RpcStreamEvent) + 'a,
     {
         let rpc_header_id = hdr.id;
-        self.response_handlers
-            .insert(rpc_header_id, Box::new(on_response));
+
+        if let Some(on_response) = on_response {
+            self.response_handlers
+                .insert(rpc_header_id, Box::new(on_response));
+        }
 
         self.mux_session
             .init_request(hdr, max_payload, on_emit)
-            .map_err(|_| FrameDecodeError::CorruptFrame)
+            .map_err(|_| FrameEncodeError::CorruptFrame)
     }
 
     pub fn start_reply_stream<F>(

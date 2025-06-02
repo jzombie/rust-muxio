@@ -1,5 +1,7 @@
 #[derive(Debug, PartialEq)]
 pub enum FrameEncodeError {
+    CorruptFrame,
+
     /// Attempted to write to a stream that has already ended.
     WriteAfterEnd,
 

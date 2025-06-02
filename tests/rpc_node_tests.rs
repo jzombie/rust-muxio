@@ -68,7 +68,7 @@ fn rpc_node_stream_and_reply_roundtrip() {
             call_header.clone(),
             4,
             |bytes| server_inbox.push(bytes.to_vec()),
-            move |event| match event {
+            Some(move |event| match event {
                 RpcStreamEvent::Header {
                     rpc_header_id,
                     rpc_header,
@@ -84,7 +84,7 @@ fn rpc_node_stream_and_reply_roundtrip() {
                 }
                 RpcStreamEvent::End { .. } => {}
                 other => panic!("unexpected client event: {:?}", other),
-            },
+            }),
         )
         .expect("client init_request failed");
 
