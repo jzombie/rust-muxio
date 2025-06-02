@@ -96,7 +96,7 @@ impl<'a> RpcDispatcher<'a> {
             }));
     }
 
-    pub fn start_reply_stream<F>(
+    pub fn respond<F>(
         &mut self,
         rpc_response: RpcResponse,
         max_chunk_size: usize,
