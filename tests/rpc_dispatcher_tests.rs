@@ -114,11 +114,9 @@ fn rpc_dispatcher_call_and_echo_response() {
                 .expect("Failed to receive bytes on server");
 
             for request_header_id in request_header_ids {
-                let is_request_finalized =
-                    match server_dispatcher.get_rpc_request(request_header_id) {
-                        Some(rpc_request) => rpc_request.is_finalized,
-                        None => false,
-                    };
+                let is_request_finalized = server_dispatcher
+                    .is_rpc_request_finalized(request_header_id)
+                    .unwrap();
 
                 // Pre-buffer entire request
                 if !is_request_finalized {

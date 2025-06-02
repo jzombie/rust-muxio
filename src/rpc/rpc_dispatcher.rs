@@ -205,6 +205,13 @@ impl<'a> RpcDispatcher<'a> {
         Some(Ref::map(queue, |q| &q[index].1))
     }
 
+    pub fn is_rpc_request_finalized(&self, header_id: u32) -> Option<bool> {
+        match self.get_rpc_request(header_id) {
+            Some(rpc_request) => Some(rpc_request.is_finalized),
+            None => None,
+        }
+    }
+
     // Deletes the request and transfers ownership to the caller
     pub fn delete_rpc_request(&self, header_id: u32) -> Option<RpcRequest> {
         let mut queue = self.rpc_request_queue.borrow_mut();
