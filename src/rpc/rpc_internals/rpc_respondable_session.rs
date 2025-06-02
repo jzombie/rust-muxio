@@ -97,31 +97,30 @@ impl<'a> RpcRespondableSession<'a> {
                     None => &false,
                 };
 
-                // Accumulate the bytes into the buffer for this request ID
-                let buffer = self
-                    .pre_buffered_responses
-                    .entry(rpc_id)
-                    .or_insert_with(|| Vec::new());
-
-                match &evt {
-                    RpcStreamEvent::PayloadChunk { bytes, .. } => {
-                        buffer.extend_from_slice(bytes);
-                    }
-                    RpcStreamEvent::End { .. } => {
-                        // When the end of the stream is reached, call the response handler
-                        if let Some(cb) = self.response_handlers.get_mut(&rpc_id) {
-                            let rpc_event = RpcStreamEvent::PayloadChunk {
-                                rpc_header_id: rpc_id,
-                                bytes: buffer.clone(),
-                            };
-                            cb(rpc_event);
-                            self.pre_buffered_responses.remove(&rpc_id); // Clear the buffer after calling
-                        }
-                    }
-                    _ => {}
-                }
-
                 if *is_pre_buffering_response {
+                    // Accumulate the bytes into the buffer for this request ID
+                    let buffer = self
+                        .pre_buffered_responses
+                        .entry(rpc_id)
+                        .or_insert_with(|| Vec::new());
+
+                    match &evt {
+                        RpcStreamEvent::PayloadChunk { bytes, .. } => {
+                            buffer.extend_from_slice(bytes);
+                        }
+                        RpcStreamEvent::End { .. } => {
+                            // When the end of the stream is reached, call the response handler
+                            if let Some(cb) = self.response_handlers.get_mut(&rpc_id) {
+                                let rpc_event = RpcStreamEvent::PayloadChunk {
+                                    rpc_header_id: rpc_id,
+                                    bytes: buffer.clone(),
+                                };
+                                cb(rpc_event);
+                                self.pre_buffered_responses.remove(&rpc_id); // Clear the buffer after calling
+                            }
+                        }
+                        _ => {}
+                    }
                 } else {
                     if let Some(cb) = self.response_handlers.get_mut(&rpc_id) {
                         cb(evt.clone());

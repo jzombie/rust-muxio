@@ -85,7 +85,7 @@ fn rpc_respondable_session_stream_and_reply_roundtrip() {
                 RpcStreamEvent::End { .. } => {}
                 other => panic!("unexpected client event: {:?}", other),
             }),
-            false,
+            true,
         )
         .expect("client init_request failed");
 
