@@ -1,13 +1,17 @@
+mod rpc_dispatcher;
 mod rpc_header;
 mod rpc_message_type;
+mod rpc_method_registry;
 mod rpc_session;
 mod rpc_session_node;
 mod rpc_stream_decoder;
 mod rpc_stream_encoder;
 mod rpc_stream_event;
 
+pub use rpc_dispatcher::RpcDispatcher;
 pub use rpc_header::RpcHeader;
 pub use rpc_message_type::RpcMessageType;
+pub use rpc_method_registry::RpcMethodRegistry;
 pub use rpc_session::RpcSession;
 pub use rpc_session_node::RpcSessionNode;
 pub use rpc_stream_decoder::{RpcDecoderState, RpcStreamDecoder};
