@@ -25,6 +25,7 @@ fn rpc_node_stream_and_reply_roundtrip() {
     {
         let recv_buf = server_received_payload.clone();
         let pending_reply = pending.clone();
+        let emit = client_inbox.clone();
 
         server
             .borrow_mut()
@@ -48,9 +49,11 @@ fn rpc_node_stream_and_reply_roundtrip() {
                         metadata_bytes: b"resp-meta".to_vec(),
                     };
 
-                    pending_reply
-                        .borrow_mut()
-                        .push_back((reply_header, reply_bytes.to_vec()));
+                    pending_reply.borrow_mut().push_back((
+                        reply_header,
+                        reply_bytes.to_vec(),
+                        emit.clone(),
+                    ));
                 }
                 _ => {}
             });
@@ -97,15 +100,23 @@ fn rpc_node_stream_and_reply_roundtrip() {
     }
 
     // Now process pending reply **after** server handler completes
-    for (reply_header, reply_bytes) in pending.borrow_mut().drain(..) {
-        server
+    for (reply_header, reply_bytes, emit) in pending.borrow_mut().drain(..) {
+        let mut server_encoder = server
             .borrow_mut()
-            .start_reply_stream(reply_header, 4, |bytes| {
-                client_inbox.borrow_mut().push(bytes.to_vec());
-            })
-            .expect("start_reply_stream failed")
-            .push_bytes(&reply_bytes)
-            .unwrap();
+            // TODO: Rename to `init_response`?
+            .init_request(
+                reply_header,
+                4,
+                move |bytes| {
+                    emit.borrow_mut().push(bytes.to_vec());
+                },
+                |_| {},
+            )
+            .expect("server init_request failed");
+
+        server_encoder.push_bytes(&reply_bytes).unwrap();
+        server_encoder.flush().unwrap();
+        server_encoder.end_stream().unwrap();
     }
 
     // Feed response back to client

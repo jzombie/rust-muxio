@@ -74,6 +74,15 @@ impl<'a> RpcNode<'a> {
                     cb(evt.clone());
                     handled = true;
                 }
+
+                if matches!(
+                    evt,
+                    RpcStreamEvent::End { .. } | RpcStreamEvent::Error { .. }
+                ) {
+                    println!("EVER?");
+
+                    self.response_handlers.remove(&rpc_id);
+                }
             }
 
             if !handled {
@@ -82,5 +91,9 @@ impl<'a> RpcNode<'a> {
                 }
             }
         })
+    }
+
+    pub fn get_remaining_response_handlers(&self) -> usize {
+        self.response_handlers.len()
     }
 }
