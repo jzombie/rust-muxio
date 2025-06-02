@@ -103,38 +103,6 @@ impl<'a> RpcDispatcher<'a> {
             }));
     }
 
-    pub fn respond<F>(
-        &mut self,
-        rpc_response: RpcResponse,
-        max_chunk_size: usize,
-        on_emit: F,
-    ) -> Result<RpcStreamEncoder<F>, FrameEncodeError>
-    where
-        F: FnMut(&[u8]),
-    {
-        let rpc_response_header = RpcHeader {
-            id: rpc_response.request_header_id,
-            msg_type: RpcMessageType::Response,
-            method_id: 0, // TODO: Don't hardcode
-            metadata_bytes: vec![],
-        };
-
-        let mut response_encoder =
-            self.rpc_session
-                .start_reply_stream(rpc_response_header, max_chunk_size, on_emit)?;
-
-        if let Some(pre_buffered_payload_bytes) = rpc_response.pre_buffered_payload_bytes {
-            response_encoder.push_bytes(&pre_buffered_payload_bytes)?;
-        }
-
-        if rpc_response.is_finalized {
-            response_encoder.flush()?;
-            response_encoder.end_stream()?;
-        }
-
-        Ok(response_encoder)
-    }
-
     pub fn call<G, F>(
         &mut self,
         rpc_request: RpcRequest,
@@ -180,6 +148,38 @@ impl<'a> RpcDispatcher<'a> {
         }
 
         Ok(encoder)
+    }
+
+    pub fn respond<F>(
+        &mut self,
+        rpc_response: RpcResponse,
+        max_chunk_size: usize,
+        on_emit: F,
+    ) -> Result<RpcStreamEncoder<F>, FrameEncodeError>
+    where
+        F: FnMut(&[u8]),
+    {
+        let rpc_response_header = RpcHeader {
+            id: rpc_response.request_header_id,
+            msg_type: RpcMessageType::Response,
+            method_id: 0, // TODO: Don't hardcode
+            metadata_bytes: vec![],
+        };
+
+        let mut response_encoder =
+            self.rpc_session
+                .start_reply_stream(rpc_response_header, max_chunk_size, on_emit)?;
+
+        if let Some(pre_buffered_payload_bytes) = rpc_response.pre_buffered_payload_bytes {
+            response_encoder.push_bytes(&pre_buffered_payload_bytes)?;
+        }
+
+        if rpc_response.is_finalized {
+            response_encoder.flush()?;
+            response_encoder.end_stream()?;
+        }
+
+        Ok(response_encoder)
     }
 
     pub fn receive_bytes(&mut self, bytes: &[u8]) -> Result<Vec<u32>, FrameDecodeError> {
