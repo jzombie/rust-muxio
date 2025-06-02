@@ -14,6 +14,8 @@ pub struct RpcRespondableSession<'a> {
     // TODO: Make these names less vague
     response_handlers: HashMap<u32, Box<dyn FnMut(RpcStreamEvent) + 'a>>,
     catch_all_response_handler: Option<Box<dyn FnMut(RpcStreamEvent) + 'a>>,
+    pre_buffered_responses: HashMap<u32, Vec<u8>>, // Track buffered responses by request ID
+    pre_buffering_flags: HashMap<u32, bool>, // Track whether pre-buffering is enabled for each request
 }
 
 impl<'a> RpcRespondableSession<'a> {
@@ -22,6 +24,8 @@ impl<'a> RpcRespondableSession<'a> {
             rpc_session: RpcSession::new(),
             response_handlers: HashMap::new(),
             catch_all_response_handler: None,
+            pre_buffered_responses: HashMap::new(),
+            pre_buffering_flags: HashMap::new(),
         }
     }
 
@@ -31,12 +35,17 @@ impl<'a> RpcRespondableSession<'a> {
         max_chunk_size: usize,
         on_emit: G,
         on_response: Option<F>,
+        pre_buffer_response: bool,
     ) -> Result<RpcStreamEncoder<G>, FrameEncodeError>
     where
         G: FnMut(&[u8]),
         F: FnMut(RpcStreamEvent) + 'a,
     {
         let rpc_header_id = hdr.id;
+
+        // Set pre-buffering flag for this specific request
+        self.pre_buffering_flags
+            .insert(rpc_header_id, pre_buffer_response);
 
         if let Some(on_response) = on_response {
             self.response_handlers
@@ -83,9 +92,41 @@ impl<'a> RpcRespondableSession<'a> {
             let mut handled = false;
 
             if let Some(rpc_id) = id {
-                if let Some(cb) = self.response_handlers.get_mut(&rpc_id) {
-                    cb(evt.clone());
-                    handled = true;
+                let is_pre_buffering_response = match self.pre_buffering_flags.get(&rpc_id) {
+                    Some(bool) => bool,
+                    None => &false,
+                };
+
+                // Accumulate the bytes into the buffer for this request ID
+                let buffer = self
+                    .pre_buffered_responses
+                    .entry(rpc_id)
+                    .or_insert_with(|| Vec::new());
+
+                match &evt {
+                    RpcStreamEvent::PayloadChunk { bytes, .. } => {
+                        buffer.extend_from_slice(bytes);
+                    }
+                    RpcStreamEvent::End { .. } => {
+                        // When the end of the stream is reached, call the response handler
+                        if let Some(cb) = self.response_handlers.get_mut(&rpc_id) {
+                            let rpc_event = RpcStreamEvent::PayloadChunk {
+                                rpc_header_id: rpc_id,
+                                bytes: buffer.clone(),
+                            };
+                            cb(rpc_event);
+                            self.pre_buffered_responses.remove(&rpc_id); // Clear the buffer after calling
+                        }
+                    }
+                    _ => {}
+                }
+
+                if *is_pre_buffering_response {
+                } else {
+                    if let Some(cb) = self.response_handlers.get_mut(&rpc_id) {
+                        cb(evt.clone());
+                        handled = true;
+                    }
                 }
 
                 if matches!(

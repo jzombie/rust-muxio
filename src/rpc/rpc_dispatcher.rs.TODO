@@ -107,6 +107,7 @@ impl<'a> RpcDispatcher<'a> {
         max_chunk_size: usize,
         on_emit: G, // Directly pass the closure, not as a reference
         on_response: Option<F>,
+        pre_buffer_response: bool,
     ) -> Result<RpcStreamEncoder<G>, FrameEncodeError>
     where
         G: FnMut(&[u8]), // Ensuring that `G` is FnMut(&[u8])
@@ -135,6 +136,7 @@ impl<'a> RpcDispatcher<'a> {
             max_chunk_size,
             on_emit,
             on_response,
+            pre_buffer_response,
         )?;
 
         // If the RPC request has a buffered payload, send it here
