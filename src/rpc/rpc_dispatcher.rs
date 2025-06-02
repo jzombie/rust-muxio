@@ -6,7 +6,7 @@ use crate::rpc::{
 
 pub struct RpcDispatcher<'a> {
     session: RpcSessionNode<'a>,
-    next_id: u32,
+    next_id: u32, // TODO: Use parent?
     rpc_method_registry: RpcMethodRegistry<'a>,
 }
 
@@ -43,7 +43,7 @@ impl<'a> RpcDispatcher<'a> {
 
         Self {
             session,
-            next_id: 1,
+            next_id: 1, // TODO: Use parent?
             rpc_method_registry: RpcMethodRegistry::new(),
         }
     }
@@ -62,7 +62,7 @@ impl<'a> RpcDispatcher<'a> {
         G: FnMut(&[u8]), // Ensuring that `G` is FnMut(&[u8])
     {
         let id = self.next_id;
-        self.next_id += 1;
+        self.next_id += 1; // TODO: Use parent?
 
         let hdr = RpcHeader {
             msg_type: RpcMessageType::Call,
