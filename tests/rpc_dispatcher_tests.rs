@@ -1,8 +1,5 @@
-use muxio::rpc::{
-    RpcDispatcher, RpcHeader, RpcMessageType, RpcRequest, RpcResponse, RpcStreamEvent,
-};
+use muxio::rpc::{RpcDispatcher, RpcRequest, RpcResponse, RpcStreamEvent};
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 #[test]
@@ -113,12 +110,6 @@ fn rpc_dispatcher_call_and_echo_response() {
                         pre_buffered_payload_bytes: Some(b"response response".to_vec()),
                         is_finalized: true,
                     },
-                    // RpcHeader {
-                    //     msg_type: RpcMessageType::Response,
-                    //     id: request_header_id,
-                    //     method_id: 0, // TODO: Don't hardcode
-                    //     metadata_bytes: b"proto".to_vec(),
-                    // },
                     4,
                     |bytes: &[u8]| {
                         // println!("Emitting: {:?}", &bytes);
