@@ -1,4 +1,4 @@
-use muxio::rpc::{RpcDispatcher, RpcRequest, RpcResponse, RpcStreamEvent};
+use muxio::rpc::{RpcDispatcher, RpcRequest, RpcResponse, rpc_internals::RpcStreamEvent};
 use std::cell::RefCell;
 use std::rc::Rc;
 

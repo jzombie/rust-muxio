@@ -1,5 +1,5 @@
 use bitcode::{Decode, Encode};
-use muxio::rpc::{RpcHeader, RpcMessageType, RpcSession, RpcStreamEvent};
+use muxio::rpc::rpc_internals::{RpcHeader, RpcMessageType, RpcSession, RpcStreamEvent};
 use rand::prelude::SliceRandom;
 use std::cell::RefCell;
 use std::collections::HashMap;

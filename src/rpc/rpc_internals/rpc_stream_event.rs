@@ -1,4 +1,4 @@
-use crate::{frame::FrameDecodeError, rpc::RpcHeader};
+use crate::{frame::FrameDecodeError, rpc::rpc_internals::RpcHeader};
 
 #[derive(Debug, Clone)]
 pub enum RpcStreamEvent {

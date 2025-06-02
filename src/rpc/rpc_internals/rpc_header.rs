@@ -1,4 +1,4 @@
-use crate::rpc::RpcMessageType;
+use crate::rpc::rpc_internals::RpcMessageType;
 
 /// Represents the header of an RPC (Remote Procedure Call) message.
 #[derive(Debug, Clone)]

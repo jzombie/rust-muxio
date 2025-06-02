@@ -1,6 +1,6 @@
 use muxio::{
     frame::{FrameDecodeError, FrameEncodeError, FrameMuxStreamDecoder, FrameStreamEncoder},
-    rpc::{RpcHeader, RpcMessageType, RpcSession},
+    rpc::rpc_internals::{RpcHeader, RpcMessageType, RpcSession},
 };
 use std::cell::RefCell;
 

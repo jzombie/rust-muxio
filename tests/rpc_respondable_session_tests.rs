@@ -1,4 +1,4 @@
-use muxio::rpc::{RpcHeader, RpcMessageType, RpcRespondableSession, RpcStreamEvent};
+use muxio::rpc::rpc_internals::{RpcHeader, RpcMessageType, RpcRespondableSession, RpcStreamEvent};
 use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
 use std::rc::Rc;

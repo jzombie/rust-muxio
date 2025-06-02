@@ -1,5 +1,5 @@
 use crate::frame::{FrameDecodeError, FrameEncodeError};
-use crate::rpc::{RpcHeader, RpcSession, RpcStreamEncoder, RpcStreamEvent};
+use crate::rpc::rpc_internals::{RpcHeader, RpcSession, RpcStreamEncoder, RpcStreamEvent};
 use std::collections::HashMap;
 
 /// Lightweight wrapper over `RpcSession` that tracks response handlers.

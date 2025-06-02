@@ -1,7 +1,9 @@
 use crate::frame::{FrameDecodeError, FrameEncodeError};
 use crate::rpc::{
-    RpcHeader, RpcMessageType, RpcRequest, RpcRespondableSession, RpcResponse, RpcStreamEncoder,
-    RpcStreamEvent,
+    RpcRequest, RpcResponse,
+    rpc_internals::{
+        RpcHeader, RpcMessageType, RpcRespondableSession, RpcStreamEncoder, RpcStreamEvent,
+    },
 };
 use std::cell::Ref;
 use std::cell::RefCell;

@@ -4,7 +4,7 @@ use crate::{
         RPC_FRAME_METADATA_LENGTH_SIZE, RPC_FRAME_METHOD_ID_OFFSET, RPC_FRAME_MSG_TYPE_OFFSET,
     },
     frame::{DecodedFrame, FrameDecodeError, FrameKind},
-    rpc::{RpcHeader, RpcMessageType, RpcStreamEvent},
+    rpc::rpc_internals::{RpcHeader, RpcMessageType, RpcStreamEvent},
 };
 
 pub struct RpcStreamDecoder {

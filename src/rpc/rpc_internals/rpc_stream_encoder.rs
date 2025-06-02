@@ -1,6 +1,6 @@
 use crate::{
     frame::{FrameEncodeError, FrameStreamEncoder},
-    rpc::RpcHeader,
+    rpc::rpc_internals::RpcHeader,
 };
 
 pub struct RpcStreamEncoder<F>
