@@ -12,8 +12,8 @@ use std::collections::HashMap;
 pub struct RpcRespondableSession<'a> {
     rpc_session: RpcSession,
     // TODO: Make these names less vague
-    response_handlers: HashMap<u32, Box<dyn FnMut(RpcStreamEvent) + 'a>>,
-    catch_all_response_handler: Option<Box<dyn FnMut(RpcStreamEvent) + 'a>>,
+    response_handlers: HashMap<u32, Box<dyn FnMut(RpcStreamEvent) + Send + 'a>>,
+    catch_all_response_handler: Option<Box<dyn FnMut(RpcStreamEvent) + Send + 'a>>,
     pre_buffered_responses: HashMap<u32, Vec<u8>>, // Track buffered responses by request ID
     pre_buffering_flags: HashMap<u32, bool>, // Track whether pre-buffering is enabled for each request
 }
@@ -40,7 +40,7 @@ impl<'a> RpcRespondableSession<'a> {
     ) -> Result<RpcStreamEncoder<G>, FrameEncodeError>
     where
         G: FnMut(&[u8]),
-        F: FnMut(RpcStreamEvent) + 'a,
+        F: FnMut(RpcStreamEvent) + Send + 'a,
     {
         let rpc_header_id = hdr.id;
 
@@ -76,7 +76,7 @@ impl<'a> RpcRespondableSession<'a> {
     // Invoked on the remote in response to `init_respondable_request` from the local client
     pub fn set_catch_all_response_handler<F>(&mut self, handler: F)
     where
-        F: FnMut(RpcStreamEvent) + 'a,
+        F: FnMut(RpcStreamEvent) + Send + 'a,
     {
         self.catch_all_response_handler = Some(Box::new(handler));
     }

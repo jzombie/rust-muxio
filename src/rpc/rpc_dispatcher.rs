@@ -113,7 +113,7 @@ impl<'a> RpcDispatcher<'a> {
     ) -> Result<RpcStreamEncoder<G>, FrameEncodeError>
     where
         G: FnMut(&[u8]), // Ensuring that `G` is FnMut(&[u8])
-        F: FnMut(RpcStreamEvent) + 'a,
+        F: FnMut(RpcStreamEvent) + Send + 'a,
     {
         let method_id = rpc_request.method_id;
         let header_id: u32 = self.next_header_id;
