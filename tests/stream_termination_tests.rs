@@ -79,7 +79,7 @@ fn rpc_stream_aborts_on_cancel_frame() {
 
     // Start a new RPC stream
     let mut enc = client
-        .start_rpc_stream(hdr, 10, |bytes: &[u8]| {
+        .init_request(hdr, 10, |bytes: &[u8]| {
             process_received_bytes.borrow_mut()(bytes);
         })
         .expect("enc instantiation failed");
@@ -129,7 +129,7 @@ fn rpc_stream_aborts_on_end_frame() {
 
     // Start a new RPC stream
     let mut enc = client
-        .start_rpc_stream(hdr, 10, |bytes: &[u8]| {
+        .init_request(hdr, 10, |bytes: &[u8]| {
             process_received_bytes.borrow_mut()(bytes);
         })
         .expect("enc instantiation failed");

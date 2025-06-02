@@ -19,7 +19,7 @@ impl RpcMuxSession {
         }
     }
 
-    pub fn start_rpc_stream<F>(
+    pub fn init_request<F>(
         &mut self,
         header: RpcHeader,
         max_chunk_size: usize,

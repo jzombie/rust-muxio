@@ -72,7 +72,7 @@ fn rpc_parallel_streams_roundtrip() {
 
     // Start the first stream (stream 1)
     let mut enc1 = client
-        .start_rpc_stream(hdr1, 8, |bytes: &[u8]| {
+        .init_request(hdr1, 8, |bytes: &[u8]| {
             // Borrow the `RefCell` mutably and call the closure
             process_received_bytes.borrow_mut()(bytes);
         })
@@ -80,7 +80,7 @@ fn rpc_parallel_streams_roundtrip() {
 
     // Start the second stream (stream 2)
     let mut enc2 = client
-        .start_rpc_stream(hdr2, 4, |bytes: &[u8]| {
+        .init_request(hdr2, 4, |bytes: &[u8]| {
             // Borrow the `RefCell` mutably and call the closure
             process_received_bytes.borrow_mut()(bytes);
         })
@@ -185,7 +185,7 @@ fn rpc_stream_with_multiple_metadata_entries() {
 
     // Start RPC stream with the header containing multiple metadata entries
     let mut enc = client
-        .start_rpc_stream(hdr, 10, |bytes: &[u8]| {
+        .init_request(hdr, 10, |bytes: &[u8]| {
             outbound.extend(bytes.to_vec());
         })
         .expect("enc instantiation failed");
@@ -299,13 +299,13 @@ fn rpc_complex_shuffled_stream() {
 
     // Start RPC stream with the header containing multiple metadata entries
     let mut enc1 = client
-        .start_rpc_stream(hdr_1, 10, |bytes: &[u8]| {
+        .init_request(hdr_1, 10, |bytes: &[u8]| {
             outbound_chunks.borrow_mut().push(bytes.to_vec())
         })
         .expect("enc1 instantiation failed");
 
     let mut enc2 = client
-        .start_rpc_stream(hdr_2, 10, |bytes: &[u8]| {
+        .init_request(hdr_2, 10, |bytes: &[u8]| {
             outbound_chunks.borrow_mut().push(bytes.to_vec())
         })
         .expect("enc2 instantiation failed");
@@ -434,10 +434,10 @@ fn rpc_session_bidirectional_roundtrip() {
     let mut outbound = Vec::new();
 
     let mut enc = client
-        .start_rpc_stream(hdr.clone(), 2, |bytes: &[u8]| {
+        .init_request(hdr.clone(), 2, |bytes: &[u8]| {
             outbound.push(bytes.to_vec());
         })
-        .expect("start_rpc_stream failed");
+        .expect("init_request failed");
 
     for chunk in b"ping".chunks(2) {
         enc.push_bytes(chunk).expect("push_chunk failed");
@@ -485,10 +485,10 @@ fn rpc_session_bidirectional_roundtrip() {
     let mut reply_bytes = Vec::new();
 
     let mut reply_enc = server
-        .start_rpc_stream(reply_hdr.clone(), 2, |bytes: &[u8]| {
+        .init_request(reply_hdr.clone(), 2, |bytes: &[u8]| {
             reply_bytes.push(bytes.to_vec());
         })
-        .expect("start_rpc_stream (reply) failed");
+        .expect("init_request (reply) failed");
 
     for chunk in b"pong".chunks(2) {
         reply_enc.push_bytes(chunk).expect("push_chunk (reply)");

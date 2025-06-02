@@ -61,7 +61,7 @@ fn rpc_node_stream_and_reply_roundtrip() {
 
     let mut client_encoder = client
         .borrow_mut()
-        .start_rpc_stream(
+        .init_request(
             call_header.clone(),
             4,
             |bytes| server_inbox.push(bytes.to_vec()),
@@ -83,7 +83,7 @@ fn rpc_node_stream_and_reply_roundtrip() {
                 other => panic!("unexpected client event: {:?}", other),
             },
         )
-        .expect("client start_rpc_stream failed");
+        .expect("client init_request failed");
 
     client_encoder.push_bytes(b"ping").unwrap();
     client_encoder.flush().unwrap();

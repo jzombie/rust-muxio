@@ -17,7 +17,7 @@ impl<'a> RpcNode<'a> {
         }
     }
 
-    pub fn start_rpc_stream<G, F>(
+    pub fn init_request<G, F>(
         &mut self,
         hdr: RpcHeader,
         max_payload: usize,
@@ -33,7 +33,7 @@ impl<'a> RpcNode<'a> {
             .insert(rpc_header_id, Box::new(on_response));
 
         self.mux_session
-            .start_rpc_stream(hdr, max_payload, on_emit)
+            .init_request(hdr, max_payload, on_emit)
             .map_err(|_| FrameDecodeError::CorruptFrame)
     }
 
@@ -47,7 +47,7 @@ impl<'a> RpcNode<'a> {
         F: FnMut(&[u8]),
     {
         self.mux_session
-            .start_rpc_stream(hdr, max_payload, on_emit)
+            .init_request(hdr, max_payload, on_emit)
             .map_err(|_| FrameDecodeError::CorruptFrame)
     }
 
