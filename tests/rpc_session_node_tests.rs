@@ -64,7 +64,7 @@ fn rpc_session_node_stream_and_reply_roundtrip() {
 
     let mut client_encoder = client
         .borrow_mut()
-        .init_request(
+        .init_respondable_request(
             call_header.clone(),
             4,
             |bytes| server_inbox.push(bytes.to_vec()),

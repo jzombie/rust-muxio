@@ -25,7 +25,7 @@ impl<'a> RpcSessionNode<'a> {
         }
     }
 
-    pub fn init_request<G, F>(
+    pub fn init_respondable_request<G, F>(
         &mut self,
         hdr: RpcHeader,
         max_chunk_size: usize,

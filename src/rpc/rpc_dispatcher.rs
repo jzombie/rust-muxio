@@ -127,9 +127,12 @@ impl<'a> RpcDispatcher<'a> {
         };
 
         // Directly pass the closure as `on_emit` without borrowing it
-        let mut encoder =
-            self.rpc_session
-                .init_request(request_header, max_chunk_size, on_emit, on_response)?;
+        let mut encoder = self.rpc_session.init_respondable_request(
+            request_header,
+            max_chunk_size,
+            on_emit,
+            on_response,
+        )?;
 
         // If the RPC request has a buffered payload, send it here
         if let Some(pre_buffered_payload_bytes) = rpc_request.pre_buffered_payload_bytes {
