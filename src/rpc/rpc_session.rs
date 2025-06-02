@@ -4,6 +4,11 @@ use crate::{
 };
 use std::collections::HashMap;
 
+/// Low-level stream multiplexing engine for RPC.
+///
+/// This struct manages the allocation of stream IDs, the decoding of framed
+/// messages, and per-stream decoding state. It does not perform any routing
+/// or application-le
 pub struct RpcSession {
     next_stream_id: u32,                             // Counter for the next stream ID
     frame_mux_stream_decoder: FrameMuxStreamDecoder, // Decoder that processes frames

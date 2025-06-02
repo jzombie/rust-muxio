@@ -2,6 +2,13 @@ use crate::frame::{FrameDecodeError, FrameEncodeError};
 use crate::rpc::{RpcHeader, RpcSession, RpcStreamEncoder, RpcStreamEvent};
 use std::collections::HashMap;
 
+/// Lightweight wrapper over `RpcSession` that tracks response handlers.
+///
+/// This struct allows the caller to associate a response callback per
+/// outgoing request. It also supports an optional global fallback handler
+/// for unmatched or unsolicited events.
+///
+/// Suitable for simple scenarios where dispatch logic is externally managed.
 pub struct RpcSessionNode<'a> {
     rpc_session: RpcSession,
     response_handlers: HashMap<u32, Box<dyn FnMut(RpcStreamEvent) + 'a>>,
