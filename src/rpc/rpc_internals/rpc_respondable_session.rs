@@ -29,6 +29,7 @@ impl<'a> RpcRespondableSession<'a> {
         }
     }
 
+    // TODO: Document that prebuffering buffers the entire response payload into a single chunk
     pub fn init_respondable_request<G, F>(
         &mut self,
         hdr: RpcHeader,
