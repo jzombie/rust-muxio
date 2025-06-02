@@ -1,5 +1,7 @@
 use crate::frame::FrameEncodeError;
-use crate::rpc::{RpcHeader, RpcMessageType, RpcMethodRegistry, RpcSessionNode, RpcStreamEvent};
+use crate::rpc::{
+    RpcHeader, RpcMessageType, RpcMethodHandler, RpcMethodRegistry, RpcSessionNode, RpcStreamEvent,
+};
 
 /// Dispatcher built on top of `RpcSessionNode`.
 ///
@@ -20,11 +22,16 @@ impl<'a> RpcDispatcher<'a> {
         }
     }
 
+    pub fn register(&mut self, method_name: &'static str, handler: RpcMethodHandler<'a>) {
+        self.rpc_method_registry.register(method_name, handler)
+    }
+
     /// Call a remote method. Metadata is the UTF-8 method name.
     pub fn call<G>(
         &mut self,
         method: &str,
         args: Vec<u8>, // TODO: Accept real args and convert internally to use metadata
+        // TODO: Accept optional payload
         max_chunk_size: usize,
         mut on_emit: G,
     ) -> Result<(), FrameEncodeError>
@@ -37,8 +44,8 @@ impl<'a> RpcDispatcher<'a> {
         let hdr = RpcHeader {
             msg_type: RpcMessageType::Call,
             id,
-            method_id: 0,
-            metadata_bytes: method.as_bytes().to_vec(),
+            method_id: 0,                               // TODO: Push hashed method
+            metadata_bytes: method.as_bytes().to_vec(), // TODO: Push metadata
         };
 
         let method_name = method.to_string();
@@ -74,15 +81,15 @@ impl<'a> RpcDispatcher<'a> {
             self.session
                 .init_request(hdr, max_chunk_size, &mut on_emit, Some(on_response))?;
 
-        encoder.push_bytes(&args)?;
+        // encoder.push_bytes(&args)?; // TODO: Push args as metadata
         encoder.flush()?;
         encoder.end_stream()?;
 
         Ok(())
     }
 
-    /// Expose internal session mutably if needed.
-    pub fn session_mut(&mut self) -> &mut RpcSessionNode<'a> {
-        &mut self.session
-    }
+    // Expose internal session mutably if needed.
+    // pub fn session_mut(&mut self) -> &mut RpcSessionNode<'a> {
+    //     &mut self.session
+    // }
 }

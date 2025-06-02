@@ -2,8 +2,9 @@ use crate::rpc::{RpcHeader, RpcStreamEvent};
 use std::collections::HashMap;
 use xxhash_rust::xxh3::xxh3_64;
 
-/// Function signature for an RPC handler.
-pub type RpcMethodHandler<'a> = Box<dyn FnMut(RpcHeader, Box<dyn FnMut(RpcStreamEvent) + 'a>) + 'a>;
+/// Function signature for an RPC handler, now including arguments.
+pub type RpcMethodHandler<'a> =
+    Box<dyn FnMut(RpcHeader, Vec<u8>, Box<dyn FnMut(RpcStreamEvent) + 'a>) + 'a>;
 
 /// A registry mapping method names to their corresponding handler and ID.
 pub struct RpcMethodRegistry<'a> {
@@ -26,6 +27,7 @@ impl<'a> RpcMethodRegistry<'a> {
     }
 
     /// Registers a method by name.
+    /// This now accepts arguments as part of the handler.
     pub fn register(&mut self, method_name: &'static str, handler: RpcMethodHandler<'a>) {
         let id = xxh3_64(method_name.as_bytes());
         self.name_to_id.insert(method_name, id);
