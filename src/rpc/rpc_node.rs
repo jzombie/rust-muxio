@@ -9,9 +9,9 @@ pub struct RpcNode<'a> {
 }
 
 impl<'a> RpcNode<'a> {
-    pub fn new(mux_session: RpcMuxSession) -> Self {
+    pub fn new() -> Self {
         Self {
-            mux_session,
+            mux_session: RpcMuxSession::new(),
             response_handlers: HashMap::new(),
             global_response_handler: None,
         }
