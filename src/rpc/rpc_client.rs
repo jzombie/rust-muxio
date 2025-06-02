@@ -5,6 +5,7 @@ use std::collections::HashMap;
 pub struct RpcClient<'a> {
     mux_session: RpcMuxSession,
     response_handlers: HashMap<u32, Box<dyn FnMut(RpcStreamEvent) + 'a>>,
+    global_response_handler: Option<Box<dyn FnMut(RpcStreamEvent) + 'a>>,
 }
 
 impl<'a> RpcClient<'a> {
@@ -12,6 +13,7 @@ impl<'a> RpcClient<'a> {
         Self {
             mux_session,
             response_handlers: HashMap::new(),
+            global_response_handler: None,
         }
     }
 
@@ -49,11 +51,11 @@ impl<'a> RpcClient<'a> {
             .map_err(|_| FrameDecodeError::CorruptFrame)
     }
 
-    pub fn set_request_handler<F>(&mut self, rpc_id: u32, handler: F)
+    pub fn set_response_handler<F>(&mut self, handler: F)
     where
         F: FnMut(RpcStreamEvent) + 'a,
     {
-        self.response_handlers.insert(rpc_id, Box::new(handler));
+        self.global_response_handler = Some(Box::new(handler));
     }
 
     pub fn receive_bytes(&mut self, bytes: &[u8]) -> Result<(), FrameDecodeError> {
@@ -65,8 +67,17 @@ impl<'a> RpcClient<'a> {
                 RpcStreamEvent::Error { rpc_header_id, .. } => *rpc_header_id,
             };
 
+            let mut handled = false;
+
             if let Some(rpc_id) = id {
                 if let Some(cb) = self.response_handlers.get_mut(&rpc_id) {
+                    cb(evt.clone());
+                    handled = true;
+                }
+            }
+
+            if !handled {
+                if let Some(cb) = self.global_response_handler.as_mut() {
                     cb(evt);
                 }
             }
