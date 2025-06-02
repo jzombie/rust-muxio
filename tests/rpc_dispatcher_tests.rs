@@ -1,7 +1,6 @@
 use bitcode::{Decode, Encode};
 use muxio::rpc::{RpcDispatcher, RpcRequest, RpcResponse, rpc_internals::RpcStreamEvent};
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 #[derive(Encode, Decode, PartialEq, Debug)]
@@ -28,9 +27,6 @@ struct MultResponseParams {
 fn rpc_dispatcher_call_and_echo_response() {
     // Shared buffer for the outgoing response
     let outgoing_buf: Rc<RefCell<Vec<u8>>> = Rc::new(RefCell::new(Vec::new()));
-
-    // Map to track the accumulated bytes for each request by its header_id
-    let mut request_buffers: HashMap<u32, Rc<RefCell<Vec<u8>>>> = HashMap::new();
 
     // Client dispatcher
     let mut client_dispatcher = RpcDispatcher::new();
@@ -82,8 +78,8 @@ fn rpc_dispatcher_call_and_echo_response() {
                         move |rpc_stream_event: RpcStreamEvent| match rpc_stream_event {
                             RpcStreamEvent::Header {
                                 rpc_header_id,
-                                rpc_method_id,
                                 rpc_header,
+                                ..
                             } => {
                                 assert_eq!(rpc_header.method_id, method_id);
                                 println!(
@@ -91,11 +87,7 @@ fn rpc_dispatcher_call_and_echo_response() {
                                     rpc_header_id, rpc_header
                                 );
                             }
-                            RpcStreamEvent::PayloadChunk {
-                                rpc_header_id,
-                                rpc_method_id,
-                                bytes,
-                            } => {
+                            RpcStreamEvent::PayloadChunk { bytes, .. } => {
                                 println!("Bytes: {:?}", bytes);
 
                                 // Look up the correct buffer for this request and append the data
@@ -142,7 +134,7 @@ fn rpc_dispatcher_call_and_echo_response() {
 
                     let rpc_response = match rpc_request.method_id {
                         id if id == RpcRequest::to_method_id("add") => {
-                            let request_params: AddRequestParams =
+                            let _request_params: AddRequestParams =
                                 bitcode::decode(&rpc_request.param_bytes.unwrap()).unwrap();
 
                             // let response_bytes = bitcode::encode(&AddResponseParams {
@@ -160,7 +152,7 @@ fn rpc_dispatcher_call_and_echo_response() {
                         }
 
                         id if id == RpcRequest::to_method_id("mult") => {
-                            let request_params: MultRequestParams =
+                            let _request_params: MultRequestParams =
                                 bitcode::decode(&rpc_request.param_bytes.unwrap()).unwrap();
 
                             // let response_bytes = bitcode::encode(&MultResponseParams {

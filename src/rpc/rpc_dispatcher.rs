@@ -43,8 +43,8 @@ impl<'a> RpcDispatcher<'a> {
                 match event {
                     RpcStreamEvent::Header {
                         rpc_header_id,
-                        rpc_method_id,
                         rpc_header,
+                        ..
                     } => {
                         // Convert metadata to parameter bytes
                         let param_bytes = match rpc_header.metadata_bytes.len() {
@@ -64,8 +64,8 @@ impl<'a> RpcDispatcher<'a> {
 
                     RpcStreamEvent::PayloadChunk {
                         rpc_header_id,
-                        rpc_method_id,
                         bytes,
+                        ..
                     } => {
                         // Look for the existing RpcRequest in the queue and borrow it mutably
                         if let Some((_, rpc_request)) =
@@ -79,10 +79,7 @@ impl<'a> RpcDispatcher<'a> {
                         }
                     }
 
-                    RpcStreamEvent::End {
-                        rpc_header_id,
-                        rpc_method_id,
-                    } => {
+                    RpcStreamEvent::End { rpc_header_id, .. } => {
                         // Finalize and process the full message when the stream ends
                         if let Some((_, rpc_request)) =
                             queue.iter_mut().find(|(id, _)| *id == rpc_header_id)
@@ -99,8 +96,8 @@ impl<'a> RpcDispatcher<'a> {
                     } => {
                         // TODO: Handle errors
                         println!(
-                            "Error in stream {:?}: {:?}",
-                            rpc_header_id, frame_decode_error
+                            "Error in stream. Method: {:?} {:?}: {:?}",
+                            rpc_method_id, rpc_header_id, frame_decode_error
                         );
                     }
                 }
