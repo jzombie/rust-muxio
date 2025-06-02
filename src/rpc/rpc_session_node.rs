@@ -93,6 +93,7 @@ impl<'a> RpcSessionNode<'a> {
                 }
             }
 
+            // TODO: This shoudld be a bit more async
             if !handled {
                 if let Some(cb) = self.global_response_handler.as_mut() {
                     cb(evt);
