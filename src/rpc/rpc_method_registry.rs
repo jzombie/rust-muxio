@@ -1,21 +1,6 @@
 use crate::rpc::{RpcHeader, RpcStreamEvent};
-use bitcode::{Decode, Encode};
 use std::collections::HashMap;
 use xxhash_rust::xxh3::xxh3_64;
-
-#[derive(Encode, Decode, PartialEq, Debug)]
-pub struct RpcRequest {
-    pub method_name: String,
-    pub param_bytes: Vec<u8>,
-    pub payload_bytes: Option<Vec<u8>>,
-    pub is_finalized: bool,
-}
-
-#[derive(Encode, Decode, PartialEq, Debug)]
-pub struct RpcResponse {
-    pub result: Vec<u8>,
-    // pub id: Option<u64>,
-}
 
 pub type RpcMethodHandler<'a> =
     Box<dyn FnMut(RpcHeader, Vec<u8>, Box<dyn FnMut(RpcStreamEvent) + 'a>) + 'a>;

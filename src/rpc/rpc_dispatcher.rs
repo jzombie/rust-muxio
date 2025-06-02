@@ -49,7 +49,7 @@ impl<'a> RpcDispatcher<'a> {
                             String::from_utf8_lossy(&rpc_header.metadata_bytes).to_string();
                         let rpc_request = RpcRequest {
                             method_name,
-                            param_bytes: rpc_header.metadata_bytes.clone(),
+                            param_bytes: rpc_header.metadata_bytes,
                             payload_bytes: None, // No payload yet
                             is_finalized: false,
                         };
@@ -133,37 +133,6 @@ impl<'a> RpcDispatcher<'a> {
             metadata_bytes: rpc_request.param_bytes,
         };
 
-        // let on_response = {
-        //     let mut seen_start = false;
-        //     Box::new(move |event: RpcStreamEvent| match event {
-        //         RpcStreamEvent::Header { .. } => {
-        //             seen_start = true;
-        //         }
-        //         RpcStreamEvent::PayloadChunk {
-        //             rpc_header_id,
-        //             bytes,
-        //         } => {
-        //             if seen_start {
-        //                 println!(
-        //                     "Received response payload from {}: {:?}",
-        //                     rpc_request.method, bytes
-        //                 );
-        //             }
-        //         }
-        //         RpcStreamEvent::End { .. } => {
-        //             println!("Call to {} completed", rpc_request.method);
-        //         }
-        //         RpcStreamEvent::Error {
-        //             frame_decode_error, ..
-        //         } => {
-        //             eprintln!(
-        //                 "Error in call to {}: {:?}",
-        //                 rpc_request.method, frame_decode_error
-        //             );
-        //         }
-        //     }) as Box<dyn FnMut(RpcStreamEvent) + 'a>
-        // };
-
         // Directly pass the closure as `on_emit` without borrowing it
         let mut encoder = self.rpc_session.borrow_mut().init_request(
             hdr,
@@ -172,10 +141,10 @@ impl<'a> RpcDispatcher<'a> {
             on_response,
         )?;
 
-        encoder.push_bytes(b"testing 1 2 3")?;
-
-        encoder.flush()?;
-        encoder.end_stream()?;
+        if rpc_request.is_finalized {
+            encoder.flush()?;
+            encoder.end_stream()?;
+        }
 
         Ok(encoder)
     }
