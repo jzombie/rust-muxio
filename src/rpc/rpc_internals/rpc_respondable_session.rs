@@ -63,6 +63,7 @@ impl<'a> RpcRespondableSession<'a> {
     }
 
     // TODO: Document
+    // Invoked on the remote in response to `init_respondable_request` from the local client
     pub fn set_catch_all_response_handler<F>(&mut self, handler: F)
     where
         F: FnMut(RpcStreamEvent) + 'a,

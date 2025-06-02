@@ -31,6 +31,7 @@ impl<'a> RpcDispatcher<'a> {
         instance
     }
 
+    // Invoked on the remote in reponse to `call` requests from the local client
     fn init_catch_all_response_handler(&mut self) {
         let rpc_request_queue_ref = Rc::clone(&self.rpc_request_queue);
 
