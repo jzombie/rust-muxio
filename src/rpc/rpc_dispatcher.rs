@@ -42,11 +42,6 @@ impl<'a> RpcDispatcher<'a> {
                         rpc_header_id,
                         rpc_header,
                     } => {
-                        // TODO: Replace! This isn't correct.  It should be looked up from the registry instead
-                        // Create a new RpcRequest with the header's method name and metadata
-                        // let method_name =
-                        //     String::from_utf8_lossy(&rpc_header.metadata_bytes).to_string();
-
                         // Convert metadata to parameter bytes
                         let param_bytes = match rpc_header.metadata_bytes.len() {
                             0 => None,
@@ -162,7 +157,7 @@ impl<'a> RpcDispatcher<'a> {
         let rpc_response_header = RpcHeader {
             id: rpc_response.request_header_id,
             msg_type: RpcMessageType::Response,
-            method_id: 0, // TODO: Don't hardcode
+            method_id: 0x00, // This is not used in the response
             metadata_bytes: vec![],
         };
 
