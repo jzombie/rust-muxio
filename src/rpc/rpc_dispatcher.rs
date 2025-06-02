@@ -43,6 +43,7 @@ impl<'a> RpcDispatcher<'a> {
                         rpc_header_id,
                         rpc_header,
                     } => {
+                        // TODO: Replace! This isn't correct.  It should be looked up from the registry instead
                         // Create a new RpcRequest with the header's method name and metadata
                         let method_name =
                             String::from_utf8_lossy(&rpc_header.metadata_bytes).to_string();
@@ -149,6 +150,7 @@ impl<'a> RpcDispatcher<'a> {
         G: FnMut(&[u8]), // Ensuring that `G` is FnMut(&[u8])
         F: FnMut(RpcStreamEvent) + 'a,
     {
+        let method_id = rpc_request.to_method_id();
         let header_id: u32 = self.next_header_id;
         self.next_header_id += 1;
 
@@ -160,7 +162,7 @@ impl<'a> RpcDispatcher<'a> {
         let hdr = RpcHeader {
             msg_type: RpcMessageType::Call,
             id: header_id,
-            method_id: 0, // Placeholder method_id, should be computed or set
+            method_id,
             metadata_bytes,
         };
 
