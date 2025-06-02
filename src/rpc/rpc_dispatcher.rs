@@ -8,7 +8,7 @@ use std::collections::VecDeque;
 use std::rc::Rc;
 
 pub struct RpcDispatcher<'a> {
-    session: Rc<RefCell<RpcSessionNode<'a>>>,
+    rpc_session: Rc<RefCell<RpcSessionNode<'a>>>,
     next_id: u32, // TODO: Use parent?
     rpc_method_registry: RpcMethodRegistry<'a>,
     // TODO: Integrate (and not public)
@@ -17,10 +17,10 @@ pub struct RpcDispatcher<'a> {
 
 impl<'a> RpcDispatcher<'a> {
     pub fn new() -> Self {
-        let session = Rc::new(RefCell::new(RpcSessionNode::new()));
+        let rpc_session = Rc::new(RefCell::new(RpcSessionNode::new()));
 
         let instance = Self {
-            session,
+            rpc_session,
             next_id: 1, // TODO: Use parent?
             rpc_method_registry: RpcMethodRegistry::new(),
             response_queue: Rc::new(RefCell::new(VecDeque::new())),
@@ -37,9 +37,8 @@ impl<'a> RpcDispatcher<'a> {
 
         let reponse_queue_ref = Rc::clone(&self.response_queue);
 
-        self.session
-            .borrow_mut()
-            .set_response_handler(Box::new(move |event: RpcStreamEvent| {
+        self.rpc_session.borrow_mut().set_response_handler(Box::new(
+            move |event: RpcStreamEvent| {
                 // Handle the event here
                 match event {
                     RpcStreamEvent::Header {
@@ -85,7 +84,8 @@ impl<'a> RpcDispatcher<'a> {
                         );
                     }
                 }
-            }));
+            },
+        ));
     }
 
     pub fn start_reply_stream<F>(
@@ -97,7 +97,7 @@ impl<'a> RpcDispatcher<'a> {
     where
         F: FnMut(&[u8]),
     {
-        self.session
+        self.rpc_session
             .borrow_mut()
             .start_reply_stream(hdr, max_chunk_size, on_emit)
     }
@@ -159,10 +159,12 @@ impl<'a> RpcDispatcher<'a> {
         // };
 
         // Directly pass the closure as `on_emit` without borrowing it
-        let mut encoder =
-            self.session
-                .borrow_mut()
-                .init_request(hdr, max_chunk_size, on_emit, on_response)?;
+        let mut encoder = self.rpc_session.borrow_mut().init_request(
+            hdr,
+            max_chunk_size,
+            on_emit,
+            on_response,
+        )?;
 
         encoder.push_bytes(b"testing 1 2 3")?;
 
@@ -174,6 +176,6 @@ impl<'a> RpcDispatcher<'a> {
 
     // TODO: Return tasks to perform
     pub fn receive_bytes(&mut self, bytes: &[u8]) -> Result<(), FrameDecodeError> {
-        self.session.borrow_mut().receive_bytes(bytes)
+        self.rpc_session.borrow_mut().receive_bytes(bytes)
     }
 }
