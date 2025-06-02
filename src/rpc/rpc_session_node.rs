@@ -27,7 +27,7 @@ impl<'a> RpcSessionNode<'a> {
     pub fn init_request<G, F>(
         &mut self,
         hdr: RpcHeader,
-        max_payload: usize,
+        max_chunk_size: usize,
         on_emit: G,
         on_response: Option<F>,
     ) -> Result<RpcStreamEncoder<G>, FrameEncodeError>
@@ -43,21 +43,21 @@ impl<'a> RpcSessionNode<'a> {
         }
 
         self.rpc_session
-            .init_request(hdr, max_payload, on_emit)
+            .init_request(hdr, max_chunk_size, on_emit)
             .map_err(|_| FrameEncodeError::CorruptFrame)
     }
 
     pub fn start_reply_stream<F>(
         &mut self,
         hdr: RpcHeader,
-        max_payload: usize,
+        max_chunk_size: usize,
         on_emit: F,
     ) -> Result<RpcStreamEncoder<F>, FrameDecodeError>
     where
         F: FnMut(&[u8]),
     {
         self.rpc_session
-            .init_request(hdr, max_payload, on_emit)
+            .init_request(hdr, max_chunk_size, on_emit)
             .map_err(|_| FrameDecodeError::CorruptFrame)
     }
 

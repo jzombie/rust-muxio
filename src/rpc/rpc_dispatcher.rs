@@ -1,7 +1,5 @@
-use crate::frame::{FrameDecodeError, FrameEncodeError};
-use crate::rpc::{RpcHeader, RpcMessageType, RpcSessionNode, RpcStreamEncoder, RpcStreamEvent};
-use std::collections::HashMap;
-use std::io::Write;
+use crate::frame::FrameEncodeError;
+use crate::rpc::{RpcHeader, RpcMessageType, RpcMethodRegistry, RpcSessionNode, RpcStreamEvent};
 
 /// Dispatcher built on top of `RpcSessionNode`.
 ///
@@ -10,7 +8,7 @@ use std::io::Write;
 pub struct RpcDispatcher<'a> {
     session: RpcSessionNode<'a>,
     next_id: u32,
-    handlers: HashMap<String, Box<dyn Fn(Vec<u8>) + 'a>>,
+    rpc_method_registry: RpcMethodRegistry<'a>,
 }
 
 impl<'a> RpcDispatcher<'a> {
@@ -18,7 +16,7 @@ impl<'a> RpcDispatcher<'a> {
         Self {
             session,
             next_id: 1,
-            handlers: HashMap::new(),
+            rpc_method_registry: RpcMethodRegistry::new(),
         }
     }
 
@@ -26,8 +24,8 @@ impl<'a> RpcDispatcher<'a> {
     pub fn call<G>(
         &mut self,
         method: &str,
-        args: Vec<u8>,
-        max_payload: usize,
+        args: Vec<u8>, // TODO: Accept real args and convert internally to use metadata
+        max_chunk_size: usize,
         mut on_emit: G,
     ) -> Result<(), FrameEncodeError>
     where
@@ -74,7 +72,7 @@ impl<'a> RpcDispatcher<'a> {
 
         let mut encoder =
             self.session
-                .init_request(hdr, max_payload, &mut on_emit, Some(on_response))?;
+                .init_request(hdr, max_chunk_size, &mut on_emit, Some(on_response))?;
 
         encoder.push_bytes(&args)?;
         encoder.flush()?;
