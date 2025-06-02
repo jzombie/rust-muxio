@@ -106,7 +106,7 @@ fn rpc_dispatcher_call_and_echo_response() {
                             _ => {}
                         }
                     }),
-                    true,
+                    true, // IMPORTANT: This is crucial to be set to true if depending on an accumulated buffer
                 )
                 .expect("Server call failed");
         }
