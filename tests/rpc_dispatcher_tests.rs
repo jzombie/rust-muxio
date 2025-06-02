@@ -50,47 +50,31 @@ fn rpc_dispatcher_call_and_echo_response() {
         let rpc_requests = vec![rpc_request_1, rpc_request_2];
 
         for rpc_request in rpc_requests {
-            // let method_id: u64 = rpc_request.method_id;
+            let method_id = rpc_request.method_id; // u64 is Copy
 
-            // Move the `outgoing_buf` into the closure, ensuring it lives as long as needed
             client_dispatcher
                 .call(
                     rpc_request,
                     4,
                     {
-                        // Move the outgoing_buf into the closure to extend its lifetime
                         let outgoing_buf = Rc::clone(&outgoing_buf);
-
-                        // The closure captures `outgoing_buf` and borrows it while executing
                         move |bytes: &[u8]| {
-                            // Collect bytes into the buffer
                             outgoing_buf.borrow_mut().extend(bytes);
                         }
                     },
-                    Some(|rpc_stream_event: RpcStreamEvent| {
-                        println!(
-                            "Client received response from server: {:?}",
-                            rpc_stream_event
-                        );
-
-                        match rpc_stream_event {
+                    Some({
+                        move |rpc_stream_event: RpcStreamEvent| match rpc_stream_event {
                             RpcStreamEvent::Header {
                                 rpc_header_id,
                                 rpc_header,
                             } => {
-                                // assert_eq!(rpc_header.method_id, method_id);
-
-                                // This is a Header event, handle it here
+                                assert_eq!(rpc_header.method_id, method_id);
                                 println!(
                                     "Client received header: ID = {}, Header = {:?}",
                                     rpc_header_id, rpc_header
                                 );
-                                // Add your code for handling the header here
                             }
-                            _ => {
-                                // Handle other event types if necessary
-                                // println!("Not a Header event");
-                            }
+                            _ => {}
                         }
                     }),
                 )
