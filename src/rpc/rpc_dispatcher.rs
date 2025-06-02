@@ -1,7 +1,9 @@
 use crate::frame::FrameEncodeError;
 use crate::rpc::{
-    RpcHeader, RpcMessageType, RpcMethodHandler, RpcMethodRegistry, RpcSessionNode, RpcStreamEvent,
+    RpcHeader, RpcMessageType, RpcMethodHandler, RpcMethodRegistry, RpcRequest, RpcSessionNode,
+    RpcStreamEvent,
 };
+// use bitcode::{decode, encode};
 
 /// Dispatcher built on top of `RpcSessionNode`.
 ///
@@ -30,8 +32,7 @@ impl<'a> RpcDispatcher<'a> {
     /// Call a remote method. Metadata is the UTF-8 method name.
     pub fn call<G>(
         &mut self,
-        method: &str,
-        args: Vec<u8>, // TODO: Accept real args and convert internally to use metadata
+        rpc_request: RpcRequest,
         // TODO: Accept optional payload
         max_chunk_size: usize,
         mut on_emit: G, // TODO: Can this be moved to a "global" emit?
@@ -45,11 +46,10 @@ impl<'a> RpcDispatcher<'a> {
         let hdr = RpcHeader {
             msg_type: RpcMessageType::Call,
             id,
-            method_id: 0,                               // TODO: Push hashed method
-            metadata_bytes: method.as_bytes().to_vec(), // TODO: Push metadata
+            method_id: 0, // TODO: Push hashed method
+            metadata_bytes: rpc_request.param_bytes,
         };
 
-        let method_name = method.to_string();
         let on_response = {
             let mut seen_start = false;
             Box::new(move |event: RpcStreamEvent| match event {
@@ -63,17 +63,20 @@ impl<'a> RpcDispatcher<'a> {
                     if seen_start {
                         println!(
                             "Received response payload from {}: {:?}",
-                            method_name, bytes
+                            rpc_request.method, bytes
                         );
                     }
                 }
                 RpcStreamEvent::End { .. } => {
-                    println!("Call to {} completed", method_name);
+                    println!("Call to {} completed", rpc_request.method);
                 }
                 RpcStreamEvent::Error {
                     frame_decode_error, ..
                 } => {
-                    eprintln!("Error in call to {}: {:?}", method_name, frame_decode_error);
+                    eprintln!(
+                        "Error in call to {}: {:?}",
+                        rpc_request.method, frame_decode_error
+                    );
                 }
             }) as Box<dyn FnMut(RpcStreamEvent) + 'a>
         };
