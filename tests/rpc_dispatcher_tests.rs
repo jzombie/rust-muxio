@@ -58,12 +58,6 @@ fn rpc_dispatcher_call_and_echo_response() {
         for rpc_request in rpc_requests {
             let method_id = rpc_request.method_id;
 
-            // Create a new buffer for each request
-            // let buffer = Rc::new(RefCell::new(Vec::new()));
-
-            // Store the buffer in the map with its associated request header ID
-            // request_buffers.insert(rpc_request.header_id, Rc::clone(&buffer));
-
             client_dispatcher
                 .call(
                     rpc_request,
@@ -182,7 +176,6 @@ fn rpc_dispatcher_call_and_echo_response() {
                     };
 
                     if let Some(rpc_response) = rpc_response {
-                        // TODO: Don't hardcode this, but rather process the request intent and formulate a response
                         server_dispatcher
                             .respond(rpc_response, 4, |bytes: &[u8]| {
                                 client_dispatcher.receive_bytes(bytes).unwrap();
@@ -193,11 +186,4 @@ fn rpc_dispatcher_call_and_echo_response() {
             }
         }
     }
-
-    // Now check if the response was properly echoed
-    // assert_eq!(
-    //     outgoing_buf.borrow().as_slice(),
-    //     b"pingpong", // Expecting "ping" + "pong" as the echoed response
-    //     "Expected response to be echoed"
-    // );
 }
