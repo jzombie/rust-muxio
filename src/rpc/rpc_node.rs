@@ -17,6 +17,7 @@ impl<'a> RpcNode<'a> {
         }
     }
 
+    // TODO: Allow responses to be optional
     pub fn init_request<G, F>(
         &mut self,
         hdr: RpcHeader,
@@ -79,8 +80,6 @@ impl<'a> RpcNode<'a> {
                     evt,
                     RpcStreamEvent::End { .. } | RpcStreamEvent::Error { .. }
                 ) {
-                    println!("EVER?");
-
                     self.response_handlers.remove(&rpc_id);
                 }
             }
@@ -90,7 +89,9 @@ impl<'a> RpcNode<'a> {
                     cb(evt);
                 }
             }
-        })
+        })?;
+
+        Ok(())
     }
 
     pub fn get_remaining_response_handlers(&self) -> usize {

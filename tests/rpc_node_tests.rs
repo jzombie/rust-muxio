@@ -99,19 +99,24 @@ fn rpc_node_stream_and_reply_roundtrip() {
             .expect("server receive_bytes failed");
     }
 
+    assert_eq!(
+        client.borrow().get_remaining_response_handlers(),
+        1,
+        "client remaining response headers incorrectly identified"
+    );
+    assert_eq!(
+        server.borrow().get_remaining_response_handlers(),
+        0,
+        "server remaining response headers incorrectly identified"
+    );
+
     // Now process pending reply **after** server handler completes
     for (reply_header, reply_bytes, emit) in pending.borrow_mut().drain(..) {
         let mut server_encoder = server
             .borrow_mut()
-            // TODO: Rename to `init_response`?
-            .init_request(
-                reply_header,
-                4,
-                move |bytes| {
-                    emit.borrow_mut().push(bytes.to_vec());
-                },
-                |_| {},
-            )
+            .start_reply_stream(reply_header, 4, move |bytes| {
+                emit.borrow_mut().push(bytes.to_vec());
+            })
             .expect("server init_request failed");
 
         server_encoder.push_bytes(&reply_bytes).unwrap();
@@ -131,5 +136,16 @@ fn rpc_node_stream_and_reply_roundtrip() {
     assert_eq!(
         client_received_metadata.borrow().get(&1).unwrap(),
         &b"resp-meta".to_vec()
+    );
+
+    assert_eq!(
+        client.borrow().get_remaining_response_handlers(),
+        0,
+        "client remaining response headers incorrectly identified"
+    );
+    assert_eq!(
+        server.borrow().get_remaining_response_handlers(),
+        0,
+        "server remaining response headers incorrectly identified"
     );
 }
