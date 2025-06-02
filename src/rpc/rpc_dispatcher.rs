@@ -1,7 +1,7 @@
 use crate::frame::{FrameDecodeError, FrameEncodeError};
 use crate::rpc::{
-    RpcHeader, RpcMessageType, RpcMethodHandler, RpcMethodRegistry, RpcRequest, RpcResponse,
-    RpcSessionNode, RpcStreamEncoder, RpcStreamEvent,
+    RpcHeader, RpcMessageType, RpcRequest, RpcResponse, RpcSessionNode, RpcStreamEncoder,
+    RpcStreamEvent,
 };
 use std::cell::Ref;
 use std::cell::RefCell;
@@ -11,7 +11,6 @@ use std::rc::Rc;
 pub struct RpcDispatcher<'a> {
     rpc_session: RpcSessionNode<'a>,
     next_header_id: u32,
-    rpc_method_registry: RpcMethodRegistry<'a>,
     rpc_request_queue: Rc<RefCell<VecDeque<(u32, RpcRequest)>>>,
 }
 
@@ -22,7 +21,6 @@ impl<'a> RpcDispatcher<'a> {
         let mut instance = Self {
             rpc_session,
             next_header_id: 1,
-            rpc_method_registry: RpcMethodRegistry::new(),
             rpc_request_queue: Rc::new(RefCell::new(VecDeque::new())),
         };
 
@@ -133,10 +131,6 @@ impl<'a> RpcDispatcher<'a> {
         }
 
         Ok(response_encoder)
-    }
-
-    pub fn register(&mut self, method_name: &'static str, handler: RpcMethodHandler<'a>) {
-        self.rpc_method_registry.register(method_name, handler);
     }
 
     pub fn call<G, F>(

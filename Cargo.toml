@@ -13,4 +13,4 @@ bitcode = "0.6.6"
 
 [dependencies]
 chrono = "0.4.41"
-xxhash-rust = { version = "0.8.15", features = ["xxh3"] }
+

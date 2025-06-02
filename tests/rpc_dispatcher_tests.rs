@@ -1,4 +1,4 @@
-use muxio::rpc::{RpcDispatcher, RpcHeader, RpcRequest, RpcResponse, RpcStreamEvent};
+use muxio::rpc::{RpcDispatcher, RpcRequest, RpcResponse, RpcStreamEvent};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -12,23 +12,23 @@ fn rpc_dispatcher_call_and_echo_response() {
     let mut server_dispatcher = RpcDispatcher::new();
 
     // TODO: Finish prototyping
-    server_dispatcher.register(
-        "test-method",
-        Box::new(
-            |header: RpcHeader, params: Vec<u8>, mut emit_event: Box<dyn FnMut(RpcStreamEvent)>| {
-                println!(
-                    "TEST METHOD CALLED with header: {:?} and params: {:?}",
-                    header, params
-                );
+    // server_dispatcher.register(
+    //     "test-method",
+    //     Box::new(
+    //         |header: RpcHeader, params: Vec<u8>, mut emit_event: Box<dyn FnMut(RpcStreamEvent)>| {
+    //             println!(
+    //                 "TEST METHOD CALLED with header: {:?} and params: {:?}",
+    //                 header, params
+    //             );
 
-                // You can call the event handler to send back an event if necessary
-                emit_event(RpcStreamEvent::Header {
-                    rpc_header_id: header.id,
-                    rpc_header: header,
-                });
-            },
-        ),
-    );
+    //             // You can call the event handler to send back an event if necessary
+    //             emit_event(RpcStreamEvent::Header {
+    //                 rpc_header_id: header.id,
+    //                 rpc_header: header,
+    //             });
+    //         },
+    //     ),
+    // );
 
     {
         // Prepare a mock RPC request
