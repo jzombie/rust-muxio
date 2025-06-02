@@ -16,10 +16,22 @@ impl<'a> RpcDispatcher<'a> {
     pub fn new() -> Self {
         let session = Rc::new(RefCell::new(RpcSessionNode::new()));
 
-        // Use a clone of the Rc to move it into the closure, allowing mutable access
-        let session_ref = Rc::clone(&session);
+        let instance = Self {
+            session,
+            next_id: 1, // TODO: Use parent?
+            rpc_method_registry: RpcMethodRegistry::new(),
+        };
 
-        session
+        instance.init_response_handler();
+
+        instance
+    }
+
+    fn init_response_handler(&self) {
+        // Use a clone of the Rc to move it into the closure, allowing mutable access
+        // let session_ref = Rc::clone(&self.session);
+
+        self.session
             .borrow_mut()
             .set_response_handler(Box::new(move |event: RpcStreamEvent| {
                 // Handle the event here
@@ -40,19 +52,22 @@ impl<'a> RpcDispatcher<'a> {
                         println!("Stream End: {}", rpc_header_id);
 
                         // Borrow mutably and use session to start reply stream
-                        session_ref.borrow_mut().start_reply_stream(
-                            RpcHeader {
-                                msg_type: RpcMessageType::Response,
-                                id: rpc_header_id,
-                                method_id: 0,
-                                metadata_bytes: vec![],
-                            },
-                            4,
-                            |bytes: &[u8]| {
-                                // Handle reply bytes here
-                                println!("Reply bytes: {:?}", bytes);
-                            },
-                        );
+                        // session_ref
+                        //     .borrow_mut()
+                        //     .start_reply_stream(
+                        //         RpcHeader {
+                        //             msg_type: RpcMessageType::Response,
+                        //             id: rpc_header_id,
+                        //             method_id: 0,
+                        //             metadata_bytes: vec![],
+                        //         },
+                        //         4,
+                        //         |bytes: &[u8]| {
+                        //             // Handle reply bytes here
+                        //             println!("Reply bytes: {:?}", bytes);
+                        //         },
+                        //     )
+                        //     .unwrap();
                     }
                     RpcStreamEvent::Error {
                         rpc_header_id,
@@ -65,12 +80,6 @@ impl<'a> RpcDispatcher<'a> {
                     }
                 }
             }));
-
-        Self {
-            session,
-            next_id: 1, // TODO: Use parent?
-            rpc_method_registry: RpcMethodRegistry::new(),
-        }
     }
 
     pub fn register(&mut self, method_name: &'static str, handler: RpcMethodHandler<'a>) {
