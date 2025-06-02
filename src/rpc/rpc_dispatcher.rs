@@ -5,15 +5,14 @@ use crate::rpc::{
         RpcHeader, RpcMessageType, RpcRespondableSession, RpcStreamEncoder, RpcStreamEvent,
     },
 };
-use std::cell::Ref;
-use std::cell::RefCell;
+
 use std::collections::VecDeque;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 pub struct RpcDispatcher<'a> {
     rpc_session: RpcRespondableSession<'a>,
     next_header_id: u32,
-    rpc_request_queue: Rc<RefCell<VecDeque<(u32, RpcRequest)>>>,
+    rpc_request_queue: Arc<Mutex<VecDeque<(u32, RpcRequest)>>>,
 }
 
 impl<'a> RpcDispatcher<'a> {
@@ -23,7 +22,7 @@ impl<'a> RpcDispatcher<'a> {
         let mut instance = Self {
             rpc_session,
             next_header_id: 1,
-            rpc_request_queue: Rc::new(RefCell::new(VecDeque::new())),
+            rpc_request_queue: Arc::new(Mutex::new(VecDeque::new())),
         };
 
         instance.init_catch_all_response_handler();
@@ -33,11 +32,11 @@ impl<'a> RpcDispatcher<'a> {
 
     // Invoked on the remote in reponse to `call` requests from the local client
     fn init_catch_all_response_handler(&mut self) {
-        let rpc_request_queue_ref = Rc::clone(&self.rpc_request_queue);
+        let rpc_request_queue_ref = Arc::clone(&self.rpc_request_queue);
 
         self.rpc_session
             .set_catch_all_response_handler(Box::new(move |event: RpcStreamEvent| {
-                let mut queue = rpc_request_queue_ref.borrow_mut(); // Borrow once
+                let mut queue = rpc_request_queue_ref.lock().unwrap();
 
                 // TODO: Delete from queue if request is canceled mid-flight
                 match event {
@@ -193,44 +192,48 @@ impl<'a> RpcDispatcher<'a> {
         self.rpc_session.receive_bytes(bytes)?;
 
         // List of request header IDs which are currently in progress
-        let active_request_header_ids: Vec<u32> = self
+        let queue = self
             .rpc_request_queue
-            .borrow_mut()
-            .iter()
-            // .filter(|(_header_id, request)| request.is_finalized)
-            .map(|(header_id, _)| *header_id)
-            .collect();
+            .lock()
+            .map_err(|_| FrameDecodeError::CorruptFrame)?;
+        let active_request_header_ids: Vec<u32> =
+            queue.iter().map(|(header_id, _)| *header_id).collect();
 
         Ok(active_request_header_ids)
     }
 
-    pub fn get_rpc_request(&self, header_id: u32) -> Option<Ref<RpcRequest>> {
-        let queue = self.rpc_request_queue.borrow();
+    pub fn get_rpc_request(
+        &self,
+        header_id: u32,
+    ) -> Option<std::sync::MutexGuard<'_, VecDeque<(u32, RpcRequest)>>> {
+        let queue = self.rpc_request_queue.lock().ok()?;
 
-        // Find the index of the matching request
-        let index = queue.iter().position(|(id, _)| *id == header_id)?;
-
-        // Now re-borrow with Ref and map to the inner request
-        Some(Ref::map(queue, |q| &q[index].1))
+        // You can't return a reference to an element inside a MutexGuard
+        // so we return the full guard instead
+        if queue.iter().any(|(id, _)| *id == header_id) {
+            Some(queue) // Caller must search again within the guard
+        } else {
+            None
+        }
     }
 
     pub fn is_rpc_request_finalized(&self, header_id: u32) -> Option<bool> {
-        match self.get_rpc_request(header_id) {
-            Some(rpc_request) => Some(rpc_request.is_finalized),
-            None => None,
-        }
+        let queue = self.rpc_request_queue.lock().ok()?;
+        queue
+            .iter()
+            .find(|(id, _)| *id == header_id)
+            .map(|(_, req)| req.is_finalized)
     }
 
     // Deletes the request and transfers ownership to the caller
     pub fn delete_rpc_request(&self, header_id: u32) -> Option<RpcRequest> {
-        let mut queue = self.rpc_request_queue.borrow_mut();
+        let mut queue = self.rpc_request_queue.lock().ok()?;
 
-        // Find the index of the matching request and remove it
         if let Some(index) = queue.iter().position(|(id, _)| *id == header_id) {
-            // Remove and return the RpcRequest at the found index
-            Some(queue.remove(index).map(|(_, request)| request).unwrap())
+            // Remove and return just the RpcRequest
+            Some(queue.remove(index)?.1)
         } else {
-            None // Return None if no matching header_id was found
+            None
         }
     }
 }
