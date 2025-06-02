@@ -26,6 +26,7 @@ impl<'a> RpcDispatcher<'a> {
         self.rpc_method_registry.register(method_name, handler)
     }
 
+    // TODO: Ensure method can be run async
     /// Call a remote method. Metadata is the UTF-8 method name.
     pub fn call<G>(
         &mut self,
