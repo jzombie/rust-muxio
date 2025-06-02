@@ -3,6 +3,7 @@ use crate::rpc::{
     RpcHeader, RpcMessageType, RpcMethodHandler, RpcMethodRegistry, RpcRequest, RpcSessionNode,
     RpcStreamEncoder, RpcStreamEvent,
 };
+use std::cell::Ref;
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::rc::Rc;
@@ -53,10 +54,7 @@ impl<'a> RpcDispatcher<'a> {
                             is_finalized: false,
                         };
 
-                        // Debug: Print the queue's state before and after adding to the queue
-                        println!("Before adding to queue: {:?}", queue);
                         queue.push_back((rpc_header_id, rpc_request));
-                        println!("After adding to queue: {:?}", queue);
                     }
 
                     RpcStreamEvent::PayloadChunk {
@@ -70,14 +68,6 @@ impl<'a> RpcDispatcher<'a> {
                             // Append bytes to the payload
                             let payload = rpc_request.payload_bytes.get_or_insert_with(Vec::new);
                             payload.extend_from_slice(&bytes);
-
-                            // Debug: Print the queue's state before and after updating
-                            println!("Before updating queue: {:?}", queue);
-                            // No need to push back; we're already mutably borrowing it
-                            println!("After updating queue: {:?}", queue);
-                        } else {
-                            // Handle the case where there's no corresponding header in the queue
-                            eprintln!("No header found for payload with ID: {}", rpc_header_id);
                         }
                     }
 
@@ -88,10 +78,6 @@ impl<'a> RpcDispatcher<'a> {
                         {
                             // Set the `is_finalized` flag to true when the stream ends
                             rpc_request.is_finalized = true;
-
-                            // Now we have the full message (header + payload)
-                            println!("Stream End: {} with complete payload", rpc_header_id);
-                            println!("Complete message: {:?}", rpc_request);
                         }
                     }
 
@@ -213,5 +199,15 @@ impl<'a> RpcDispatcher<'a> {
 
         // Return the list of header IDs
         Ok(finalized_request_header_ids)
+    }
+
+    pub fn get_rpc_request(&self, header_id: u32) -> Option<Ref<RpcRequest>> {
+        let queue = self.rpc_request_queue.borrow();
+
+        // Find the index of the matching request
+        let index = queue.iter().position(|(id, _)| *id == header_id)?;
+
+        // Now re-borrow with Ref and map to the inner request
+        Some(Ref::map(queue, |q| &q[index].1))
     }
 }
