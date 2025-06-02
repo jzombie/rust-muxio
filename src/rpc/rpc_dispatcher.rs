@@ -36,6 +36,7 @@ impl<'a> RpcDispatcher<'a> {
             .set_catch_all_response_handler(Box::new(move |event: RpcStreamEvent| {
                 let mut queue = rpc_request_queue_ref.borrow_mut(); // Borrow once
 
+                // TODO: Delete from queue if request is canceled mid-flight
                 match event {
                     RpcStreamEvent::Header {
                         rpc_header_id,
