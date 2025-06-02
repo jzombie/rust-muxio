@@ -13,7 +13,7 @@ pub struct RpcSessionNode<'a> {
     rpc_session: RpcSession,
     // TODO: Make these names less vague
     response_handlers: HashMap<u32, Box<dyn FnMut(RpcStreamEvent) + 'a>>,
-    global_response_handler: Option<Box<dyn FnMut(RpcStreamEvent) + 'a>>,
+    catch_all_response_handler: Option<Box<dyn FnMut(RpcStreamEvent) + 'a>>,
 }
 
 impl<'a> RpcSessionNode<'a> {
@@ -21,7 +21,7 @@ impl<'a> RpcSessionNode<'a> {
         Self {
             rpc_session: RpcSession::new(),
             response_handlers: HashMap::new(),
-            global_response_handler: None,
+            catch_all_response_handler: None,
         }
     }
 
@@ -63,11 +63,11 @@ impl<'a> RpcSessionNode<'a> {
     }
 
     // TODO: Document
-    pub fn set_response_handler<F>(&mut self, handler: F)
+    pub fn set_catch_all_response_handler<F>(&mut self, handler: F)
     where
         F: FnMut(RpcStreamEvent) + 'a,
     {
-        self.global_response_handler = Some(Box::new(handler));
+        self.catch_all_response_handler = Some(Box::new(handler));
     }
 
     pub fn receive_bytes(&mut self, bytes: &[u8]) -> Result<(), FrameDecodeError> {
@@ -95,9 +95,8 @@ impl<'a> RpcSessionNode<'a> {
                 }
             }
 
-            // TODO: This shoudld be a bit more async
             if !handled {
-                if let Some(cb) = self.global_response_handler.as_mut() {
+                if let Some(cb) = self.catch_all_response_handler.as_mut() {
                     cb(evt);
                 }
             }

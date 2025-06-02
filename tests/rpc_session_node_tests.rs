@@ -29,7 +29,7 @@ fn rpc_session_node_stream_and_reply_roundtrip() {
 
         server
             .borrow_mut()
-            .set_response_handler(move |evt| match evt {
+            .set_catch_all_response_handler(move |evt| match evt {
                 RpcStreamEvent::Header { rpc_header, .. } => {
                     assert_eq!(rpc_header.metadata_bytes, b"req-meta");
                 }

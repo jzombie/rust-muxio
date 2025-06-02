@@ -26,19 +26,20 @@ impl<'a> RpcDispatcher<'a> {
             response_queue: Rc::new(RefCell::new(VecDeque::new())),
         };
 
-        instance.init_response_handler();
+        instance.init_catch_all_response_handler();
 
         instance
     }
 
-    fn init_response_handler(&self) {
+    fn init_catch_all_response_handler(&self) {
         // Use a clone of the Rc to move it into the closure, allowing mutable access
         // let session_ref = Rc::clone(&self.session);
 
         let reponse_queue_ref = Rc::clone(&self.response_queue);
 
-        self.rpc_session.borrow_mut().set_response_handler(Box::new(
-            move |event: RpcStreamEvent| {
+        self.rpc_session
+            .borrow_mut()
+            .set_catch_all_response_handler(Box::new(move |event: RpcStreamEvent| {
                 // Handle the event here
                 match event {
                     RpcStreamEvent::Header {
@@ -84,8 +85,7 @@ impl<'a> RpcDispatcher<'a> {
                         );
                     }
                 }
-            },
-        ));
+            }));
     }
 
     pub fn start_reply_stream<F>(
@@ -176,6 +176,14 @@ impl<'a> RpcDispatcher<'a> {
 
     // TODO: Return tasks to perform
     pub fn receive_bytes(&mut self, bytes: &[u8]) -> Result<(), FrameDecodeError> {
-        self.rpc_session.borrow_mut().receive_bytes(bytes)
+        // TODO: Remove
+        println!("BEFORE RECEIVE BYTES QUEUE: {:?}", self.response_queue);
+
+        let resp = self.rpc_session.borrow_mut().receive_bytes(bytes);
+
+        // TODO: Remove
+        println!("AFTER RECEIVE BYTES QUEUE: {:?}", self.response_queue);
+
+        resp
     }
 }
