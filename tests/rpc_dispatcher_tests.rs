@@ -5,14 +5,6 @@ use std::rc::Rc;
 
 #[test]
 fn rpc_dispatcher_call_and_echo_response() {
-    // Prepare a mock RPC request
-    let rpc_request = RpcRequest {
-        method_name: "ping".to_string(),
-        param_bytes: b"ping".to_vec(),
-        payload_bytes: None,
-        is_finalized: true,
-    };
-
     // Shared buffer for the outgoing response
     let outgoing_buf: Rc<RefCell<Vec<u8>>> = Rc::new(RefCell::new(Vec::new()));
 
@@ -21,42 +13,78 @@ fn rpc_dispatcher_call_and_echo_response() {
     let mut server_dispatcher = RpcDispatcher::new();
 
     {
-        // Move the `outgoing_buf` into the closure, ensuring it lives as long as needed
-        client_dispatcher
-            .call(
-                rpc_request,
-                4,
-                {
-                    // Move the outgoing_buf into the closure to extend its lifetime
-                    let outgoing_buf = Rc::clone(&outgoing_buf);
+        // Prepare a mock RPC request
+        let rpc_request_1 = RpcRequest {
+            method_name: "ping".to_string(),
+            param_bytes: b"ping".to_vec(),
+            payload_bytes: None,
+            is_finalized: true,
+        };
 
-                    // The closure captures `outgoing_buf` and borrows it while executing
-                    move |bytes: &[u8]| {
-                        println!("Client sending bytes to server: {:?}", bytes);
+        // Prepare a mock RPC request
+        let rpc_request_2 = RpcRequest {
+            method_name: "ping2".to_string(),
+            param_bytes: b"ping2".to_vec(),
+            payload_bytes: None,
+            is_finalized: true,
+        };
 
-                        // Collect bytes into the buffer
-                        outgoing_buf.borrow_mut().extend(bytes);
+        let rpc_requests = vec![rpc_request_1, rpc_request_2];
 
-                        // Simulate echoing back the received payload
-                        // The following lines would normally simulate a server echoing back the payload
-                        // let reply_bytes = if bytes == b"ping" {
-                        //     b"pong".to_vec() // Echo response "pong"
-                        // } else {
-                        //     b"fail".to_vec() // Error message if something else is received
-                        // };
+        for rpc_request in rpc_requests {
+            // Move the `outgoing_buf` into the closure, ensuring it lives as long as needed
+            client_dispatcher
+                .call(
+                    rpc_request,
+                    4,
+                    {
+                        // Move the outgoing_buf into the closure to extend its lifetime
+                        let outgoing_buf = Rc::clone(&outgoing_buf);
 
-                        // Instead of responding to the client dispatcher, we're appending the reply to the buffer
-                        //  outgoing_buf.borrow_mut().extend(reply_bytes);
-                    }
-                },
-                Some(|rpc_stream_event: RpcStreamEvent| {
-                    println!(
-                        "Client received response from server: {:?}",
-                        rpc_stream_event
-                    )
-                }),
-            )
-            .expect("Server call failed");
+                        // The closure captures `outgoing_buf` and borrows it while executing
+                        move |bytes: &[u8]| {
+                            // Collect bytes into the buffer
+                            outgoing_buf.borrow_mut().extend(bytes);
+
+                            // Simulate echoing back the received payload
+                            // The following lines would normally simulate a server echoing back the payload
+                            // let reply_bytes = if bytes == b"ping" {
+                            //     b"pong".to_vec() // Echo response "pong"
+                            // } else {
+                            //     b"fail".to_vec() // Error message if something else is received
+                            // };
+
+                            // Instead of responding to the client dispatcher, we're appending the reply to the buffer
+                            //  outgoing_buf.borrow_mut().extend(reply_bytes);
+                        }
+                    },
+                    Some(|rpc_stream_event: RpcStreamEvent| {
+                        println!(
+                            "Client received response from server: {:?}",
+                            rpc_stream_event
+                        );
+
+                        match rpc_stream_event {
+                            RpcStreamEvent::Header {
+                                rpc_header_id,
+                                rpc_header,
+                            } => {
+                                // This is a Header event, handle it here
+                                println!(
+                                    "Client received header: ID = {}, Header = {:?}",
+                                    rpc_header_id, rpc_header
+                                );
+                                // Add your code for handling the header here
+                            }
+                            _ => {
+                                // Handle other event types if necessary
+                                println!("Not a Header event");
+                            }
+                        }
+                    }),
+                )
+                .expect("Server call failed");
+        }
     }
 
     {

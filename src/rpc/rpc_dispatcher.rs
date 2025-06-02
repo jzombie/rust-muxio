@@ -160,9 +160,6 @@ impl<'a> RpcDispatcher<'a> {
         // Process the incoming bytes
         self.rpc_session.borrow_mut().receive_bytes(bytes)?;
 
-        // TODO: Remove
-        println!("RPC request queue {:?}", self.rpc_request_queue);
-
         // Capture the list of header IDs currently in the queue
         let request_header_ids: Vec<u32> = self
             .rpc_request_queue
