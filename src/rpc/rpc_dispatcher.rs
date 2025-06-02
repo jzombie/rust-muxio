@@ -62,19 +62,18 @@ impl<'a> RpcDispatcher<'a> {
                         rpc_header_id,
                         bytes,
                     } => {
-                        // If we have an existing RpcRequest in the queue, we append the payload
-                        if let Some((header_id, mut rpc_request)) = queue.pop_back() {
-                            if header_id == rpc_header_id {
-                                // Append bytes to the payload
-                                let payload =
-                                    rpc_request.payload_bytes.get_or_insert_with(Vec::new);
-                                payload.extend_from_slice(&bytes);
+                        // Look for the existing RpcRequest in the queue and borrow it mutably
+                        if let Some((_, rpc_request)) =
+                            queue.iter_mut().find(|(id, _)| *id == rpc_header_id)
+                        {
+                            // Append bytes to the payload
+                            let payload = rpc_request.payload_bytes.get_or_insert_with(Vec::new);
+                            payload.extend_from_slice(&bytes);
 
-                                // Debug: Print the queue's state before and after updating
-                                println!("Before updating queue: {:?}", queue);
-                                queue.push_back((header_id, rpc_request));
-                                println!("After updating queue: {:?}", queue);
-                            }
+                            // Debug: Print the queue's state before and after updating
+                            println!("Before updating queue: {:?}", queue);
+                            // No need to push back; we're already mutably borrowing it
+                            println!("After updating queue: {:?}", queue);
                         } else {
                             // Handle the case where there's no corresponding header in the queue
                             eprintln!("No header found for payload with ID: {}", rpc_header_id);
@@ -83,12 +82,12 @@ impl<'a> RpcDispatcher<'a> {
 
                     RpcStreamEvent::End { rpc_header_id } => {
                         // Finalize and process the full message when the stream ends
-                        if let Some((header_id, rpc_request)) = queue.pop_back() {
-                            if header_id == rpc_header_id {
-                                // Now we have the full message (header + payload)
-                                println!("Stream End: {} with complete payload", rpc_header_id);
-                                println!("Complete message: {:?}", rpc_request);
-                            }
+                        if let Some((_, rpc_request)) =
+                            queue.iter_mut().find(|(id, _)| *id == rpc_header_id)
+                        {
+                            // Now we have the full message (header + payload)
+                            println!("Stream End: {} with complete payload", rpc_header_id);
+                            println!("Complete message: {:?}", rpc_request);
                         }
                     }
 
