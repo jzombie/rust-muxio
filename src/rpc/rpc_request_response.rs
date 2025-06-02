@@ -1,4 +1,4 @@
-// use xxhash_rust::xxh3::xxh3_64;
+use xxhash_rust::xxh3::xxh3_64;
 
 #[derive(PartialEq, Debug)]
 pub struct RpcRequest {
@@ -8,12 +8,11 @@ pub struct RpcRequest {
     pub is_finalized: bool,
 }
 
-// TODO: Re-add?
-// impl RpcRequest {
-//     pub fn to_method_id(method_name: &str) -> u64 {
-//         xxh3_64(method_name.as_bytes())
-//     }
-// }
+impl RpcRequest {
+    pub fn to_method_id(method_name: &str) -> u64 {
+        xxh3_64(method_name.as_bytes())
+    }
+}
 
 #[derive(PartialEq, Debug)]
 pub struct RpcResponse {
