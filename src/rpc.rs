@@ -13,7 +13,7 @@ pub use rpc_dispatcher::RpcDispatcher;
 pub use rpc_header::RpcHeader;
 pub use rpc_message_type::RpcMessageType;
 pub use rpc_method_registry::{RpcMethodHandler, RpcMethodRegistry};
-pub use rpc_request_response::{RpcRequest, RpcResponse};
+pub use rpc_request_response::{RpcRequest /* RpcResponse */};
 pub use rpc_session::RpcSession;
 pub use rpc_session_node::RpcSessionNode;
 pub use rpc_stream_decoder::{RpcDecoderState, RpcStreamDecoder};

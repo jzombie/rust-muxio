@@ -10,7 +10,7 @@ use std::rc::Rc;
 
 pub struct RpcDispatcher<'a> {
     rpc_session: RpcSessionNode<'a>,
-    next_header_id: u32, // TODO: Use parent?
+    next_header_id: u32,
     rpc_method_registry: RpcMethodRegistry<'a>,
     rpc_request_queue: Rc<RefCell<VecDeque<(u32, RpcRequest)>>>,
 }
@@ -21,7 +21,7 @@ impl<'a> RpcDispatcher<'a> {
 
         let mut instance = Self {
             rpc_session,
-            next_header_id: 1, // TODO: Use parent?
+            next_header_id: 1,
             rpc_method_registry: RpcMethodRegistry::new(),
             rpc_request_queue: Rc::new(RefCell::new(VecDeque::new())),
         };
@@ -49,7 +49,7 @@ impl<'a> RpcDispatcher<'a> {
                         let rpc_request = RpcRequest {
                             method_name,
                             param_bytes: rpc_header.metadata_bytes,
-                            payload_bytes: None, // No payload yet
+                            pre_buffered_payload_bytes: None, // No payload yet
                             is_finalized: false,
                         };
 
@@ -65,7 +65,9 @@ impl<'a> RpcDispatcher<'a> {
                             queue.iter_mut().find(|(id, _)| *id == rpc_header_id)
                         {
                             // Append bytes to the payload
-                            let payload = rpc_request.payload_bytes.get_or_insert_with(Vec::new);
+                            let payload = rpc_request
+                                .pre_buffered_payload_bytes
+                                .get_or_insert_with(Vec::new);
                             payload.extend_from_slice(&bytes);
                         }
                     }
@@ -138,8 +140,8 @@ impl<'a> RpcDispatcher<'a> {
                 .init_request(hdr, max_chunk_size, on_emit, on_response)?;
 
         // If the RPC request has a buffered payload, send it here
-        if let Some(payload) = rpc_request.payload_bytes {
-            encoder.push_bytes(&payload)?;
+        if let Some(pre_buffered_payload_bytes) = rpc_request.pre_buffered_payload_bytes {
+            encoder.push_bytes(&pre_buffered_payload_bytes)?;
         }
 
         // If the RPC request is pre-finalized, close the stream
