@@ -64,7 +64,7 @@ fn rpc_dispatcher_call_and_echo_response() {
             .expect("Failed to receive bytes on server");
 
         println!("Request header ids: {:?}", request_header_ids);
-        println!("TEST: {:?}", server_dispatcher.get_rpc_request(1));
+        println!("TEST: {:?}", server_dispatcher.delete_rpc_request(1));
 
         // println!("{:?}", server_dispatcher.response_queue);
         server_dispatcher

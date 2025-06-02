@@ -189,16 +189,16 @@ impl<'a> RpcDispatcher<'a> {
         println!("RPC request queue {:?}", self.rpc_request_queue);
 
         // Capture the list of header IDs currently in the queue
-        let finalized_request_header_ids: Vec<u32> = self
+        let request_header_ids: Vec<u32> = self
             .rpc_request_queue
             .borrow_mut()
             .iter()
-            .filter(|(_header_id, request)| request.is_finalized)
+            // .filter(|(_header_id, request)| request.is_finalized)
             .map(|(header_id, _)| *header_id)
             .collect();
 
         // Return the list of header IDs
-        Ok(finalized_request_header_ids)
+        Ok(request_header_ids)
     }
 
     pub fn get_rpc_request(&self, header_id: u32) -> Option<Ref<RpcRequest>> {
@@ -209,5 +209,18 @@ impl<'a> RpcDispatcher<'a> {
 
         // Now re-borrow with Ref and map to the inner request
         Some(Ref::map(queue, |q| &q[index].1))
+    }
+
+    // Deletes the request and transfers ownership to the caller
+    pub fn delete_rpc_request(&self, header_id: u32) -> Option<RpcRequest> {
+        let mut queue = self.rpc_request_queue.borrow_mut();
+
+        // Find the index of the matching request and remove it
+        if let Some(index) = queue.iter().position(|(id, _)| *id == header_id) {
+            // Remove and return the RpcRequest at the found index
+            Some(queue.remove(index).map(|(_, request)| request).unwrap())
+        } else {
+            None // Return None if no matching header_id was found
+        }
     }
 }
