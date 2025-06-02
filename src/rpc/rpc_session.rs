@@ -4,13 +4,18 @@ use crate::{
 };
 use std::collections::HashMap;
 
-pub struct RpcMuxSession {
+/// Low-level stream multiplexing engine for RPC.
+///
+/// This struct manages the allocation of stream IDs, the decoding of framed
+/// messages, and per-stream decoding state. It does not perform any routing
+/// or application-le
+pub struct RpcSession {
     next_stream_id: u32,                             // Counter for the next stream ID
     frame_mux_stream_decoder: FrameMuxStreamDecoder, // Decoder that processes frames
     rpc_stream_decoders: HashMap<u32, RpcStreamDecoder>, // Maps stream ID to decoders for individual streams
 }
 
-impl RpcMuxSession {
+impl RpcSession {
     pub fn new() -> Self {
         Self {
             next_stream_id: 1,
@@ -19,7 +24,7 @@ impl RpcMuxSession {
         }
     }
 
-    pub fn start_rpc_stream<F>(
+    pub fn init_request<F>(
         &mut self,
         header: RpcHeader,
         max_chunk_size: usize,
@@ -57,7 +62,7 @@ impl RpcMuxSession {
                         .entry(stream_id)
                         .or_insert_with(RpcStreamDecoder::new);
 
-                    match rpc_stream_decoder.decode_frame(&frame) {
+                    match rpc_stream_decoder.decode_rpc_frame(&frame) {
                         Ok(events) => {
                             for event in events {
                                 if matches!(event, RpcStreamEvent::End { .. }) {

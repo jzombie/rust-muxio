@@ -36,9 +36,8 @@ impl RpcStreamDecoder {
         self.rpc_header_id
     }
 
-    // TODO: Rename to `decode_rpc_frame`
     // Decoding the frame with fixed metadata length
-    pub fn decode_frame(
+    pub fn decode_rpc_frame(
         &mut self,
         frame: &DecodedFrame,
     ) -> Result<Vec<RpcStreamEvent>, FrameDecodeError> {
