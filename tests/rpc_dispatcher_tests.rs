@@ -31,8 +31,8 @@ fn rpc_dispatcher_call_and_echo_response() {
                     let outgoing_buf = Rc::clone(&outgoing_buf);
 
                     // The closure captures `outgoing_buf` and borrows it while executing
-                    move |bytes| {
-                        println!("Server processing: {:?}", bytes);
+                    move |bytes: &[u8]| {
+                        println!("Client sending bytes to server: {:?}", bytes);
 
                         // Collect bytes into the buffer
                         outgoing_buf.borrow_mut().extend(bytes);
@@ -50,7 +50,10 @@ fn rpc_dispatcher_call_and_echo_response() {
                     }
                 },
                 Some(|rpc_stream_event: RpcStreamEvent| {
-                    println!("Received response: {:?}", rpc_stream_event)
+                    println!(
+                        "Client received response from server: {:?}",
+                        rpc_stream_event
+                    )
                 }),
             )
             .expect("Server call failed");
@@ -63,26 +66,32 @@ fn rpc_dispatcher_call_and_echo_response() {
             .receive_bytes(incoming_buf.borrow().as_slice())
             .expect("Failed to receive bytes on server");
 
-        println!("Request header ids: {:?}", request_header_ids);
-        println!("TEST: {:?}", server_dispatcher.delete_rpc_request(1));
+        for request_header_id in request_header_ids {
+            println!("Server received request header ID: {:?}", request_header_id);
+            println!(
+                "\t{:?}: {:?}",
+                request_header_id,
+                server_dispatcher.delete_rpc_request(request_header_id)
+            );
 
-        // println!("{:?}", server_dispatcher.response_queue);
-        server_dispatcher
-            .start_reply_stream(
-                RpcHeader {
-                    msg_type: RpcMessageType::Response,
-                    id: 1,
-                    method_id: 0,
-                    metadata_bytes: b"proto".to_vec(),
-                },
-                4,
-                |bytes: &[u8]| {
-                    // println!("Emitting: {:?}", &bytes);
+            // println!("{:?}", server_dispatcher.response_queue);
+            server_dispatcher
+                .start_reply_stream(
+                    RpcHeader {
+                        msg_type: RpcMessageType::Response,
+                        id: request_header_id,
+                        method_id: 0, // TODO: Don't hardcode
+                        metadata_bytes: b"proto".to_vec(),
+                    },
+                    4,
+                    |bytes: &[u8]| {
+                        // println!("Emitting: {:?}", &bytes);
 
-                    client_dispatcher.receive_bytes(bytes);
-                },
-            )
-            .unwrap();
+                        client_dispatcher.receive_bytes(bytes).unwrap();
+                    },
+                )
+                .unwrap();
+        }
     }
 
     // Now check if the response was properly echoed

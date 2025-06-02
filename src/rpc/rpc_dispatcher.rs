@@ -10,7 +10,7 @@ use std::rc::Rc;
 
 pub struct RpcDispatcher<'a> {
     rpc_session: Rc<RefCell<RpcSessionNode<'a>>>,
-    next_id: u32, // TODO: Use parent?
+    next_header_id: u32, // TODO: Use parent?
     rpc_method_registry: RpcMethodRegistry<'a>,
     rpc_request_queue: Rc<RefCell<VecDeque<(u32, RpcRequest)>>>,
 }
@@ -21,7 +21,7 @@ impl<'a> RpcDispatcher<'a> {
 
         let instance = Self {
             rpc_session,
-            next_id: 1, // TODO: Use parent?
+            next_header_id: 1, // TODO: Use parent?
             rpc_method_registry: RpcMethodRegistry::new(),
             rpc_request_queue: Rc::new(RefCell::new(VecDeque::new())),
         };
@@ -123,12 +123,12 @@ impl<'a> RpcDispatcher<'a> {
         G: FnMut(&[u8]), // Ensuring that `G` is FnMut(&[u8])
         F: FnMut(RpcStreamEvent) + 'a,
     {
-        let id = self.next_id;
-        self.next_id += 1; // TODO: Use parent?
+        let header_id: u32 = self.next_header_id;
+        self.next_header_id += 1;
 
         let hdr = RpcHeader {
             msg_type: RpcMessageType::Call,
-            id,
+            id: header_id,
             method_id: 0, // Placeholder method_id, should be computed or set
             metadata_bytes: rpc_request.param_bytes,
         };
