@@ -10,6 +10,7 @@ fn rpc_dispatcher_call_and_echo_response() {
         method_name: "ping".to_string(),
         param_bytes: b"ping".to_vec(),
         payload_bytes: None,
+        is_finalized: true,
     };
 
     // Shared buffer for the outgoing response

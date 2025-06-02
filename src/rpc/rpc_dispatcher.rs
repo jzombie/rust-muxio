@@ -50,6 +50,7 @@ impl<'a> RpcDispatcher<'a> {
                             method_name,
                             param_bytes: rpc_header.metadata_bytes.clone(),
                             payload_bytes: None, // No payload yet
+                            is_finalized: false,
                         };
 
                         // Debug: Print the queue's state before and after adding to the queue
@@ -85,6 +86,9 @@ impl<'a> RpcDispatcher<'a> {
                         if let Some((_, rpc_request)) =
                             queue.iter_mut().find(|(id, _)| *id == rpc_header_id)
                         {
+                            // Set the `is_finalized` flag to true when the stream ends
+                            rpc_request.is_finalized = true;
+
                             // Now we have the full message (header + payload)
                             println!("Stream End: {} with complete payload", rpc_header_id);
                             println!("Complete message: {:?}", rpc_request);
@@ -199,14 +203,15 @@ impl<'a> RpcDispatcher<'a> {
         println!("RPC request queue {:?}", self.rpc_request_queue);
 
         // Capture the list of header IDs currently in the queue
-        let header_ids: Vec<u32> = self
+        let finalized_request_header_ids: Vec<u32> = self
             .rpc_request_queue
             .borrow_mut()
             .iter()
+            .filter(|(_header_id, request)| request.is_finalized)
             .map(|(header_id, _)| *header_id)
             .collect();
 
         // Return the list of header IDs
-        Ok(header_ids)
+        Ok(finalized_request_header_ids)
     }
 }

@@ -3,11 +3,12 @@ use bitcode::{Decode, Encode};
 use std::collections::HashMap;
 use xxhash_rust::xxh3::xxh3_64;
 
-#[derive(Encode, Decode, PartialEq, Debug, Clone)]
+#[derive(Encode, Decode, PartialEq, Debug)]
 pub struct RpcRequest {
     pub method_name: String,
     pub param_bytes: Vec<u8>,
     pub payload_bytes: Option<Vec<u8>>,
+    pub is_finalized: bool,
 }
 
 #[derive(Encode, Decode, PartialEq, Debug)]
