@@ -1,22 +1,21 @@
 use muxio::rpc::rpc_internals::{RpcHeader, RpcMessageType, RpcRespondableSession, RpcStreamEvent};
-use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 #[test]
 fn rpc_respondable_session_stream_and_reply_roundtrip() {
     let prebuffering_options = vec![true, false];
 
     for is_prebuffering_response in prebuffering_options {
-        let client = Rc::new(RefCell::new(RpcRespondableSession::new()));
-        let server = Rc::new(RefCell::new(RpcRespondableSession::new()));
+        let client = Arc::new(Mutex::new(RpcRespondableSession::new()));
+        let server = Arc::new(Mutex::new(RpcRespondableSession::new()));
 
         let mut server_inbox = Vec::new();
-        let client_inbox = Rc::new(RefCell::new(Vec::new()));
-        let client_received_payload = Rc::new(RefCell::new(Vec::new()));
-        let client_received_metadata = Rc::new(RefCell::new(HashMap::new()));
-        let server_received_payload = Rc::new(RefCell::new(Vec::new()));
-        let pending = Rc::new(RefCell::new(VecDeque::new()));
+        let client_inbox = Arc::new(Mutex::new(Vec::new()));
+        let client_received_payload = Arc::new(Mutex::new(Vec::new()));
+        let client_received_metadata = Arc::new(Mutex::new(HashMap::new()));
+        let server_received_payload = Arc::new(Mutex::new(Vec::new()));
+        let pending = Arc::new(Mutex::new(VecDeque::new()));
 
         let call_header = RpcHeader {
             msg_type: RpcMessageType::Call,
@@ -26,21 +25,22 @@ fn rpc_respondable_session_stream_and_reply_roundtrip() {
         };
 
         {
-            let recv_buf = server_received_payload.clone();
-            let pending_reply = pending.clone();
-            let emit = client_inbox.clone();
+            let recv_buf = Arc::clone(&server_received_payload);
+            let pending_reply = Arc::clone(&pending);
+            let emit = Arc::clone(&client_inbox);
 
             server
-                .borrow_mut()
+                .lock()
+                .unwrap()
                 .set_catch_all_response_handler(move |evt| match evt {
                     RpcStreamEvent::Header { rpc_header, .. } => {
                         assert_eq!(rpc_header.metadata_bytes, b"req-meta");
                     }
                     RpcStreamEvent::PayloadChunk { bytes, .. } => {
-                        recv_buf.borrow_mut().extend(bytes);
+                        recv_buf.lock().unwrap().extend(bytes);
                     }
                     RpcStreamEvent::End { rpc_header_id, .. } => {
-                        let reply_bytes = match recv_buf.borrow().as_slice() {
+                        let reply_bytes = match recv_buf.lock().unwrap().as_slice() {
                             b"ping" => b"pong".as_ref(),
                             _ => b"fail".as_ref(),
                         };
@@ -52,21 +52,22 @@ fn rpc_respondable_session_stream_and_reply_roundtrip() {
                             metadata_bytes: b"resp-meta".to_vec(),
                         };
 
-                        pending_reply.borrow_mut().push_back((
+                        pending_reply.lock().unwrap().push_back((
                             reply_header,
                             reply_bytes.to_vec(),
-                            emit.clone(),
+                            Arc::clone(&emit),
                         ));
                     }
                     _ => {}
                 });
         }
 
-        let payload_clone = client_received_payload.clone();
-        let metadata_clone = client_received_metadata.clone();
+        let payload_clone = Arc::clone(&client_received_payload);
+        let metadata_clone = Arc::clone(&client_received_metadata);
 
         let mut client_encoder = client
-            .borrow_mut()
+            .lock()
+            .unwrap()
             .init_respondable_request(
                 call_header.clone(),
                 4,
@@ -80,11 +81,12 @@ fn rpc_respondable_session_stream_and_reply_roundtrip() {
                         assert_eq!(rpc_header_id, call_header.id);
                         assert_eq!(rpc_header.msg_type, RpcMessageType::Response);
                         metadata_clone
-                            .borrow_mut()
+                            .lock()
+                            .unwrap()
                             .insert(rpc_header_id, rpc_header.metadata_bytes);
                     }
                     RpcStreamEvent::PayloadChunk { bytes, .. } => {
-                        payload_clone.borrow_mut().extend(bytes);
+                        payload_clone.lock().unwrap().extend(bytes);
                     }
                     RpcStreamEvent::End { .. } => {}
                     other => panic!("unexpected client event: {:?}", other),
@@ -99,28 +101,32 @@ fn rpc_respondable_session_stream_and_reply_roundtrip() {
 
         for chunk in server_inbox.iter() {
             server
-                .borrow_mut()
+                .lock()
+                .unwrap()
                 .receive_bytes(chunk)
                 .expect("server receive_bytes failed");
         }
 
         assert_eq!(
-            client.borrow().get_remaining_response_handlers(),
+            client.lock().unwrap().get_remaining_response_handlers(),
             1,
             "client remaining response headers incorrectly identified"
         );
         assert_eq!(
-            server.borrow().get_remaining_response_handlers(),
+            server.lock().unwrap().get_remaining_response_handlers(),
             0,
             "server remaining response headers incorrectly identified"
         );
 
-        // Now process pending reply **after** server handler completes
-        for (reply_header, reply_bytes, emit) in pending.borrow_mut().drain(..) {
+        for (reply_header, reply_bytes, emit) in pending.lock().unwrap().drain(..) {
             let mut server_encoder = server
-                .borrow_mut()
-                .start_reply_stream(reply_header, 4, move |bytes| {
-                    emit.borrow_mut().push(bytes.to_vec());
+                .lock()
+                .unwrap()
+                .start_reply_stream(reply_header, 4, {
+                    let emit = Arc::clone(&emit);
+                    move |bytes| {
+                        emit.lock().unwrap().push(bytes.to_vec());
+                    }
                 })
                 .expect("server init_request failed");
 
@@ -129,27 +135,27 @@ fn rpc_respondable_session_stream_and_reply_roundtrip() {
             server_encoder.end_stream().unwrap();
         }
 
-        // Feed response back to client
-        for chunk in client_inbox.borrow().iter() {
+        for chunk in client_inbox.lock().unwrap().iter() {
             client
-                .borrow_mut()
+                .lock()
+                .unwrap()
                 .receive_bytes(chunk)
                 .expect("client receive_bytes failed");
         }
 
-        assert_eq!(client_received_payload.borrow().as_slice(), b"pong");
+        assert_eq!(client_received_payload.lock().unwrap().as_slice(), b"pong");
         assert_eq!(
-            client_received_metadata.borrow().get(&1).unwrap(),
+            client_received_metadata.lock().unwrap().get(&1).unwrap(),
             &b"resp-meta".to_vec()
         );
 
         assert_eq!(
-            client.borrow().get_remaining_response_handlers(),
+            client.lock().unwrap().get_remaining_response_handlers(),
             0,
             "client remaining response headers incorrectly identified"
         );
         assert_eq!(
-            server.borrow().get_remaining_response_handlers(),
+            server.lock().unwrap().get_remaining_response_handlers(),
             0,
             "server remaining response headers incorrectly identified"
         );
