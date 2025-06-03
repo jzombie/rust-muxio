@@ -137,7 +137,9 @@ impl<'a> RpcRespondableSession<'a> {
                                 self.pre_buffered_responses.remove(&rpc_id); // Clear the buffer after calling
                             }
                         }
-                        _ => {}
+                        _ => {
+                            // TODO: Handle
+                        }
                     }
                 } else {
                     if let Some(cb) = self.response_handlers.get_mut(&rpc_id) {
