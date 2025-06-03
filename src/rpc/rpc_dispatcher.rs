@@ -18,6 +18,8 @@ pub struct RpcDispatcher<'a> {
 }
 
 impl<'a> RpcDispatcher<'a> {
+    /// Creates a new `RpcDispatcher` and sets a catch-all response handler
+    /// to capture incoming stream events for all requests.
     pub fn new() -> Self {
         let rpc_session = RpcRespondableSession::new();
 
@@ -32,7 +34,12 @@ impl<'a> RpcDispatcher<'a> {
         instance
     }
 
-    // Invoked on the remote in reponse to `call` requests from the local client
+    /// Initializes a global response handler that listens to all incoming
+    /// `RpcStreamEvent`s and tracks each in a shared queue.
+    ///
+    /// - Buffers metadata in the header as parameters.
+    /// - Buffers chunks as pre-payload.
+    /// - Marks request as finalized when stream ends.
     fn init_catch_all_response_handler(&mut self) {
         let rpc_request_queue_ref = Arc::clone(&self.rpc_request_queue);
 
@@ -105,6 +112,12 @@ impl<'a> RpcDispatcher<'a> {
             }));
     }
 
+    /// Issues an outbound RPC `call` with a request header and optional
+    /// payload. If the request is pre-buffered, it is sent immediately.
+    ///
+    /// - `on_emit`: callback to emit bytes.
+    /// - `on_response`: handler for processing responses.
+    /// - `pre_buffer_response`: whether to pre-buffer response handling.
     pub fn call<E, R>(
         &mut self,
         rpc_request: RpcRequest,
@@ -158,6 +171,11 @@ impl<'a> RpcDispatcher<'a> {
         Ok(encoder)
     }
 
+    /// Sends a response stream for a given incoming request header.
+    /// May include metadata and/or pre-buffered payload. Ends the stream
+    /// immediately if the response is finalized.
+    ///
+    /// - `on_emit`: callback to emit bytes.
     pub fn respond<E>(
         &mut self,
         rpc_response: RpcResponse,
@@ -195,6 +213,10 @@ impl<'a> RpcDispatcher<'a> {
         Ok(response_encoder)
     }
 
+    /// Feeds raw bytes into the underlying `RpcRespondableSession` and
+    /// returns a list of currently active request header IDs in the queue.
+    ///
+    /// Errors if decode fails or mutex is poisoned.
     pub fn receive_bytes(&mut self, bytes: &[u8]) -> Result<Vec<u32>, FrameDecodeError> {
         // Process the incoming bytes
         self.rpc_session.receive_bytes(bytes)?;
@@ -210,6 +232,8 @@ impl<'a> RpcDispatcher<'a> {
         Ok(active_request_header_ids)
     }
 
+    /// Attempts to acquire the queue lock and return the full queue guard
+    /// if the request ID exists. Caller must re-check inside the guard.
     pub fn get_rpc_request(
         &self,
         header_id: u32,
@@ -225,6 +249,7 @@ impl<'a> RpcDispatcher<'a> {
         }
     }
 
+    /// Checks whether a request is finalized by looking it up in the queue.
     pub fn is_rpc_request_finalized(&self, header_id: u32) -> Option<bool> {
         let queue = self.rpc_request_queue.lock().ok()?;
         queue
@@ -233,7 +258,8 @@ impl<'a> RpcDispatcher<'a> {
             .map(|(_, req)| req.is_finalized)
     }
 
-    // Deletes the request and transfers ownership to the caller
+    /// Removes a request from the queue if present and transfers ownership
+    /// of the `RpcRequest` to the caller.
     pub fn delete_rpc_request(&self, header_id: u32) -> Option<RpcRequest> {
         let mut queue = self.rpc_request_queue.lock().ok()?;
 
