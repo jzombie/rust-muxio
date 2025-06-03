@@ -48,6 +48,7 @@ impl RpcStreamDecoder {
         frame: &DecodedFrame,
     ) -> Result<Vec<RpcStreamEvent>, FrameDecodeError> {
         let mut events = Vec::new();
+
         match self.state {
             RpcDecoderState::AwaitHeader => {
                 self.buffer.extend(&frame.inner.payload);
