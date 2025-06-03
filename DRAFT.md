@@ -15,3 +15,9 @@ TODO: Mention something about "layered transport kit"
 - Cancelable — cancel by ID midstream
 
 - Metrics-capable — latency, jitter, throughput if needed
+
+## Test Coverage 
+
+```sh
+cargo llvm-cov --summary-only
+```
