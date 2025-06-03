@@ -119,13 +119,7 @@ impl<'a> RpcDispatcher<'a> {
         let method_id = rpc_request.method_id;
 
         let header_id: u32 = self.next_header_id;
-        loop {
-            let pred_next_header_id = generate_u32_id();
-            if pred_next_header_id != header_id {
-                self.next_header_id = pred_next_header_id;
-                break;
-            }
-        }
+        self.next_header_id = generate_u32_id();
 
         // Convert parameter bytes to metadata
         let metadata_bytes = match rpc_request.param_bytes {

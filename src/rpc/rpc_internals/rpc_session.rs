@@ -35,13 +35,7 @@ impl RpcSession {
         F: FnMut(&[u8]),
     {
         let stream_id = self.next_stream_id;
-        loop {
-            let pred_next_stream_id = generate_u32_id();
-            if pred_next_stream_id != stream_id {
-                self.next_stream_id = pred_next_stream_id;
-                break;
-            }
-        }
+        self.next_stream_id = generate_u32_id();
 
         let rpc_stream_encoder =
             RpcStreamEncoder::new(stream_id, max_chunk_size, &header, on_emit)?;

@@ -1,7 +1,5 @@
-// Note: `generate_u32_id` tests are colocated with the implementation
-// to allow direct access to the local static counter for controlled testing
-
-use muxio::utils::now;
+use muxio::utils::{generate_u32_id, now};
+use std::collections::HashSet;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
@@ -28,4 +26,14 @@ fn test_now_close_to_system_time() {
 
     // Acceptable skew threshold (e.g., 5 milliseconds)
     assert!(delta < 5_000, "Timestamp delta too large: {} µs", delta);
+}
+
+#[test]
+fn test_generate_u32_id_uniqueness() {
+    let mut seen = HashSet::new();
+
+    for _ in 0..10_000 {
+        let id = generate_u32_id();
+        assert!(seen.insert(id), "Duplicate ID generated: {}", id);
+    }
 }
