@@ -2,7 +2,8 @@ use crate::frame::{FrameDecodeError, FrameEncodeError};
 use crate::rpc::{
     RpcRequest, RpcResponse,
     rpc_internals::{
-        RpcHeader, RpcMessageType, RpcRespondableSession, RpcStreamEncoder, RpcStreamEvent,
+        RpcEmit, RpcHeader, RpcMessageType, RpcRespondableSession, RpcResponseHandler,
+        RpcStreamEncoder, RpcStreamEvent,
     },
 };
 use crate::utils::increment_u32_id;
@@ -104,17 +105,17 @@ impl<'a> RpcDispatcher<'a> {
             }));
     }
 
-    pub fn call<G, F>(
+    pub fn call<E, R>(
         &mut self,
         rpc_request: RpcRequest,
         max_chunk_size: usize,
-        on_emit: G, // Directly pass the closure, not as a reference
-        on_response: Option<F>,
+        on_emit: E,
+        on_response: Option<R>,
         pre_buffer_response: bool,
-    ) -> Result<RpcStreamEncoder<G>, FrameEncodeError>
+    ) -> Result<RpcStreamEncoder<E>, FrameEncodeError>
     where
-        G: FnMut(&[u8]), // Ensuring that `G` is FnMut(&[u8])
-        F: FnMut(RpcStreamEvent) + Send + 'a,
+        E: RpcEmit,
+        R: RpcResponseHandler + 'a,
     {
         let method_id = rpc_request.method_id;
 
@@ -157,14 +158,14 @@ impl<'a> RpcDispatcher<'a> {
         Ok(encoder)
     }
 
-    pub fn respond<F>(
+    pub fn respond<E>(
         &mut self,
         rpc_response: RpcResponse,
         max_chunk_size: usize,
-        on_emit: F,
-    ) -> Result<RpcStreamEncoder<F>, FrameEncodeError>
+        on_emit: E,
+    ) -> Result<RpcStreamEncoder<E>, FrameEncodeError>
     where
-        F: FnMut(&[u8]),
+        E: RpcEmit,
     {
         let rpc_response_header = RpcHeader {
             id: rpc_response.request_header_id,
