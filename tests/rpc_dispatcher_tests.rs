@@ -29,9 +29,9 @@ fn rpc_dispatcher_call_and_echo_response() {
     // Shared buffer for the outgoing response
     let outgoing_buf: Rc<RefCell<Vec<u8>>> = Rc::new(RefCell::new(Vec::new()));
 
-    // Client dispatcher
-    let mut client_dispatcher = RpcDispatcher::new();
-    let mut server_dispatcher = RpcDispatcher::new();
+    // Client and server dispatchers
+    let mut client_dispatcher: RpcDispatcher<'_> = RpcDispatcher::new();
+    let mut server_dispatcher: RpcDispatcher<'_> = RpcDispatcher::new();
 
     {
         // Prepare a mock RPC request
