@@ -5,6 +5,7 @@ use crate::rpc::{
         RpcHeader, RpcMessageType, RpcRespondableSession, RpcStreamEncoder, RpcStreamEvent,
     },
 };
+use crate::utils::generate_u32_id;
 
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
@@ -21,7 +22,7 @@ impl<'a> RpcDispatcher<'a> {
 
         let mut instance = Self {
             rpc_session,
-            next_header_id: 1,
+            next_header_id: generate_u32_id(),
             rpc_request_queue: Arc::new(Mutex::new(VecDeque::new())),
         };
 
@@ -116,8 +117,15 @@ impl<'a> RpcDispatcher<'a> {
         F: FnMut(RpcStreamEvent) + Send + 'a,
     {
         let method_id = rpc_request.method_id;
+
         let header_id: u32 = self.next_header_id;
-        self.next_header_id += 1;
+        loop {
+            let pred_next_header_id = generate_u32_id();
+            if pred_next_header_id != header_id {
+                self.next_header_id = pred_next_header_id;
+                break;
+            }
+        }
 
         // Convert parameter bytes to metadata
         let metadata_bytes = match rpc_request.param_bytes {

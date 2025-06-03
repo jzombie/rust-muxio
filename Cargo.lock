@@ -177,6 +177,7 @@ dependencies = [
  "bitcode",
  "chrono",
  "rand",
+ "rand_chacha",
  "xxhash-rust",
 ]
 
