@@ -25,7 +25,7 @@ pub struct RpcResponse {
 }
 
 impl RpcResponse {
-    pub fn from_rpc_header(rpc_header: &RpcHeader, is_finalized: bool) -> RpcResponse {
+    pub fn from_rpc_header(rpc_header: &RpcHeader) -> RpcResponse {
         RpcResponse {
             request_header_id: rpc_header.id,
             method_id: rpc_header.method_id,
@@ -36,7 +36,7 @@ impl RpcResponse {
                 }
             },
             pre_buffered_payload_bytes: None,
-            is_finalized,
+            is_finalized: false, // Hardcoded to false because it is currently non-determinable from the header alone
         }
     }
 }
