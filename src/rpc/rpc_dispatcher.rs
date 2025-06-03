@@ -168,7 +168,12 @@ impl<'a> RpcDispatcher<'a> {
             id: rpc_response.request_header_id,
             msg_type: RpcMessageType::Response,
             method_id: rpc_response.method_id,
-            metadata_bytes: vec![rpc_response.result_status],
+            metadata_bytes: {
+                match rpc_response.result_status {
+                    Some(result_status) => vec![result_status],
+                    None => vec![],
+                }
+            },
         };
 
         let mut response_encoder =
