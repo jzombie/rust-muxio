@@ -1,6 +1,7 @@
 use crate::{
     frame::{FrameDecodeError, FrameEncodeError, FrameKind, FrameMuxStreamDecoder},
     rpc::rpc_internals::{RpcHeader, RpcStreamDecoder, RpcStreamEncoder, RpcStreamEvent},
+    utils::increment_u32_id,
 };
 use std::collections::HashMap;
 
@@ -18,7 +19,7 @@ pub struct RpcSession {
 impl RpcSession {
     pub fn new() -> Self {
         Self {
-            next_stream_id: 1,
+            next_stream_id: increment_u32_id(),
             frame_mux_stream_decoder: FrameMuxStreamDecoder::new(),
             rpc_stream_decoders: HashMap::new(),
         }
@@ -34,7 +35,7 @@ impl RpcSession {
         F: FnMut(&[u8]),
     {
         let stream_id = self.next_stream_id;
-        self.next_stream_id += 1;
+        self.next_stream_id = increment_u32_id();
 
         let rpc_stream_encoder =
             RpcStreamEncoder::new(stream_id, max_chunk_size, &header, on_emit)?;

@@ -172,10 +172,11 @@ checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
 
 [[package]]
 name = "muxio"
-version = "0.2.0-alpha"
+version = "0.3.0-alpha"
 dependencies = [
  "bitcode",
  "chrono",
+ "once_cell",
  "rand",
  "xxhash-rust",
 ]

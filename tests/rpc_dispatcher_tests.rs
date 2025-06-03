@@ -23,14 +23,15 @@ struct MultResponseParams {
     result: f64,
 }
 
+// TODO: Add assertions
 #[test]
 fn rpc_dispatcher_call_and_echo_response() {
     // Shared buffer for the outgoing response
     let outgoing_buf: Rc<RefCell<Vec<u8>>> = Rc::new(RefCell::new(Vec::new()));
 
-    // Client dispatcher
-    let mut client_dispatcher = RpcDispatcher::new();
-    let mut server_dispatcher = RpcDispatcher::new();
+    // Client and server dispatchers
+    let mut client_dispatcher: RpcDispatcher<'_> = RpcDispatcher::new();
+    let mut server_dispatcher: RpcDispatcher<'_> = RpcDispatcher::new();
 
     {
         // Prepare a mock RPC request
@@ -160,6 +161,7 @@ fn rpc_dispatcher_call_and_echo_response() {
                             Some(RpcResponse {
                                 request_header_id,
                                 method_id: rpc_request.method_id,
+                                result_status: Some(0),
                                 pre_buffered_payload_bytes: Some(response_bytes),
                                 is_finalized: true,
                             })
@@ -178,6 +180,7 @@ fn rpc_dispatcher_call_and_echo_response() {
                             Some(RpcResponse {
                                 request_header_id,
                                 method_id: rpc_request.method_id,
+                                result_status: Some(0),
                                 pre_buffered_payload_bytes: Some(response_bytes),
                                 is_finalized: true,
                             })

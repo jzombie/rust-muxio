@@ -1,16 +1,17 @@
 [package]
 name = "muxio"
 authors = ["Jeremy Harris <jeremy.harris@zenosmosis.com>"]
-version = "0.2.0-alpha"
+version = "0.3.0-alpha"
 edition = "2024"
 description = "Toolkit for layered stream multiplexing and schema-less RPC communication"
 repository = "https://github.com/jzombie/rust-muxio"
 license = "Apache-2.0"
 
 [dev-dependencies]
-rand = "0.9.1"
 bitcode = "0.6.6"
+rand = "0.9.1"
 
 [dependencies]
 chrono = "0.4.41"
 xxhash-rust = { version = "0.8.15", features = ["xxh3"] }
+once_cell = "1.21.3"
