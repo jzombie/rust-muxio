@@ -160,6 +160,7 @@ fn rpc_dispatcher_call_and_echo_response() {
                             Some(RpcResponse {
                                 request_header_id,
                                 method_id: rpc_request.method_id,
+                                result_status: 0,
                                 pre_buffered_payload_bytes: Some(response_bytes),
                                 is_finalized: true,
                             })
@@ -178,6 +179,7 @@ fn rpc_dispatcher_call_and_echo_response() {
                             Some(RpcResponse {
                                 request_header_id,
                                 method_id: rpc_request.method_id,
+                                result_status: 0,
                                 pre_buffered_payload_bytes: Some(response_bytes),
                                 is_finalized: true,
                             })

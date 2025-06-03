@@ -18,6 +18,7 @@ impl RpcRequest {
 pub struct RpcResponse {
     pub request_header_id: u32,
     pub method_id: u64,
+    pub result_status: u8,
     pub pre_buffered_payload_bytes: Option<Vec<u8>>,
     pub is_finalized: bool,
 }
