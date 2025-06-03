@@ -1,4 +1,4 @@
-use muxio::utils::{generate_u32_id, now};
+use muxio::utils::{increment_u32_id, now};
 use std::collections::HashSet;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -29,11 +29,11 @@ fn test_now_close_to_system_time() {
 }
 
 #[test]
-fn test_generate_u32_id_uniqueness() {
+fn test_increment_u32_id_uniqueness() {
     let mut seen = HashSet::new();
 
     for _ in 0..10_000 {
-        let id = generate_u32_id();
+        let id = increment_u32_id();
         assert!(seen.insert(id), "Duplicate ID generated: {}", id);
     }
 }

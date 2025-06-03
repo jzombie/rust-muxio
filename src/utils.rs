@@ -1,5 +1,5 @@
 mod now;
 pub use now::now;
 
-mod generate_u32_id;
-pub use generate_u32_id::generate_u32_id;
+mod increment_u32_id;
+pub use increment_u32_id::increment_u32_id;

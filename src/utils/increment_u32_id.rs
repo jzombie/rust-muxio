@@ -5,6 +5,6 @@ use std::sync::atomic::{AtomicU64, Ordering};
 static GLOBAL_ID_COUNTER: Lazy<AtomicU64> = Lazy::new(|| AtomicU64::new(0));
 
 #[inline]
-pub fn generate_u32_id() -> u32 {
+pub fn increment_u32_id() -> u32 {
     GLOBAL_ID_COUNTER.fetch_add(1, Ordering::Relaxed) as u32
 }
