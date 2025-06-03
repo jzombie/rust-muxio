@@ -1,11 +1,8 @@
 use once_cell::sync::Lazy;
-use rand::{RngCore, rng};
 use std::sync::atomic::{AtomicU64, Ordering};
 
-static GLOBAL_ID_COUNTER: Lazy<AtomicU64> = Lazy::new(|| {
-    let mut thread_range = rng();
-    AtomicU64::new(thread_range.next_u64())
-});
+/// A simple counter which is initialized at 0.
+static GLOBAL_ID_COUNTER: Lazy<AtomicU64> = Lazy::new(|| AtomicU64::new(0));
 
 #[inline]
 pub fn generate_u32_id() -> u32 {
