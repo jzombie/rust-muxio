@@ -176,8 +176,8 @@ version = "0.2.0-alpha"
 dependencies = [
  "bitcode",
  "chrono",
+ "once_cell",
  "rand",
- "rand_chacha",
  "xxhash-rust",
 ]
 
