@@ -185,6 +185,7 @@ fn rpc_dispatcher_call_and_echo_response() {
                         _ => None,
                     };
 
+                    // Send response to client
                     if let Some(rpc_response) = rpc_response {
                         server_dispatcher
                             .respond(rpc_response, 4, |bytes: &[u8]| {
