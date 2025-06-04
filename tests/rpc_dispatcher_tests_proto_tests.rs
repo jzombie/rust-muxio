@@ -33,6 +33,12 @@ fn encode_request(method_id: u64, param_bytes: Vec<u8>) -> RpcRequest {
     }
 }
 
+/// Dispatches a call and returns the decoded response.
+///
+/// In a real network setup, the client and server would reside on different
+/// machines or contexts and communicate over sockets. However, for the purposes
+/// of this test, both the client and server dispatchers are instantiated and
+/// used locally to simulate full end-to-end behavior.
 fn dispatch_call_and_get_response<T: for<'a> Decode<'a>>(
     client_dispatcher: &mut RpcDispatcher,
     server_dispatcher: &mut RpcDispatcher,
@@ -162,6 +168,9 @@ fn mult(
 
 #[test]
 fn rpc_dispatcher_call_and_echo_response() {
+    // In a real-world application, only one of these dispatchers would exist
+    // locally depending on whether you're implementing the client or server.
+    // Here
     let mut client_dispatcher: RpcDispatcher<'_> = RpcDispatcher::new();
     let mut server_dispatcher: RpcDispatcher<'_> = RpcDispatcher::new();
 
