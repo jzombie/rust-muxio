@@ -1,5 +1,7 @@
 use crate::frame::{FrameDecodeError, FrameEncodeError};
-use crate::rpc::rpc_internals::{RpcHeader, RpcSession, RpcStreamEncoder, RpcStreamEvent};
+use crate::rpc::rpc_internals::{
+    RpcEmit, RpcHeader, RpcResponseHandler, RpcSession, RpcStreamEncoder, RpcStreamEvent,
+};
 use std::collections::HashMap;
 
 /// Lightweight wrapper over `RpcSession` that tracks response handlers.
@@ -30,17 +32,17 @@ impl<'a> RpcRespondableSession<'a> {
     }
 
     // TODO: Document that prebuffering buffers the entire response payload into a single chunk
-    pub fn init_respondable_request<G, F>(
+    pub fn init_respondable_request<E, R>(
         &mut self,
         hdr: RpcHeader,
         max_chunk_size: usize,
-        on_emit: G,
-        on_response: Option<F>,
+        on_emit: E,
+        on_response: Option<R>,
         pre_buffer_response: bool,
-    ) -> Result<RpcStreamEncoder<G>, FrameEncodeError>
+    ) -> Result<RpcStreamEncoder<E>, FrameEncodeError>
     where
-        G: FnMut(&[u8]),
-        F: FnMut(RpcStreamEvent) + Send + 'a,
+        E: RpcEmit,
+        R: RpcResponseHandler + 'a,
     {
         let rpc_header_id = hdr.id;
 
@@ -58,14 +60,14 @@ impl<'a> RpcRespondableSession<'a> {
             .map_err(|_| FrameEncodeError::CorruptFrame)
     }
 
-    pub fn start_reply_stream<F>(
+    pub fn start_reply_stream<E>(
         &mut self,
         hdr: RpcHeader,
         max_chunk_size: usize,
-        on_emit: F,
-    ) -> Result<RpcStreamEncoder<F>, FrameEncodeError>
+        on_emit: E,
+    ) -> Result<RpcStreamEncoder<E>, FrameEncodeError>
     where
-        F: FnMut(&[u8]),
+        E: RpcEmit,
     {
         self.rpc_session
             .init_request(hdr, max_chunk_size, on_emit)
@@ -74,9 +76,9 @@ impl<'a> RpcRespondableSession<'a> {
 
     // TODO: Document
     // Invoked on the remote in response to `init_respondable_request` from the local client
-    pub fn set_catch_all_response_handler<F>(&mut self, handler: F)
+    pub fn set_catch_all_response_handler<R>(&mut self, handler: R)
     where
-        F: FnMut(RpcStreamEvent) + Send + 'a,
+        R: RpcResponseHandler + 'a,
     {
         self.catch_all_response_handler = Some(Box::new(handler));
     }

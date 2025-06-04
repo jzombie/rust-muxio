@@ -5,6 +5,15 @@ use crate::{
 };
 use std::collections::HashMap;
 
+pub trait RpcEmit: FnMut(&[u8]) {}
+impl<T: FnMut(&[u8])> RpcEmit for T {}
+
+pub trait RpcResponseHandler: FnMut(RpcStreamEvent) + Send {}
+impl<T: FnMut(RpcStreamEvent) + Send> RpcResponseHandler for T {}
+
+pub trait RpcStreamEventHandler: FnMut(RpcStreamEvent) {}
+impl<T: FnMut(RpcStreamEvent)> RpcStreamEventHandler for T {}
+
 /// Low-level stream multiplexing engine for RPC.
 ///
 /// This struct manages the allocation of stream IDs, the decoding of framed
@@ -25,14 +34,14 @@ impl RpcSession {
         }
     }
 
-    pub fn init_request<F>(
+    pub fn init_request<E>(
         &mut self,
         header: RpcHeader,
         max_chunk_size: usize,
-        on_emit: F,
-    ) -> Result<RpcStreamEncoder<F>, FrameEncodeError>
+        on_emit: E,
+    ) -> Result<RpcStreamEncoder<E>, FrameEncodeError>
     where
-        F: FnMut(&[u8]),
+        E: RpcEmit,
     {
         let stream_id = self.next_stream_id;
         self.next_stream_id = increment_u32_id();
@@ -43,13 +52,13 @@ impl RpcSession {
     }
 
     /// Receives incoming bytes, decodes them, and invokes the provided callback for each event.
-    pub fn receive_bytes<F>(
+    pub fn receive_bytes<H>(
         &mut self,
         input: &[u8],
-        mut on_rpc_stream_event: F,
+        mut on_rpc_stream_event: H,
     ) -> Result<(), FrameDecodeError>
     where
-        F: FnMut(RpcStreamEvent),
+        H: RpcStreamEventHandler,
     {
         let frames = self.frame_mux_stream_decoder.pull_bytes(input);
 

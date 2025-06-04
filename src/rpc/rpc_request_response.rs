@@ -1,30 +1,94 @@
 use crate::rpc::rpc_internals::RpcHeader;
-use xxhash_rust::xxh3::xxh3_64;
 
+/// Represents an outbound RPC call request.
+///
+/// An `RpcRequest` is initiated by a client and contains the encoded
+/// parameters for a specific remote method. Optionally, it may include a
+/// buffered payload and a flag indicating whether the full message is
+/// ready to send immediately (finalized).
 #[derive(PartialEq, Debug)]
 pub struct RpcRequest {
+    /// Unique identifier for the remote method to invoke.
+    ///
+    /// This can be a sequential or a hashed ID (e.g., XXH3 or FNV) that maps
+    /// to a known method on the remote server.
     pub method_id: u64,
+
+    /// Optional encoded metadata (typically parameters).
+    ///
+    /// These are serialized function arguments and are transmitted in the
+    /// `RpcHeader.metadata_bytes` field. If `None`, the metadata section is empty.
     pub param_bytes: Option<Vec<u8>>,
+
+    /// Optional payload that should be sent immediately after the header.
+    ///
+    /// This is useful for single-frame RPCs where the entire message (metadata
+    /// and payload) is known up front. If provided, it is sent during `call()`.
     pub pre_buffered_payload_bytes: Option<Vec<u8>>,
+
+    /// Indicates whether the request is fully formed and no more payload is expected.
+    ///
+    /// If true, the stream is closed immediately after sending the header and payload.
     pub is_finalized: bool,
 }
 
-impl RpcRequest {
-    pub fn to_method_id(method_name: &str) -> u64 {
-        xxh3_64(method_name.as_bytes())
-    }
-}
-
+/// Represents a response to a prior RPC request.
+///
+/// The `RpcResponse` contains the original request ID (header ID), the method ID,
+/// and any result status or response payload. It may be used to encode a response
+/// frame or passed to the `respond()` function to emit a full RPC reply.
 #[derive(PartialEq, Debug)]
 pub struct RpcResponse {
+    /// The request header ID this response corresponds to.
+    ///
+    /// This *must match* the `RpcHeader.id` from the initiating request.
     pub request_header_id: u32,
+
+    /// The method ID associated with this response.
+    ///
+    /// This should match the original `method_id` from the request.
+    ///
+    /// Note: While the internal routing mechanism relies on the header ID to correlate
+    /// responses, user-defined services may still benefit from retaining the method ID to
+    /// dispatch or verify responses against known handlers.
     pub method_id: u64,
+
+    /// Optional result status byte (e.g., success/fail/system error).
+    ///
+    /// If present, this value is embedded in the response metadata and typically
+    /// represents a single-byte status code.
+    ///
+    /// Note: While the `RpcResultStatus` enum can be used to interpret standard values,
+    /// this schema is not enforced — any arbitrary `u8` may be used depending on the application.
+    ///
+    /// By convention, `RpcResultStatus::Success` is `0` and `RpcResultStatus::Fail` is `1`.
     pub result_status: Option<u8>,
+
+    /// Optional payload to return with the response.
+    ///
+    /// If set, this will be sent immediately as the response payload.
     pub pre_buffered_payload_bytes: Option<Vec<u8>>,
+
+    /// Marks whether the response stream is complete.
+    ///
+    /// If true, the stream will be ended immediately after sending the header
+    /// and payload. If false, the caller is expected to stream additional data and manually
+    /// end the stream.
     pub is_finalized: bool,
 }
 
 impl RpcResponse {
+    /// Constructs an `RpcResponse` from a received `RpcHeader`.
+    ///
+    /// This is typically called on the server side when processing a new request.
+    /// The metadata is interpreted as a single-byte result status if present.
+    ///
+    /// # Arguments
+    /// - `rpc_header`: The header received from the client.
+    ///
+    /// # Returns
+    /// A new `RpcResponse` with the same request ID and method ID, and
+    /// optionally a result status if metadata exists.
     pub fn from_rpc_header(rpc_header: &RpcHeader) -> RpcResponse {
         RpcResponse {
             request_header_id: rpc_header.id,
