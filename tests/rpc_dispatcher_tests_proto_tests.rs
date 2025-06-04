@@ -129,38 +129,59 @@ fn dispatch_call_and_get_response<T: for<'a> Decode<'a>>(
     bitcode::decode(&result_buf_locked).unwrap()
 }
 
+fn add(
+    client_dispatcher: &mut RpcDispatcher,
+    server_dispatcher: &mut RpcDispatcher,
+    numbers: Vec<f64>,
+) -> f64 {
+    let decoded: AddResponseParams = dispatch_call_and_get_response(
+        client_dispatcher,
+        server_dispatcher,
+        ADD_METHOD_ID,
+        bitcode::encode(&AddRequestParams { numbers }),
+    );
+
+    decoded.result
+}
+
+fn mult(
+    client_dispatcher: &mut RpcDispatcher,
+    server_dispatcher: &mut RpcDispatcher,
+    numbers: Vec<f64>,
+) -> f64 {
+    let decoded: AddResponseParams = dispatch_call_and_get_response(
+        client_dispatcher,
+        server_dispatcher,
+        MULT_METHOD_ID,
+        bitcode::encode(&MultRequestParams { numbers }),
+    );
+
+    decoded.result
+}
+
 #[test]
 fn rpc_dispatcher_call_and_echo_response() {
     let mut client_dispatcher: RpcDispatcher<'_> = RpcDispatcher::new();
     let mut server_dispatcher: RpcDispatcher<'_> = RpcDispatcher::new();
 
-    let decoded: AddResponseParams = dispatch_call_and_get_response(
+    let add_result = add(
         &mut client_dispatcher,
         &mut server_dispatcher,
-        ADD_METHOD_ID,
-        bitcode::encode(&AddRequestParams {
-            numbers: vec![1.0, 2.0, 3.0],
-        }),
+        vec![1.0, 2.0, 3.0],
     );
-    assert_eq!(decoded.result, 6.0);
+    assert_eq!(add_result, 6.0);
 
-    let decoded: MultResponseParams = dispatch_call_and_get_response(
+    let mult_result = mult(
         &mut client_dispatcher,
         &mut server_dispatcher,
-        MULT_METHOD_ID,
-        bitcode::encode(&MultRequestParams {
-            numbers: vec![4.0, 5.0, 6.0, 3.14],
-        }),
+        vec![4.0, 5.0, 6.0, 3.14],
     );
-    assert!((decoded.result - 376.8).abs() < 0.01);
+    assert!((mult_result - 376.8).abs() < 0.01);
 
-    let decoded: MultResponseParams = dispatch_call_and_get_response(
+    let mult_result = mult(
         &mut client_dispatcher,
         &mut server_dispatcher,
-        MULT_METHOD_ID,
-        bitcode::encode(&MultRequestParams {
-            numbers: vec![10.0, 5.0, 6.0, 3.14],
-        }),
+        vec![10.0, 5.0, 6.0, 3.14],
     );
-    assert!((decoded.result - 942.0).abs() < 0.1);
+    assert!((mult_result - 942.0).abs() < 0.1);
 }
