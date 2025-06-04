@@ -21,3 +21,12 @@ TODO: Mention something about "layered transport kit"
 ```sh
 cargo llvm-cov --summary-only
 ```
+
+## Graph Modules
+
+https://github.com/regexident/cargo-modules?tab=readme-ov-file
+
+```sh
+cargo modules dependencies --no-externs --no-fns --no-sysroot --no-traits --no-types --no-uses > mods.dot
+dot -Tsvg mods.dot -o mods.svg
+```
