@@ -117,7 +117,7 @@ fn dispatch_call_and_get_response<T: for<'a> Decode<'a>>(
                             is_finalized: true,
                         })
                     }
-                    _ => None,
+                    _ => unimplemented!("Unhandled request route"),
                 };
 
                 if let Some(rpc_response) = rpc_response {

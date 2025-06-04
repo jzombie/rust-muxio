@@ -26,7 +26,6 @@ struct MultResponseParams {
     result: f64,
 }
 
-// TODO: Add assertions
 #[test]
 fn rpc_dispatcher_call_and_echo_response() {
     // Shared buffer for the outgoing response
@@ -114,7 +113,7 @@ fn rpc_dispatcher_call_and_echo_response() {
                                     );
                                 }
                                 _ => {
-                                    unreachable!("Unhandled response");
+                                    unimplemented!("Unhandled response");
                                 }
                             },
                             _ => {}
