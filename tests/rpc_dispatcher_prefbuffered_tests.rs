@@ -1,8 +1,68 @@
 use bitcode::{Decode, Encode};
 use muxio::rpc::{RpcDispatcher, RpcRequest, RpcResponse, rpc_internals::RpcStreamEvent};
 
+#[test]
+fn test_rpc_dispatcher_prebuffered_calls() {
+    // In a real-world application, only one of these dispatchers would exist
+    // locally depending on whether you're implementing the client or server.
+    // Here
+    let mut client_dispatcher: RpcDispatcher<'_> = RpcDispatcher::new();
+    let mut server_dispatcher: RpcDispatcher<'_> = RpcDispatcher::new();
+
+    let add_result = add(
+        &mut client_dispatcher,
+        &mut server_dispatcher,
+        vec![1.0, 2.0, 3.0],
+    );
+    assert_eq!(add_result, 6.0);
+
+    let mult_result = mult(
+        &mut client_dispatcher,
+        &mut server_dispatcher,
+        vec![4.0, 5.0, 6.0, 3.14],
+    );
+    assert!((mult_result - 376.8).abs() < 0.01);
+
+    let mult_result = mult(
+        &mut client_dispatcher,
+        &mut server_dispatcher,
+        vec![10.0, 5.0, 6.0, 3.14],
+    );
+    assert!((mult_result - 942.0).abs() < 0.1);
+}
+
 const ADD_METHOD_ID: u64 = 0x01;
 const MULT_METHOD_ID: u64 = 0x02;
+
+fn add(
+    client_dispatcher: &mut RpcDispatcher,
+    server_dispatcher: &mut RpcDispatcher,
+    numbers: Vec<f64>,
+) -> f64 {
+    let decoded: AddResponseParams = dispatch_call_and_get_prebuffered_response(
+        client_dispatcher,
+        server_dispatcher,
+        ADD_METHOD_ID,
+        bitcode::encode(&AddRequestParams { numbers }),
+    );
+
+    decoded.result
+}
+
+fn mult(
+    client_dispatcher: &mut RpcDispatcher,
+    server_dispatcher: &mut RpcDispatcher,
+    numbers: Vec<f64>,
+) -> f64 {
+    let decoded: AddResponseParams = dispatch_call_and_get_prebuffered_response(
+        client_dispatcher,
+        server_dispatcher,
+        MULT_METHOD_ID,
+        bitcode::encode(&MultRequestParams { numbers }),
+    );
+
+    decoded.result
+}
 
 #[derive(Encode, Decode, PartialEq, Debug)]
 struct AddRequestParams {
@@ -39,7 +99,7 @@ fn encode_request(method_id: u64, param_bytes: Vec<u8>) -> RpcRequest {
 /// machines or contexts and communicate over sockets. However, for the purposes
 /// of this test, both the client and server dispatchers are instantiated and
 /// used locally to simulate full end-to-end behavior.
-fn dispatch_call_and_get_response<T: for<'a> Decode<'a>>(
+fn dispatch_call_and_get_prebuffered_response<T: for<'a> Decode<'a>>(
     client_dispatcher: &mut RpcDispatcher,
     server_dispatcher: &mut RpcDispatcher,
     method_id: u64,
@@ -134,64 +194,4 @@ fn dispatch_call_and_get_response<T: for<'a> Decode<'a>>(
 
     let result_buf_locked = result_buf.lock().unwrap();
     bitcode::decode(&result_buf_locked).unwrap()
-}
-
-fn add(
-    client_dispatcher: &mut RpcDispatcher,
-    server_dispatcher: &mut RpcDispatcher,
-    numbers: Vec<f64>,
-) -> f64 {
-    let decoded: AddResponseParams = dispatch_call_and_get_response(
-        client_dispatcher,
-        server_dispatcher,
-        ADD_METHOD_ID,
-        bitcode::encode(&AddRequestParams { numbers }),
-    );
-
-    decoded.result
-}
-
-fn mult(
-    client_dispatcher: &mut RpcDispatcher,
-    server_dispatcher: &mut RpcDispatcher,
-    numbers: Vec<f64>,
-) -> f64 {
-    let decoded: AddResponseParams = dispatch_call_and_get_response(
-        client_dispatcher,
-        server_dispatcher,
-        MULT_METHOD_ID,
-        bitcode::encode(&MultRequestParams { numbers }),
-    );
-
-    decoded.result
-}
-
-#[test]
-fn rpc_dispatcher_call_and_echo_response() {
-    // In a real-world application, only one of these dispatchers would exist
-    // locally depending on whether you're implementing the client or server.
-    // Here
-    let mut client_dispatcher: RpcDispatcher<'_> = RpcDispatcher::new();
-    let mut server_dispatcher: RpcDispatcher<'_> = RpcDispatcher::new();
-
-    let add_result = add(
-        &mut client_dispatcher,
-        &mut server_dispatcher,
-        vec![1.0, 2.0, 3.0],
-    );
-    assert_eq!(add_result, 6.0);
-
-    let mult_result = mult(
-        &mut client_dispatcher,
-        &mut server_dispatcher,
-        vec![4.0, 5.0, 6.0, 3.14],
-    );
-    assert!((mult_result - 376.8).abs() < 0.01);
-
-    let mult_result = mult(
-        &mut client_dispatcher,
-        &mut server_dispatcher,
-        vec![10.0, 5.0, 6.0, 3.14],
-    );
-    assert!((mult_result - 942.0).abs() < 0.1);
 }
