@@ -10,6 +10,7 @@ license = "Apache-2.0"
 [dev-dependencies]
 bitcode = "0.6.6"
 rand = "0.9.1"
+tokio = { version = "1.45.1", features = ["full"] }
 
 [dependencies]
 chrono = "0.4.41"

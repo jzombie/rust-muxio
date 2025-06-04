@@ -1,0 +1,166 @@
+use bitcode::{Decode, Encode};
+use muxio::rpc::{RpcDispatcher, RpcRequest, RpcResponse, rpc_internals::RpcStreamEvent};
+
+const ADD_METHOD_ID: u64 = 0x01;
+const MULT_METHOD_ID: u64 = 0x02;
+
+#[derive(Encode, Decode, PartialEq, Debug)]
+struct AddRequestParams {
+    numbers: Vec<f64>,
+}
+
+#[derive(Encode, Decode, PartialEq, Debug)]
+struct AddResponseParams {
+    result: f64,
+}
+
+#[derive(Encode, Decode, PartialEq, Debug)]
+struct MultRequestParams {
+    numbers: Vec<f64>,
+}
+
+#[derive(Encode, Decode, PartialEq, Debug)]
+struct MultResponseParams {
+    result: f64,
+}
+
+fn encode_request(method_id: u64, param_bytes: Vec<u8>) -> RpcRequest {
+    RpcRequest {
+        method_id,
+        param_bytes: Some(param_bytes),
+        pre_buffered_payload_bytes: None,
+        is_finalized: true,
+    }
+}
+
+fn dispatch_call_and_get_response<T: for<'a> Decode<'a>>(
+    client_dispatcher: &mut RpcDispatcher,
+    server_dispatcher: &mut RpcDispatcher,
+    method_id: u64,
+    param_bytes: Vec<u8>,
+) -> T {
+    let mut outgoing_buf = Vec::new();
+    let result_buf = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+
+    let rpc_request = encode_request(method_id, param_bytes);
+    let result_buf_clone = result_buf.clone();
+
+    client_dispatcher
+        .call(
+            rpc_request,
+            4,
+            |bytes: &[u8]| {
+                outgoing_buf.extend_from_slice(bytes);
+            },
+            Some(
+                move |rpc_stream_event: RpcStreamEvent| match rpc_stream_event {
+                    RpcStreamEvent::PayloadChunk { bytes, .. } => {
+                        result_buf_clone.lock().unwrap().extend_from_slice(&bytes);
+                    }
+                    _ => {}
+                },
+            ),
+            true,
+        )
+        .expect("Server call failed");
+
+    for chunk in outgoing_buf.chunks(4) {
+        let request_header_ids = server_dispatcher
+            .receive_bytes(chunk)
+            .expect("Failed to receive bytes on server");
+
+        for request_header_id in request_header_ids {
+            if !server_dispatcher
+                .is_rpc_request_finalized(request_header_id)
+                .unwrap()
+            {
+                continue;
+            }
+
+            let rpc_request = server_dispatcher.delete_rpc_request(request_header_id);
+
+            if let Some(rpc_request) = rpc_request {
+                let rpc_response = match rpc_request.method_id {
+                    id if id == ADD_METHOD_ID => {
+                        let request_params: AddRequestParams =
+                            bitcode::decode(&rpc_request.param_bytes.unwrap()).unwrap();
+
+                        Some(RpcResponse {
+                            request_header_id,
+                            method_id: id,
+                            result_status: Some(0),
+                            pre_buffered_payload_bytes: Some(bitcode::encode(&AddResponseParams {
+                                result: request_params.numbers.iter().sum(),
+                            })),
+                            is_finalized: true,
+                        })
+                    }
+                    id if id == MULT_METHOD_ID => {
+                        let request_params: MultRequestParams =
+                            bitcode::decode(&rpc_request.param_bytes.unwrap()).unwrap();
+
+                        Some(RpcResponse {
+                            request_header_id,
+                            method_id: id,
+                            result_status: Some(0),
+                            pre_buffered_payload_bytes: Some(bitcode::encode(
+                                &MultResponseParams {
+                                    result: request_params.numbers.iter().product(),
+                                },
+                            )),
+                            is_finalized: true,
+                        })
+                    }
+                    _ => None,
+                };
+
+                if let Some(rpc_response) = rpc_response {
+                    server_dispatcher
+                        .respond(rpc_response, 4, |bytes: &[u8]| {
+                            client_dispatcher.receive_bytes(bytes).unwrap();
+                        })
+                        .unwrap();
+                }
+            }
+        }
+    }
+
+    let result_buf_locked = result_buf.lock().unwrap();
+    bitcode::decode(&result_buf_locked).unwrap()
+}
+
+#[test]
+fn rpc_dispatcher_call_and_echo_response() {
+    let mut client_dispatcher: RpcDispatcher<'_> = RpcDispatcher::new();
+    let mut server_dispatcher: RpcDispatcher<'_> = RpcDispatcher::new();
+
+    let decoded: AddResponseParams = dispatch_call_and_get_response(
+        &mut client_dispatcher,
+        &mut server_dispatcher,
+        ADD_METHOD_ID,
+        bitcode::encode(&AddRequestParams {
+            numbers: vec![1.0, 2.0, 3.0],
+        }),
+    );
+    assert_eq!(decoded.result, 6.0);
+
+    let decoded: MultResponseParams = dispatch_call_and_get_response(
+        &mut client_dispatcher,
+        &mut server_dispatcher,
+        MULT_METHOD_ID,
+        bitcode::encode(&MultRequestParams {
+            numbers: vec![4.0, 5.0, 6.0, 3.14],
+        }),
+    );
+    assert!((decoded.result - 376.8).abs() < 0.01);
+
+    let decoded: MultResponseParams = dispatch_call_and_get_response(
+        &mut client_dispatcher,
+        &mut server_dispatcher,
+        MULT_METHOD_ID,
+        bitcode::encode(&MultRequestParams {
+            numbers: vec![10.0, 5.0, 6.0, 3.14],
+        }),
+    );
+    assert!((decoded.result - 942.0).abs() < 0.1);
+}
