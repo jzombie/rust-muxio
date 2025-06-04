@@ -117,6 +117,7 @@ fn dispatch_call_and_get_response<T: for<'a> Decode<'a>>(
                 if let Some(rpc_response) = rpc_response {
                     server_dispatcher
                         .respond(rpc_response, 4, |bytes: &[u8]| {
+                            // Write the response back to the client dispatcher
                             client_dispatcher.receive_bytes(bytes).unwrap();
                         })
                         .unwrap();
