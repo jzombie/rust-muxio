@@ -12,9 +12,10 @@ use muxio::rpc::{
     RpcDispatcher, RpcRequest, RpcResponse, RpcResultStatus, rpc_internals::RpcStreamEvent,
 };
 use std::net::SocketAddr;
+use std::sync::Arc;
 use tokio::{
     net::TcpListener,
-    sync::mpsc::unbounded_channel,
+    sync::{Mutex, mpsc::unbounded_channel, oneshot},
     time::{Duration, sleep},
 };
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message as WsMessage};
@@ -42,7 +43,6 @@ async fn handle_socket(socket: WebSocket) {
     let (tx, mut rx) = unbounded_channel::<Message>();
     let (recv_tx, mut recv_rx) = unbounded_channel::<Option<Result<Message, axum::Error>>>();
 
-    // Spawn message reader
     tokio::spawn(async move {
         while let Some(msg) = receiver.next().await {
             let done = msg.is_err();
@@ -54,7 +54,6 @@ async fn handle_socket(socket: WebSocket) {
         let _ = recv_tx.send(None);
     });
 
-    // Spawn message writer
     tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {
             if sender.send(msg).await.is_err() {
@@ -136,18 +135,61 @@ async fn run_server() {
 
 async fn run_client() {
     sleep(Duration::from_millis(300)).await;
-    let (mut ws_stream, _) = connect_async("ws://127.0.0.1:3000/ws")
+    let (ws_stream, _) = connect_async("ws://127.0.0.1:3000/ws")
         .await
         .expect("Failed to connect");
+    let (mut sender, mut receiver) = ws_stream.split();
 
+    let (tx, mut rx) = unbounded_channel::<WsMessage>();
+    let (recv_tx, mut recv_rx) =
+        unbounded_channel::<Option<Result<WsMessage, tokio_tungstenite::tungstenite::Error>>>();
+
+    let dispatcher = Arc::new(Mutex::new(RpcDispatcher::new()));
+    let tx_clone = tx.clone();
+    let dispatcher_clone = dispatcher.clone();
+
+    // Receive loop
+    tokio::spawn(async move {
+        while let Some(msg) = receiver.next().await {
+            let done = msg.is_err();
+            let _ = recv_tx.send(Some(msg));
+            if done {
+                break;
+            }
+        }
+        let _ = recv_tx.send(None);
+    });
+
+    // Send loop
+    tokio::spawn(async move {
+        while let Some(msg) = rx.recv().await {
+            if sender.send(msg).await.is_err() {
+                break;
+            }
+        }
+    });
+
+    // Wait for response
+    let (done_tx, done_rx) = oneshot::channel();
+    let done_tx = Arc::new(Mutex::new(Some(done_tx)));
+    let done_tx_clone = done_tx.clone();
+
+    // Handle incoming
+    let dispatcher_handle = dispatcher.clone();
+    tokio::spawn(async move {
+        while let Some(Some(Ok(WsMessage::Binary(bytes)))) = recv_rx.recv().await {
+            dispatcher_handle.lock().await.receive_bytes(&bytes).ok();
+        }
+    });
+
+    // Send request
     let payload = bitcode::encode(&AddRequestParams {
         numbers: vec![1.0, 2.0, 3.0],
     });
 
-    let mut client_dispatcher = RpcDispatcher::new();
-    let mut outgoing = Vec::new();
-
-    client_dispatcher
+    dispatcher
+        .lock()
+        .await
         .call(
             RpcRequest {
                 method_id: 0x01,
@@ -156,27 +198,27 @@ async fn run_client() {
                 is_finalized: true,
             },
             1024,
-            |chunk| outgoing.extend_from_slice(chunk),
-            Some(|evt| match evt {
-                RpcStreamEvent::PayloadChunk { bytes, .. } => {
+            move |chunk| {
+                let _ = tx_clone.send(WsMessage::Binary(Bytes::copy_from_slice(chunk)));
+            },
+            Some(move |evt| {
+                if let RpcStreamEvent::PayloadChunk { bytes, .. } = evt {
                     let decoded: AddResponseParams = bitcode::decode(&bytes).unwrap();
-
                     println!("decoded: {:?}", decoded);
+                    let done_tx_clone2 = done_tx_clone.clone();
+                    tokio::spawn(async move {
+                        let mut tx_lock = done_tx_clone2.lock().await;
+                        if let Some(tx) = tx_lock.take() {
+                            let _ = tx.send(());
+                        }
+                    });
                 }
-                _ => println!("Client received evt: {:?}", evt),
             }),
             true,
         )
         .unwrap();
 
-    ws_stream
-        .send(WsMessage::Binary(outgoing.into()))
-        .await
-        .unwrap();
-
-    while let Some(Ok(WsMessage::Binary(bytes))) = ws_stream.next().await {
-        client_dispatcher.receive_bytes(&bytes);
-    }
+    let _ = done_rx.await;
 }
 
 #[tokio::main]
