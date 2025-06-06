@@ -15,7 +15,11 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::{
     net::TcpListener,
-    sync::{Mutex, mpsc::unbounded_channel, oneshot},
+    sync::{
+        Mutex,
+        mpsc::{self, unbounded_channel},
+        oneshot,
+    },
     time::{Duration, sleep},
 };
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message as WsMessage};
@@ -133,6 +137,51 @@ async fn run_server() {
     .unwrap();
 }
 
+async fn add(
+    dispatcher: Arc<Mutex<RpcDispatcher<'static>>>,
+    tx: mpsc::UnboundedSender<WsMessage>,
+    numbers: Vec<f64>,
+) -> f64 {
+    let (done_tx, done_rx) = oneshot::channel();
+    let done_tx = Arc::new(Mutex::new(Some(done_tx)));
+    let done_tx_clone = done_tx.clone();
+
+    let payload = bitcode::encode(&AddRequestParams { numbers });
+
+    dispatcher
+        .lock()
+        .await
+        .call(
+            RpcRequest {
+                method_id: 0x01,
+                param_bytes: Some(payload),
+                pre_buffered_payload_bytes: None,
+                is_finalized: true,
+            },
+            1024,
+            move |chunk| {
+                let _ = tx.send(WsMessage::Binary(Bytes::copy_from_slice(chunk)));
+            },
+            Some(move |evt| {
+                if let RpcStreamEvent::PayloadChunk { bytes, .. } = evt {
+                    let decoded: AddResponseParams = bitcode::decode(&bytes).unwrap();
+                    println!("decoded: {:?}", decoded);
+                    let done_tx_clone2 = done_tx_clone.clone();
+                    tokio::spawn(async move {
+                        let mut tx_lock = done_tx_clone2.lock().await;
+                        if let Some(tx) = tx_lock.take() {
+                            let _ = tx.send(decoded.result);
+                        }
+                    });
+                }
+            }),
+            true,
+        )
+        .unwrap();
+
+    done_rx.await.unwrap()
+}
+
 async fn run_client() {
     sleep(Duration::from_millis(300)).await;
     let (ws_stream, _) = connect_async("ws://127.0.0.1:3000/ws")
@@ -145,8 +194,8 @@ async fn run_client() {
         unbounded_channel::<Option<Result<WsMessage, tokio_tungstenite::tungstenite::Error>>>();
 
     let dispatcher = Arc::new(Mutex::new(RpcDispatcher::new()));
-    let tx_clone = tx.clone();
     let dispatcher_clone = dispatcher.clone();
+    let tx_clone = tx.clone();
 
     // Receive loop
     tokio::spawn(async move {
@@ -169,11 +218,6 @@ async fn run_client() {
         }
     });
 
-    // Wait for response
-    let (done_tx, done_rx) = oneshot::channel();
-    let done_tx = Arc::new(Mutex::new(Some(done_tx)));
-    let done_tx_clone = done_tx.clone();
-
     // Handle incoming
     let dispatcher_handle = dispatcher.clone();
     tokio::spawn(async move {
@@ -182,43 +226,8 @@ async fn run_client() {
         }
     });
 
-    // Send request
-    let payload = bitcode::encode(&AddRequestParams {
-        numbers: vec![1.0, 2.0, 3.0],
-    });
-
-    dispatcher
-        .lock()
-        .await
-        .call(
-            RpcRequest {
-                method_id: 0x01,
-                param_bytes: Some(payload),
-                pre_buffered_payload_bytes: None,
-                is_finalized: true,
-            },
-            1024,
-            move |chunk| {
-                let _ = tx_clone.send(WsMessage::Binary(Bytes::copy_from_slice(chunk)));
-            },
-            Some(move |evt| {
-                if let RpcStreamEvent::PayloadChunk { bytes, .. } = evt {
-                    let decoded: AddResponseParams = bitcode::decode(&bytes).unwrap();
-                    println!("decoded: {:?}", decoded);
-                    let done_tx_clone2 = done_tx_clone.clone();
-                    tokio::spawn(async move {
-                        let mut tx_lock = done_tx_clone2.lock().await;
-                        if let Some(tx) = tx_lock.take() {
-                            let _ = tx.send(());
-                        }
-                    });
-                }
-            }),
-            true,
-        )
-        .unwrap();
-
-    let _ = done_rx.await;
+    let result = add(dispatcher_clone, tx_clone, vec![1.0, 2.0, 3.0]).await;
+    println!("Result from add(): {}", result);
 }
 
 #[tokio::main]
