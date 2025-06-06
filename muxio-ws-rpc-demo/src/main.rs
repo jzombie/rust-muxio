@@ -8,7 +8,9 @@ use axum::{
 use bitcode::{Decode, Encode};
 use bytes::Bytes;
 use futures_util::{SinkExt, StreamExt};
-use muxio::rpc::{RpcDispatcher, RpcRequest, RpcResponse, RpcResultStatus};
+use muxio::rpc::{
+    RpcDispatcher, RpcRequest, RpcResponse, RpcResultStatus, rpc_internals::RpcStreamEvent,
+};
 use std::net::SocketAddr;
 use tokio::{
     net::TcpListener,
@@ -137,7 +139,14 @@ async fn run_client() {
             },
             1024,
             |chunk| outgoing.extend_from_slice(chunk),
-            None::<fn(_)>,
+            Some(|evt| match evt {
+                RpcStreamEvent::PayloadChunk { bytes, .. } => {
+                    let decoded: AddResponseParams = bitcode::decode(&bytes).unwrap();
+
+                    println!("decoded: {:?}", decoded);
+                }
+                _ => println!("Client received evt: {:?}", evt),
+            }),
             true,
         )
         .unwrap();
@@ -148,25 +157,26 @@ async fn run_client() {
         .unwrap();
 
     while let Some(Ok(WsMessage::Binary(bytes))) = ws_stream.next().await {
-        let response_ids = client_dispatcher.receive_bytes(&bytes).unwrap_or_default();
+        client_dispatcher.receive_bytes(&bytes);
+        // let response_ids = client_dispatcher.receive_bytes(&bytes).unwrap_or_default();
 
-        for request_id in response_ids {
-            if !client_dispatcher
-                .is_rpc_request_finalized(request_id)
-                .unwrap_or(false)
-            {
-                continue;
-            }
+        // for request_id in response_ids {
+        //     if !client_dispatcher
+        //         .is_rpc_request_finalized(request_id)
+        //         .unwrap_or(false)
+        //     {
+        //         continue;
+        //     }
 
-            let Some(response) = client_dispatcher.delete_rpc_request(request_id) else {
-                continue;
-            };
+        //     let Some(response) = client_dispatcher.delete_rpc_request(request_id) else {
+        //         continue;
+        //     };
 
-            let decoded: AddResponseParams =
-                bitcode::decode(&response.pre_buffered_payload_bytes.unwrap()).unwrap();
-            println!("Add result: {}", decoded.result);
-            return;
-        }
+        //     let decoded: AddResponseParams =
+        //         bitcode::decode(&response.pre_buffered_payload_bytes.unwrap()).unwrap();
+        //     println!("Add result: {}", decoded.result);
+        //     return;
+        // }
     }
 }
 
