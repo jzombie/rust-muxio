@@ -14,6 +14,7 @@ use muxio::rpc::{
 use std::net::SocketAddr;
 use tokio::{
     net::TcpListener,
+    sync::mpsc::unbounded_channel,
     time::{Duration, sleep},
 };
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message as WsMessage};
@@ -36,70 +37,87 @@ async fn ws_handler(
     ws.on_upgrade(handle_socket)
 }
 
-async fn handle_socket(mut socket: WebSocket) {
+async fn handle_socket(socket: WebSocket) {
+    let (mut sender, mut receiver) = socket.split();
+    let (tx, mut rx) = unbounded_channel::<Message>();
+    let (recv_tx, mut recv_rx) = unbounded_channel::<Option<Result<Message, axum::Error>>>();
+
+    // Spawn message reader
+    tokio::spawn(async move {
+        while let Some(msg) = receiver.next().await {
+            let done = msg.is_err();
+            let _ = recv_tx.send(Some(msg));
+            if done {
+                break;
+            }
+        }
+        let _ = recv_tx.send(None);
+    });
+
+    // Spawn message writer
+    tokio::spawn(async move {
+        while let Some(msg) = rx.recv().await {
+            if sender.send(msg).await.is_err() {
+                break;
+            }
+        }
+    });
+
     let mut dispatcher = RpcDispatcher::new();
 
-    while let Some(Ok(msg)) = socket.next().await {
-        if let Message::Binary(bytes) = msg {
-            let request_ids = match dispatcher.receive_bytes(&bytes) {
-                Ok(ids) => ids,
-                Err(e) => {
-                    eprintln!("Failed to decode incoming bytes: {e:?}");
-                    continue;
-                }
+    while let Some(Some(Ok(Message::Binary(bytes)))) = recv_rx.recv().await {
+        let request_ids = match dispatcher.receive_bytes(&bytes) {
+            Ok(ids) => ids,
+            Err(e) => {
+                eprintln!("Failed to decode incoming bytes: {e:?}");
+                continue;
+            }
+        };
+
+        for request_id in request_ids {
+            if !dispatcher
+                .is_rpc_request_finalized(request_id)
+                .unwrap_or(false)
+            {
+                continue;
+            }
+
+            let Some(request) = dispatcher.delete_rpc_request(request_id) else {
+                continue;
+            };
+            let Some(payload) = &request.param_bytes else {
+                continue;
             };
 
-            for request_id in request_ids {
-                if !dispatcher
-                    .is_rpc_request_finalized(request_id)
-                    .unwrap_or(false)
-                {
-                    continue;
-                }
+            let response = match request.method_id {
+                0x01 => {
+                    let req: AddRequestParams = bitcode::decode(payload).unwrap();
+                    let sum = req.numbers.iter().sum();
+                    let encoded = bitcode::encode(&AddResponseParams { result: sum });
 
-                let Some(request) = dispatcher.delete_rpc_request(request_id) else {
-                    continue;
-                };
-                let Some(payload) = &request.param_bytes else {
-                    continue;
-                };
-
-                let response = match request.method_id {
-                    0x01 => {
-                        let req: AddRequestParams = bitcode::decode(payload).unwrap();
-                        let sum = req.numbers.iter().sum();
-                        let encoded = bitcode::encode(&AddResponseParams { result: sum });
-
-                        RpcResponse {
-                            request_header_id: request_id,
-                            method_id: 0x01,
-                            result_status: Some(RpcResultStatus::Success.value()),
-                            pre_buffered_payload_bytes: Some(encoded),
-                            is_finalized: true,
-                        }
-                    }
-                    _ => RpcResponse {
+                    RpcResponse {
                         request_header_id: request_id,
-                        method_id: request.method_id,
-                        result_status: Some(RpcResultStatus::SystemError.value()),
-                        pre_buffered_payload_bytes: None,
+                        method_id: 0x01,
+                        result_status: Some(RpcResultStatus::Success.value()),
+                        pre_buffered_payload_bytes: Some(encoded),
                         is_finalized: true,
-                    },
-                };
-
-                let mut chunks = Vec::new();
-                dispatcher
-                    .respond(response, 1024, |chunk| {
-                        chunks.push(Bytes::copy_from_slice(chunk));
-                    })
-                    .unwrap();
-
-                for chunk in chunks {
-                    if socket.send(Message::Binary(chunk)).await.is_err() {
-                        break;
                     }
                 }
-            }
+                _ => RpcResponse {
+                    request_header_id: request_id,
+                    method_id: request.method_id,
+                    result_status: Some(RpcResultStatus::SystemError.value()),
+                    pre_buffered_payload_bytes: None,
+                    is_finalized: true,
+                },
+            };
+
+            let tx_clone = tx.clone();
+            dispatcher
+                .respond(response, 1024, move |chunk| {
+                    let _ = tx_clone.send(Message::Binary(Bytes::copy_from_slice(chunk)));
+                })
+                .unwrap();
         }
     }
 }
@@ -158,25 +176,6 @@ async fn run_client() {
 
     while let Some(Ok(WsMessage::Binary(bytes))) = ws_stream.next().await {
         client_dispatcher.receive_bytes(&bytes);
-        // let response_ids = client_dispatcher.receive_bytes(&bytes).unwrap_or_default();
-
-        // for request_id in response_ids {
-        //     if !client_dispatcher
-        //         .is_rpc_request_finalized(request_id)
-        //         .unwrap_or(false)
-        //     {
-        //         continue;
-        //     }
-
-        //     let Some(response) = client_dispatcher.delete_rpc_request(request_id) else {
-        //         continue;
-        //     };
-
-        //     let decoded: AddResponseParams =
-        //         bitcode::decode(&response.pre_buffered_payload_bytes.unwrap()).unwrap();
-        //     println!("Add result: {}", decoded.result);
-        //     return;
-        // }
     }
 }
 
