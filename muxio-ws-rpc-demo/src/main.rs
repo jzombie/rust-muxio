@@ -125,10 +125,10 @@ async fn handle_socket(socket: WebSocket) {
     }
 }
 
-async fn run_server() {
+async fn run_server(address: &str) {
     let app = Router::new().route("/ws", get(ws_handler));
-    let listener = TcpListener::bind("127.0.0.1:3000").await.unwrap();
-    println!("Server running on 127.0.0.1:3000");
+    let listener = TcpListener::bind(address).await.unwrap();
+    println!("Server running on {:?}", address);
     axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),
@@ -182,9 +182,9 @@ async fn add(
     done_rx.await.unwrap()
 }
 
-async fn run_client() {
+async fn run_client(websocket_address: &str) {
     sleep(Duration::from_millis(300)).await;
-    let (ws_stream, _) = connect_async("ws://127.0.0.1:3000/ws")
+    let (ws_stream, _) = connect_async(websocket_address)
         .await
         .expect("Failed to connect");
     let (mut sender, mut receiver) = ws_stream.split();
@@ -232,6 +232,6 @@ async fn run_client() {
 
 #[tokio::main]
 async fn main() {
-    tokio::spawn(run_server());
-    run_client().await;
+    tokio::spawn(run_server("127.0.0.1:3000"));
+    run_client("ws://127.0.0.1:3000/ws").await;
 }
