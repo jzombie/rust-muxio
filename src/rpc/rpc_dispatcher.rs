@@ -27,7 +27,7 @@ use std::sync::{Arc, Mutex};
 /// request queue for tracking inbound response metadata and payloads.
 pub struct RpcDispatcher<'a> {
     /// Core session responsible for managing stream lifecycles and handlers.
-    rpc_session: RpcRespondableSession<'a>,
+    rpc_respondable_session: RpcRespondableSession<'a>,
 
     // TODO: Document how this must be unique per session
     /// Monotonic ID generator for outbound RPC request headers.
@@ -48,10 +48,10 @@ impl<'a> RpcDispatcher<'a> {
     /// The handler collects incoming response stream events and maintains
     /// them in a shared, thread-safe queue for downstream access.
     pub fn new() -> Self {
-        let rpc_session = RpcRespondableSession::new();
+        let rpc_respondable_session = RpcRespondableSession::new();
 
         let mut instance = Self {
-            rpc_session,
+            rpc_respondable_session,
             next_header_id: increment_u32_id(),
             rpc_request_queue: Arc::new(Mutex::new(VecDeque::new())),
         };
@@ -75,7 +75,7 @@ impl<'a> RpcDispatcher<'a> {
     fn init_catch_all_response_handler(&mut self) {
         let rpc_request_queue_ref = Arc::clone(&self.rpc_request_queue);
 
-        self.rpc_session
+        self.rpc_respondable_session
             .set_catch_all_response_handler(Box::new(move |event: RpcStreamEvent| {
                 // TODO: Don't use unwrap
                 let mut queue = rpc_request_queue_ref.lock().unwrap();
@@ -191,7 +191,7 @@ impl<'a> RpcDispatcher<'a> {
         };
 
         // Directly pass the closure as `on_emit` without borrowing it
-        let mut encoder = self.rpc_session.init_respondable_request(
+        let mut encoder = self.rpc_respondable_session.init_respondable_request(
             request_header,
             max_chunk_size,
             on_emit,
@@ -244,9 +244,11 @@ impl<'a> RpcDispatcher<'a> {
             },
         };
 
-        let mut response_encoder =
-            self.rpc_session
-                .start_reply_stream(rpc_response_header, max_chunk_size, on_emit)?;
+        let mut response_encoder = self.rpc_respondable_session.start_reply_stream(
+            rpc_response_header,
+            max_chunk_size,
+            on_emit,
+        )?;
 
         if let Some(pre_buffered_payload_bytes) = rpc_response.pre_buffered_payload_bytes {
             response_encoder.push_bytes(&pre_buffered_payload_bytes)?;
@@ -285,7 +287,7 @@ impl<'a> RpcDispatcher<'a> {
     ///   the `rpc_request_queue` mutex is poisoned.
     pub fn receive_bytes(&mut self, bytes: &[u8]) -> Result<Vec<u32>, FrameDecodeError> {
         // Process the incoming bytes
-        self.rpc_session.receive_bytes(bytes)?;
+        self.rpc_respondable_session.receive_bytes(bytes)?;
 
         // List of request header IDs which are currently in progress
         let queue = self
