@@ -213,10 +213,29 @@ impl<'a> RpcDispatcher<'a> {
         Ok(response_encoder)
     }
 
-    /// Feeds raw bytes into the underlying `RpcRespondableSession` and
-    /// returns a list of currently active request header IDs in the queue.
+    /// Feeds incoming byte stream data into the `RpcRespondableSession` for
+    /// decoding and stream reassembly. This method should be called whenever
+    /// new bytes are received from the transport layer (e.g. socket).
     ///
-    /// Errors if decode fails or mutex is poisoned.
+    /// Internally, this triggers stream event callbacks—such as header,
+    /// payload, and end events—that populate and update the internal
+    /// `rpc_request_queue` used for tracking in-flight requests.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<u32>` containing the active request `header_id`s currently
+    /// stored in the shared `rpc_request_queue`. These represent all requests
+    /// that:
+    /// - Have received at least a `Header` frame, and
+    /// - Have not yet been deleted or fully handled.
+    ///
+    /// This list is useful for downstream logic to inspect which requests are
+    /// pending, in-progress, or ready for consumption.
+    ///
+    /// # Errors
+    ///
+    /// - Returns `FrameDecodeError` if the incoming frame is invalid or if
+    ///   the `rpc_request_queue` mutex is poisoned.
     pub fn receive_bytes(&mut self, bytes: &[u8]) -> Result<Vec<u32>, FrameDecodeError> {
         // Process the incoming bytes
         self.rpc_session.receive_bytes(bytes)?;
