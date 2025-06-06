@@ -142,18 +142,31 @@ async fn add(
     tx: mpsc::UnboundedSender<WsMessage>,
     numbers: Vec<f64>,
 ) -> f64 {
-    let (done_tx, done_rx) = oneshot::channel();
+    let payload = bitcode::encode(&AddRequestParams { numbers });
+    call_rpc(dispatcher, tx, 0x01, payload, |bytes| {
+        let decoded: AddResponseParams = bitcode::decode(&bytes).unwrap();
+        decoded.result
+    })
+    .await
+}
+
+async fn call_rpc<T: Send + 'static, F: Fn(Vec<u8>) -> T + Send + Sync + 'static>(
+    dispatcher: Arc<Mutex<RpcDispatcher<'static>>>,
+    tx: mpsc::UnboundedSender<WsMessage>,
+    method_id: u64,
+    payload: Vec<u8>,
+    handler: F,
+) -> T {
+    let (done_tx, done_rx) = oneshot::channel::<T>();
     let done_tx = Arc::new(Mutex::new(Some(done_tx)));
     let done_tx_clone = done_tx.clone();
-
-    let payload = bitcode::encode(&AddRequestParams { numbers });
 
     dispatcher
         .lock()
         .await
         .call(
             RpcRequest {
-                method_id: 0x01,
+                method_id,
                 param_bytes: Some(payload),
                 pre_buffered_payload_bytes: None,
                 is_finalized: true,
@@ -164,13 +177,12 @@ async fn add(
             },
             Some(move |evt| {
                 if let RpcStreamEvent::PayloadChunk { bytes, .. } = evt {
-                    let decoded: AddResponseParams = bitcode::decode(&bytes).unwrap();
-                    println!("decoded: {:?}", decoded);
+                    let result = handler(bytes);
                     let done_tx_clone2 = done_tx_clone.clone();
                     tokio::spawn(async move {
                         let mut tx_lock = done_tx_clone2.lock().await;
                         if let Some(tx) = tx_lock.take() {
-                            let _ = tx.send(decoded.result);
+                            let _ = tx.send(result);
                         }
                     });
                 }
