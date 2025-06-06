@@ -77,8 +77,21 @@ impl<'a> RpcDispatcher<'a> {
 
         self.rpc_respondable_session
             .set_catch_all_response_handler(Box::new(move |event: RpcStreamEvent| {
-                // TODO: Don't use unwrap
-                let mut queue = rpc_request_queue_ref.lock().unwrap();
+                let Ok(mut queue) = rpc_request_queue_ref.lock() else {
+                    // If the lock is poisoned, it likely means another thread panicked while
+                    // holding the mutex. The internal state of the request queue may now be
+                    // inconsistent or partially mutated.
+                    //
+                    // Continuing execution could result in incorrect dispatch behavior,
+                    // undefined state transitions, or silent data loss.
+                    //
+                    // This should be treated as a critical failure and escalated appropriately.
+                    panic!(
+                        "[RpcDispatcher] Critical: Request queue mutex poisoned. \
+                        Dispatcher may be in an inconsistent state. \
+                        Event dropped to avoid undefined behavior."
+                    );
+                };
 
                 // TODO: Delete from queue if request is canceled mid-flight
                 match event {
