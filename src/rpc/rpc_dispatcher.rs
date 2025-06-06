@@ -63,15 +63,29 @@ impl<'a> RpcDispatcher<'a> {
 
     /// Internal helper to register a global response event handler.
     ///
-    /// This callback listens for all response stream events, and tracks them
-    /// by `rpc_header_id` in the internal `rpc_request_queue`.
+    /// This callback listens for all incoming response stream events and updates
+    /// the internal `rpc_request_queue` by `rpc_header_id`. It is installed as a
+    /// global fallback handler to track all incoming responses, even those without
+    /// a dedicated handler.
     ///
-    /// - Adds new requests on `Header`
-    /// - Appends payload chunks on `PayloadChunk`
-    /// - Marks request as complete on `End`
+    /// Behavior:
+    /// - On `Header`: pushes a new `RpcRequest` into the queue.
+    /// - On `PayloadChunk`: appends bytes to the matching request’s payload.
+    /// - On `End`: marks the request as finalized.
     ///
-    /// This design enables response stream tracking even when no specific
-    /// handler is registered per-request.
+    /// ## Thread Safety and Poisoning
+    ///
+    /// The queue is protected by a `Mutex`. If this mutex has been poisoned
+    /// (i.e., a previous thread panicked while holding the lock), this method
+    /// will `panic!` immediately. This is a deliberate design choice:
+    ///
+    /// - A poisoned queue likely means shared state is inconsistent or partially mutated.
+    /// - Continuing execution in this situation could lead to data loss, incorrect routing,
+    ///   or undefined behavior.
+    /// - Crashing fast provides better safety and debugging signals in production or test.
+    ///
+    /// If graceful recovery is ever desired, this behavior should be restructured
+    /// behind a configurable panic policy or error reporting mechanism.
     fn init_catch_all_response_handler(&mut self) {
         let rpc_request_queue_ref = Arc::clone(&self.rpc_request_queue);
 
