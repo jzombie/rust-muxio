@@ -1,28 +1,8 @@
-mod client;
-mod server;
-mod service_definition;
-use bitcode;
-use client::RpcClient;
-use server::RpcServer;
-use service_definition::{Add, RpcApi};
-
-async fn add(rpc_client: &RpcClient, numbers: Vec<f64>) -> Result<f64, bitcode::Error> {
-    let dispatcher = rpc_client.dispatcher.clone();
-    let tx = rpc_client.tx.clone();
-
-    let payload = Add::encode_request(numbers);
-    let (_dispatcher, result) = RpcClient::call_rpc(
-        dispatcher,
-        tx,
-        Add::METHOD_ID,
-        payload,
-        Add::decode_response,
-        true,
-    )
-    .await;
-
-    result
-}
+use muxio_ws_rpc_demo_app::{
+    RpcClient, RpcServer, add,
+    service_definition::{Add, RpcApi},
+};
+use tokio;
 
 #[tokio::main]
 async fn main() {
@@ -36,7 +16,7 @@ async fn main() {
         .await;
 
     // Spawn server in the background
-    let server_task = tokio::spawn(async move {
+    let _server_task = tokio::spawn(async move {
         server.serve("127.0.0.1:3000").await;
     });
 
@@ -51,6 +31,6 @@ async fn main() {
     let result = add(&rpc_client, vec![8.0, 3.0, 7.0]).await;
     println!("Result from add(): {:?}", result);
 
-    // Optionally wait for server task if needed:
+    // Optionally wait for server task to end
     // let _ = server_task.await;
 }
