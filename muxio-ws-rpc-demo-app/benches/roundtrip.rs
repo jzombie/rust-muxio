@@ -1,4 +1,5 @@
 use criterion::{Criterion, criterion_group, criterion_main};
+use futures::{StreamExt, stream::FuturesUnordered};
 use muxio_ws_rpc_demo_app::{
     RpcClient, RpcServer,
     service_definition::{Add, RpcApi},
@@ -65,6 +66,23 @@ fn bench_roundtrip(c: &mut Criterion) {
                 r9.unwrap(),
                 r10.unwrap(),
             ));
+        });
+    });
+
+    c.bench_function("rpc_add_roundtrip_futures_unordered_batch_10", |b| {
+        b.to_async(&rt).iter(|| async {
+            let mut tasks = FuturesUnordered::new();
+
+            for _ in 0..10 {
+                tasks.push(muxio_ws_rpc_demo_app::add(&client, vec![1.0, 2.0, 3.0]));
+            }
+
+            let mut results = Vec::with_capacity(10);
+            while let Some(res) = tasks.next().await {
+                results.push(res.unwrap());
+            }
+
+            black_box(results);
         });
     });
 }
