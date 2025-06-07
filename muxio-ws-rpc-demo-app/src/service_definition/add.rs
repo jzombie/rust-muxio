@@ -18,7 +18,6 @@ impl RpcRequestPrebuffered for Add {
     const METHOD_ID: u64 = 0x01;
 
     type Input = Vec<f64>;
-    type EncodedRequest = Vec<u8>;
     type DecodedRequest = AddRequestParams;
 
     fn encode_request(numbers: Vec<f64>) -> Vec<u8> {
@@ -37,7 +36,6 @@ impl RpcResponsePrebuffered for Add {
     const METHOD_ID: u64 = 0x01;
 
     type Output = f64;
-    type EncodedResponse = Vec<u8>;
     type DecodedResponse = f64;
 
     fn encode_response(result: f64) -> Vec<u8> {

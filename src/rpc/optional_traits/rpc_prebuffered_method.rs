@@ -7,17 +7,11 @@ pub trait RpcRequestPrebuffered {
     /// The high-level input type expected by the request encoder (e.g., `Vec<f64>`).
     type Input;
 
-    /// The serialized request payload type (e.g., `Vec<u8>`).
-    type EncodedRequest;
-
     /// The deserialized request struct (e.g., `AddRequestParams`).
     type DecodedRequest;
 
-    /// Encodes the user input into a serialized request payload.
-    ///
-    /// # Arguments
-    /// * `input` - The high-level input to encode (e.g., parameters like numbers to add).
-    fn encode_request(input: Self::Input) -> Self::EncodedRequest;
+    /// Encodes the request into a byte array.
+    fn encode_request(input: Self::Input) -> Vec<u8>;
 
     /// Decodes raw request bytes into a typed request struct.
     ///
@@ -33,17 +27,11 @@ pub trait RpcResponsePrebuffered {
     /// The high-level output type returned from the response encoder (e.g., `f64`).
     type Output;
 
-    /// The serialized response payload type (e.g., `Vec<u8>`).
-    type EncodedResponse;
-
     /// The deserialized response struct (e.g., `AddResponseParams`).
     type DecodedResponse;
 
-    /// Encodes the response value into a serialized payload.
-    ///
-    /// # Arguments
-    /// * `output` - The high-level response result to encode (e.g., the sum).
-    fn encode_response(output: Self::Output) -> Self::EncodedResponse;
+    /// Encodes the response value into a byte array.
+    fn encode_response(output: Self::Output) -> Vec<u8>;
 
     /// Decodes raw response bytes into a typed response struct or value.
     ///
