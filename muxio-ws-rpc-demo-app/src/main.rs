@@ -1,5 +1,5 @@
 use muxio::rpc::optional_traits::{RpcRequestPrebuffered, RpcResponsePrebuffered};
-use muxio_ws_rpc_demo_app::{RpcClient, RpcServer, add, service_definition::Add};
+use muxio_ws_rpc_demo_app::{RpcClient, RpcServer, service_definition::Add};
 use tokio::join;
 use tokio::net::TcpListener;
 
@@ -33,8 +33,8 @@ async fn main() {
     let rpc_client = RpcClient::new(&format!("ws://{}/ws", addr)).await;
 
     let (res1, res2) = join!(
-        add(&rpc_client, vec![1.0, 2.0, 3.0]),
-        add(&rpc_client, vec![8.0, 3.0, 7.0])
+        Add::call(&rpc_client, vec![1.0, 2.0, 3.0]),
+        Add::call(&rpc_client, vec![8.0, 3.0, 7.0])
     );
 
     println!("Result from first add(): {:?}", res1);
