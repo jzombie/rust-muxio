@@ -13,7 +13,7 @@ async fn main() {
     server
         .register(<Add as RpcRequestPrebuffered>::METHOD_ID, |bytes| {
             let req = Add::decode_request(bytes).unwrap();
-            let result = req.numbers.iter().sum();
+            let result = req.iter().sum();
             Add::encode_response(result)
         })
         .await;

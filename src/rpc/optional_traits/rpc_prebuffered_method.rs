@@ -7,9 +7,6 @@ pub trait RpcRequestPrebuffered {
     /// The high-level input type expected by the request encoder (e.g., `Vec<f64>`).
     type Input;
 
-    /// The deserialized request struct (e.g., `AddRequestParams`).
-    type DecodedRequest;
-
     /// Encodes the request into a byte array.
     fn encode_request(input: Self::Input) -> Vec<u8>;
 
@@ -17,7 +14,7 @@ pub trait RpcRequestPrebuffered {
     ///
     /// # Arguments
     /// * `bytes` - Serialized request payload.
-    fn decode_request(bytes: Vec<u8>) -> Result<Self::DecodedRequest, io::Error>;
+    fn decode_request(bytes: Vec<u8>) -> Result<Self::Input, io::Error>;
 }
 
 pub trait RpcResponsePrebuffered {
@@ -27,9 +24,6 @@ pub trait RpcResponsePrebuffered {
     /// The high-level output type returned from the response encoder (e.g., `f64`).
     type Output;
 
-    /// The deserialized response struct (e.g., `AddResponseParams`).
-    type DecodedResponse;
-
     /// Encodes the response value into a byte array.
     fn encode_response(output: Self::Output) -> Vec<u8>;
 
@@ -37,5 +31,5 @@ pub trait RpcResponsePrebuffered {
     ///
     /// # Arguments
     /// * `bytes` - Serialized response payload.
-    fn decode_response(bytes: Vec<u8>) -> Result<Self::DecodedResponse, io::Error>;
+    fn decode_response(bytes: Vec<u8>) -> Result<Self::Output, io::Error>;
 }
