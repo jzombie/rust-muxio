@@ -44,7 +44,7 @@ impl RpcServer {
         let addr = listener.local_addr().unwrap();
 
         let app = Router::new().route(
-            "/ws",
+            "/ws", // TODO: Don't hardcode
             get({
                 let handlers = self.handlers.clone();
                 move |ws, conn| Self::ws_handler(ws, conn, handlers.clone())
