@@ -1,5 +1,6 @@
 use std::io;
 
+// TODO: Differentiate between pre-buffered and streaming request/responses (current implementation is just pre-buffered)
 /// A trait to define the contract for an RPC API service.
 ///
 /// This trait allows a service to define its own encoding and decoding logic
