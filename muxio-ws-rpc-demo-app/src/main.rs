@@ -2,7 +2,9 @@ use muxio_ws_rpc_demo_app::{
     RpcClient, RpcServer, add,
     service_definition::{Add, RpcApi},
 };
-use tokio;
+use tokio::join;
+
+const SERVER_ADDRESS: &str = "127.0.0.1:3000";
 
 #[tokio::main]
 async fn main() {
@@ -17,19 +19,23 @@ async fn main() {
 
     // Spawn server in the background
     let _server_task = tokio::spawn(async move {
-        server.serve("127.0.0.1:3000").await;
+        server.serve(SERVER_ADDRESS).await;
     });
 
     // Optional delay to ensure server is up before client connects
     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
-    let rpc_client = RpcClient::new("ws://127.0.0.1:3000/ws").await;
+    let rpc_client = RpcClient::new(&format!("ws://{}/ws", SERVER_ADDRESS)).await;
 
-    let result = add(&rpc_client, vec![1.0, 2.0, 3.0]).await;
-    println!("Result from add(): {:?}", result);
+    // Run requests concurrently
+    // `join!` waits for both futures to complete.
+    let (res1, res2) = join!(
+        add(&rpc_client, vec![1.0, 2.0, 3.0]),
+        add(&rpc_client, vec![8.0, 3.0, 7.0])
+    );
 
-    let result = add(&rpc_client, vec![8.0, 3.0, 7.0]).await;
-    println!("Result from add(): {:?}", result);
+    println!("Result from first add(): {:?}", res1);
+    println!("Result from second add(): {:?}", res2);
 
     // Optionally wait for server task to end
     // let _ = server_task.await;
