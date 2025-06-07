@@ -34,19 +34,21 @@ where
 }
 
 #[async_trait::async_trait]
-pub trait RpcCall: RpcRequestPrebuffered + RpcResponsePrebuffered + Sized + Send + Sync {
+pub trait RpcCallPrebuffered:
+    RpcRequestPrebuffered + RpcResponsePrebuffered + Sized + Send + Sync
+{
     async fn call(rpc_client: &RpcClient, input: Self::Input) -> Result<Self::Output, io::Error>;
 }
 
 #[async_trait::async_trait]
-impl RpcCall for Add {
+impl RpcCallPrebuffered for Add {
     async fn call(rpc_client: &RpcClient, input: Self::Input) -> Result<Self::Output, io::Error> {
         call_prebuffered_rpc::<Add>(rpc_client, input).await
     }
 }
 
 #[async_trait::async_trait]
-impl RpcCall for Mult {
+impl RpcCallPrebuffered for Mult {
     async fn call(rpc_client: &RpcClient, input: Self::Input) -> Result<Self::Output, io::Error> {
         call_prebuffered_rpc::<Mult>(rpc_client, input).await
     }
