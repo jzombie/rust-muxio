@@ -1,5 +1,18 @@
 use std::io;
 
+// These are optional helper traits that define a convention for encoding and
+// decoding RPC method data using pre-buffered (i.e., fully materialized) payloads.
+//
+// These traits are not used by the core Muxio framework directly — it is up to
+// the consuming application to adopt them if desired. They provide a structured,
+// ergonomic way to couple method metadata (such as `METHOD_ID`) with
+// serialization logic in a single location.
+//
+// These traits assume that the transport has already buffered the complete
+// request or response body, making them unsuitable for streaming scenarios.
+// In cases requiring incremental transmission, alternative traits or interfaces
+// should be used instead.
+
 pub trait RpcRequestPrebuffered {
     /// A unique identifier for the RPC method.
     const METHOD_ID: u64;
