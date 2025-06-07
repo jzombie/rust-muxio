@@ -1,12 +1,12 @@
 mod client;
 mod server;
 pub mod service_definition;
-use bitcode;
 pub use client::RpcClient;
 pub use server::RpcServer;
 pub use service_definition::{Add, RpcApi};
+use std::io;
 
-pub async fn add(rpc_client: &RpcClient, numbers: Vec<f64>) -> Result<f64, bitcode::Error> {
+pub async fn add(rpc_client: &RpcClient, numbers: Vec<f64>) -> Result<f64, io::Error> {
     let dispatcher = rpc_client.dispatcher.clone();
     let tx = rpc_client.tx.clone();
 
