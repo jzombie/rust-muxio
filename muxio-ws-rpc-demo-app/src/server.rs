@@ -15,6 +15,8 @@ use tokio::{net::TcpListener, sync::mpsc::unbounded_channel};
 pub struct RpcServer {}
 
 impl RpcServer {
+    /// Initializes the RPC server and starts serving WebSocket connections
+    /// on the given address.
     pub async fn init(address: &str) -> RpcServer {
         let app = Router::new().route("/ws", get(Self::ws_handler));
         let listener = TcpListener::bind(address).await.unwrap();
@@ -29,6 +31,7 @@ impl RpcServer {
         Self {}
     }
 
+    /// WebSocket route handler that sets up the WebSocket connection.
     async fn ws_handler(
         ws: WebSocketUpgrade,
         ConnectInfo(addr): ConnectInfo<SocketAddr>,
@@ -37,6 +40,8 @@ impl RpcServer {
         ws.on_upgrade(Self::handle_socket)
     }
 
+    /// Handles the actual WebSocket connection lifecycle, dispatching incoming
+    /// RPC messages and sending appropriate responses using the `Muxio` dispatcher.
     async fn handle_socket(socket: WebSocket) {
         let (mut sender, mut receiver) = socket.split();
         let (tx, mut rx) = unbounded_channel::<Message>();
