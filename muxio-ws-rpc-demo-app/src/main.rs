@@ -4,7 +4,7 @@ mod service_definition;
 use bitcode;
 use client::RpcClient;
 use server::RpcServer;
-use service_definition::Add;
+use service_definition::{Add, RpcApi};
 
 async fn add(rpc_client: &RpcClient, numbers: Vec<f64>) -> Result<f64, bitcode::Error> {
     let dispatcher = rpc_client.dispatcher.clone();
