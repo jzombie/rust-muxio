@@ -24,7 +24,7 @@ async fn main() {
     let _server_task = tokio::spawn({
         let server = server;
         async move {
-            server.serve_with_listener(listener).await;
+            let _ = server.serve_with_listener(listener).await;
         }
     });
 

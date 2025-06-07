@@ -30,14 +30,17 @@ impl RpcServer {
 
     /// Starts serving the RPC server with already registered handlers
     /// on the given address.
-    pub async fn serve(self, address: &str) {
+    pub async fn serve(self, address: &str) -> Result<SocketAddr, axum::BoxError> {
         let listener = TcpListener::bind(address).await.unwrap();
-        self.serve_with_listener(listener).await;
+        self.serve_with_listener(listener).await
     }
 
     /// Starts serving the RPC server using a pre-bound TcpListener.
     /// Useful for dynamic ports or external socket management.
-    pub async fn serve_with_listener(self, listener: TcpListener) -> SocketAddr {
+    pub async fn serve_with_listener(
+        self,
+        listener: TcpListener,
+    ) -> Result<SocketAddr, axum::BoxError> {
         let addr = listener.local_addr().unwrap();
 
         let app = Router::new().route(
@@ -50,17 +53,13 @@ impl RpcServer {
 
         println!("Server running on {:?}", addr);
 
-        tokio::spawn(async move {
-            axum::serve(
-                listener,
-                app.into_make_service_with_connect_info::<SocketAddr>(),
-            )
-            .await
-            // TODO: Don't unwrap
-            .unwrap();
-        });
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<SocketAddr>(),
+        )
+        .await?;
 
-        addr
+        Ok(addr)
     }
 
     // TODO: Add ability to register streaming handler
