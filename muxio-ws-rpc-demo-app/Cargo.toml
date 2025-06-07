@@ -1,5 +1,5 @@
 [package]
-name = "muxio-ws-rpc-demo"
+name = "muxio-ws-rpc-demo-app"
 version = "0.1.0"
 edition = "2024"
 publish = false
