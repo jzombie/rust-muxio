@@ -3,11 +3,14 @@ use muxio_ws_rpc_demo_app::{
     service_definition::{Add, RpcApi},
 };
 use tokio::join;
-
-const SERVER_ADDRESS: &str = "127.0.0.1:3000";
+use tokio::net::TcpListener;
 
 #[tokio::main]
 async fn main() {
+    // Bind to a random available port
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
     let server = RpcServer::new();
     server
         .register(Add::METHOD_ID, |bytes| {
@@ -17,18 +20,20 @@ async fn main() {
         })
         .await;
 
-    // Spawn server in the background
-    let _server_task = tokio::spawn(async move {
-        server.serve(SERVER_ADDRESS).await;
+    // Spawn the server using the pre-bound listener
+    let _server_task = tokio::spawn({
+        let server = server;
+        async move {
+            server.serve_with_listener(listener).await;
+        }
     });
 
-    // Optional delay to ensure server is up before client connects
+    // Wait briefly for server to start
     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
-    let rpc_client = RpcClient::new(&format!("ws://{}/ws", SERVER_ADDRESS)).await;
+    // Use the actual bound address for the client
+    let rpc_client = RpcClient::new(&format!("ws://{}/ws", addr)).await;
 
-    // Run requests concurrently
-    // `join!` waits for both futures to complete.
     let (res1, res2) = join!(
         add(&rpc_client, vec![1.0, 2.0, 3.0]),
         add(&rpc_client, vec![8.0, 3.0, 7.0])
@@ -36,7 +41,4 @@ async fn main() {
 
     println!("Result from first add(): {:?}", res1);
     println!("Result from second add(): {:?}", res2);
-
-    // Optionally wait for server task to end
-    // let _ = server_task.await;
 }

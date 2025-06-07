@@ -30,7 +30,29 @@ impl RpcServer {
 
     /// Starts serving the RPC server with already registered handlers
     /// on the given address.
-    pub async fn serve(self, address: &str) {
+    // pub async fn serve(self, address: &str) {
+    //     let app = Router::new().route(
+    //         "/ws",
+    //         get({
+    //             let handlers = self.handlers.clone();
+    //             move |ws, conn| Self::ws_handler(ws, conn, handlers.clone())
+    //         }),
+    //     );
+
+    //     let listener = TcpListener::bind(address).await.unwrap();
+    //     println!("Server running on {:?}", address);
+    //     axum::serve(
+    //         listener,
+    //         app.into_make_service_with_connect_info::<SocketAddr>(),
+    //     )
+    //     .await
+    //     .unwrap();
+    // }
+    /// Starts serving the RPC server using a pre-bound TcpListener.
+    /// Useful for dynamic ports or external socket management.
+    pub async fn serve_with_listener(self, listener: TcpListener) -> SocketAddr {
+        let addr = listener.local_addr().unwrap();
+
         let app = Router::new().route(
             "/ws",
             get({
@@ -39,14 +61,18 @@ impl RpcServer {
             }),
         );
 
-        let listener = TcpListener::bind(address).await.unwrap();
-        println!("Server running on {:?}", address);
-        axum::serve(
-            listener,
-            app.into_make_service_with_connect_info::<SocketAddr>(),
-        )
-        .await
-        .unwrap();
+        println!("Server running on {:?}", addr);
+
+        tokio::spawn(async move {
+            axum::serve(
+                listener,
+                app.into_make_service_with_connect_info::<SocketAddr>(),
+            )
+            .await
+            .unwrap();
+        });
+
+        addr
     }
 
     // TODO: Add ability to register streaming handler
