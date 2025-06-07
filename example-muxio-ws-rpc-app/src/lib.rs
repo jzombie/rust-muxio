@@ -11,33 +11,71 @@ use std::io;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc::UnboundedSender;
+use tokio_tungstenite::tungstenite::protocol::Message as WsMessage;
 
-// TODO: Extract `GenericRpcClient` into a separate crate
+/// Abstracts the RPC transport mechanism.
+#[async_trait::async_trait]
+pub trait RpcTransport {
+    type Dispatcher;
+    type Sender;
 
-/// Trait representing the minimal interface required for an RPC client.
-/// This enables decoupling from a specific `RpcClient` implementation.
-#[cfg(not(target_arch = "wasm32"))]
-pub trait GenericRpcClient {
-    fn dispatcher(&self) -> Arc<Mutex<RpcDispatcher<'static>>>;
-    fn sender(&self) -> UnboundedSender<tokio_tungstenite::tungstenite::protocol::Message>;
+    fn dispatcher(&self) -> Arc<Mutex<Self::Dispatcher>>;
+    fn sender(&self) -> Self::Sender;
+
+    async fn call_rpc<T, F>(
+        dispatcher: Arc<Mutex<Self::Dispatcher>>,
+        sender: Self::Sender,
+        method_id: u64,
+        payload: Vec<u8>,
+        response_handler: F,
+        is_finalized: bool,
+    ) -> Result<T, io::Error>
+    where
+        T: Send + 'static,
+        F: Fn(Vec<u8>) -> T + Send + Sync + 'static;
 }
 
-// TODO: Alternate handling, etc.
-// #[cfg(target_arch = "wasm32")]
-// pub trait GenericRpcClient { /* wasm-based version */ }
+#[async_trait::async_trait]
+impl RpcTransport for RpcClient {
+    type Dispatcher = RpcDispatcher<'static>;
+    type Sender = UnboundedSender<WsMessage>;
 
-impl GenericRpcClient for RpcClient {
-    fn dispatcher(&self) -> Arc<Mutex<RpcDispatcher<'static>>> {
+    fn dispatcher(&self) -> Arc<Mutex<Self::Dispatcher>> {
         self.dispatcher.clone()
     }
 
-    fn sender(&self) -> UnboundedSender<tokio_tungstenite::tungstenite::protocol::Message> {
+    fn sender(&self) -> Self::Sender {
         self.tx.clone()
+    }
+
+    async fn call_rpc<T, F>(
+        dispatcher: Arc<Mutex<Self::Dispatcher>>,
+        sender: Self::Sender,
+        method_id: u64,
+        payload: Vec<u8>,
+        response_handler: F,
+        is_finalized: bool,
+    ) -> Result<T, io::Error>
+    where
+        T: Send + 'static,
+        F: Fn(Vec<u8>) -> T + Send + Sync + 'static,
+    {
+        let (_dispatcher, result) = RpcClient::call_rpc(
+            dispatcher,
+            sender,
+            method_id,
+            payload,
+            response_handler,
+            is_finalized,
+        )
+        .await;
+
+        Ok(result)
     }
 }
 
 /// Calls a prebuffered RPC method defined by the `RpcRequestPrebuffered` and
-/// `RpcResponsePrebuffered` traits using a generic RPC client.
+/// `RpcResponsePrebuffered` traits using a generic RPC transport.
 ///
 /// The output type must be `'static` to comply with async executor bounds.
 pub async fn call_prebuffered_rpc<T, C>(
@@ -47,24 +85,22 @@ pub async fn call_prebuffered_rpc<T, C>(
 where
     T: RpcRequestPrebuffered + RpcResponsePrebuffered + Send + Sync + 'static,
     T::Output: Send + 'static,
-    C: GenericRpcClient + Send + Sync,
+    C: RpcTransport + Send + Sync,
 {
     let dispatcher = rpc_client.dispatcher();
     let tx = rpc_client.sender();
 
-    let payload = T::encode_request(input);
-
-    let (_dispatcher, result) = RpcClient::call_rpc(
+    let result = C::call_rpc(
         dispatcher,
         tx,
         <T as RpcRequestPrebuffered>::METHOD_ID,
-        payload,
+        T::encode_request(input),
         T::decode_response,
         true,
     )
-    .await;
+    .await?;
 
-    result
+    Ok(result?)
 }
 
 /// Trait for types that represent callable prebuffered RPC methods.
@@ -75,7 +111,7 @@ where
 pub trait RpcCallPrebuffered:
     RpcRequestPrebuffered + RpcResponsePrebuffered + Sized + Send + Sync
 {
-    async fn call<C: GenericRpcClient + Send + Sync>(
+    async fn call<C: RpcTransport + Send + Sync>(
         rpc_client: &C,
         input: Self::Input,
     ) -> Result<Self::Output, io::Error>;
@@ -83,7 +119,7 @@ pub trait RpcCallPrebuffered:
 
 #[async_trait::async_trait]
 impl RpcCallPrebuffered for Add {
-    async fn call<C: GenericRpcClient + Send + Sync>(
+    async fn call<C: RpcTransport + Send + Sync>(
         rpc_client: &C,
         input: Self::Input,
     ) -> Result<Self::Output, io::Error> {
@@ -93,7 +129,7 @@ impl RpcCallPrebuffered for Add {
 
 #[async_trait::async_trait]
 impl RpcCallPrebuffered for Mult {
-    async fn call<C: GenericRpcClient + Send + Sync>(
+    async fn call<C: RpcTransport + Send + Sync>(
         rpc_client: &C,
         input: Self::Input,
     ) -> Result<Self::Output, io::Error> {
