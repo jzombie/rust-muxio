@@ -56,9 +56,6 @@ impl RpcClient {
             }
         });
 
-        // let result = add(dispatcher_clone, tx_clone, vec![1.0, 2.0, 3.0]).await;
-        // println!("Result from add(): {}", result);
-
         RpcClient { dispatcher, tx }
     }
 
@@ -84,7 +81,7 @@ impl RpcClient {
                     pre_buffered_payload_bytes: None,
                     is_finalized,
                 },
-                1024,
+                1024, // TODO: Don't hardcode
                 move |chunk| {
                     let _ = tx.send(WsMessage::Binary(Bytes::copy_from_slice(chunk)));
                 },

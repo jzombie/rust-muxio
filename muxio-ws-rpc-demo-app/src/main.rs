@@ -40,6 +40,12 @@ async fn main() {
 
     let rpc_client = RpcClient::new("ws://127.0.0.1:3000/ws").await;
 
-    let result = add(rpc_client.dispatcher, rpc_client.tx, vec![1.0, 2.0, 3.0]).await;
+    let dispatcher = rpc_client.dispatcher.clone();
+    let tx = rpc_client.tx.clone();
+
+    let result = add(dispatcher.clone(), tx.clone(), vec![1.0, 2.0, 3.0]).await;
+    println!("Result from add(): {}", result);
+
+    let result = add(dispatcher.clone(), tx.clone(), vec![8.0, 3.0, 7.0]).await;
     println!("Result from add(): {}", result);
 }
