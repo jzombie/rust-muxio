@@ -12,3 +12,10 @@ futures-util = "0.3.31"
 tokio = { version = "1.45.1", features = ["full"] }
 tokio-tungstenite = "0.26.2"
 muxio = { path = "../" }
+
+[[bench]]
+name = "roundtrip"
+harness = false
+
+[dev-dependencies]
+criterion = { version = "0.6.0", features = ["async_tokio"] }
