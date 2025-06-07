@@ -1,4 +1,5 @@
 use bitcode::{Decode, Encode};
+use std::io;
 
 /// A trait to define the contract for an RPC API service.
 ///
@@ -39,7 +40,7 @@ pub trait RpcApi {
     ///
     /// # Arguments
     /// * `bytes` - Serialized request payload.
-    fn decode_request(bytes: Vec<u8>) -> Result<Self::DecodedRequest, bitcode::Error>;
+    fn decode_request(bytes: Vec<u8>) -> Result<Self::DecodedRequest, io::Error>;
 
     /// Encodes the response value into a serialized payload.
     ///
@@ -51,7 +52,7 @@ pub trait RpcApi {
     ///
     /// # Arguments
     /// * `bytes` - Serialized response payload.
-    fn decode_response(bytes: Vec<u8>) -> Result<Self::DecodedResponse, bitcode::Error>;
+    fn decode_response(bytes: Vec<u8>) -> Result<Self::DecodedResponse, io::Error>;
 }
 
 #[derive(Encode, Decode, PartialEq, Debug)]
@@ -81,16 +82,20 @@ impl RpcApi for Add {
         bitcode::encode(&AddRequestParams { numbers })
     }
 
-    fn decode_request(bytes: Vec<u8>) -> Result<AddRequestParams, bitcode::Error> {
-        bitcode::decode::<AddRequestParams>(&bytes)
+    fn decode_request(bytes: Vec<u8>) -> Result<AddRequestParams, io::Error> {
+        let result = bitcode::decode::<AddRequestParams>(&bytes)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+
+        Ok(result)
     }
 
     fn encode_response(result: f64) -> Vec<u8> {
         bitcode::encode(&AddResponseParams { result })
     }
 
-    fn decode_response(bytes: Vec<u8>) -> Result<f64, bitcode::Error> {
-        let raw = bitcode::decode::<AddResponseParams>(&bytes)?;
+    fn decode_response(bytes: Vec<u8>) -> Result<f64, io::Error> {
+        let raw = bitcode::decode::<AddResponseParams>(&bytes)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
         Ok(raw.result)
     }
