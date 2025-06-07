@@ -1,6 +1,6 @@
 use muxio_ws_rpc_demo_app::{
     RpcClient, RpcServer, add,
-    service_definition::{Add, RpcApi},
+    service_definition::{Add, RpcMethodPrebuffered},
 };
 use tokio::join;
 use tokio::net::TcpListener;

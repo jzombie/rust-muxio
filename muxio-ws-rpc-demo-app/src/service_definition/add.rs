@@ -1,4 +1,4 @@
-use super::RpcApi;
+use super::RpcMethodPrebuffered;
 use bitcode::{Decode, Encode};
 use std::io;
 
@@ -14,7 +14,7 @@ pub struct AddResponseParams {
 
 pub struct Add;
 
-impl RpcApi for Add {
+impl RpcMethodPrebuffered for Add {
     const METHOD_ID: u64 = 0x01;
 
     type Input = Vec<f64>;

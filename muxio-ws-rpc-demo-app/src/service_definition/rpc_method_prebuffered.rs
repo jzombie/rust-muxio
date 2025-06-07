@@ -1,14 +1,17 @@
 use std::io;
 
-// TODO: Differentiate between pre-buffered and streaming request/responses (current implementation is just pre-buffered)
-/// A trait to define the contract for an RPC API service.
+/// Defines the codec contract for a single RPC method using pre-buffered payloads.
 ///
-/// This trait allows a service to define its own encoding and decoding logic
-/// for both request and response types while preserving its own ergonomic API.
+/// While the underlying transport layer may operate in a streaming fashion,
+/// this trait assumes that the complete request and response payloads are
+/// fully received (or generated) before being decoded or encoded.
 ///
-/// Implementors are free to define custom input/output types and how they are encoded
-/// or decoded, as long as the required methods are provided.
-pub trait RpcApi {
+/// Implementors define how high-level request/response types are serialized into
+/// and deserialized from binary formats, such as Bitcode, JSON, or Protobuf.
+///
+/// This trait is best suited for RPC methods where the payloads are small
+/// enough to be buffered in memory as a single contiguous blob.
+pub trait RpcMethodPrebuffered {
     /// A unique identifier for the RPC method.
     const METHOD_ID: u64;
 

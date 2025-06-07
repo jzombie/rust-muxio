@@ -3,7 +3,7 @@ mod server;
 pub mod service_definition;
 pub use client::RpcClient;
 pub use server::RpcServer;
-pub use service_definition::{Add, RpcApi};
+pub use service_definition::{Add, RpcMethodPrebuffered};
 use std::io;
 
 pub async fn add(rpc_client: &RpcClient, numbers: Vec<f64>) -> Result<f64, io::Error> {
