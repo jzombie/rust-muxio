@@ -1,5 +1,5 @@
+use example_muxio_ws_rpc_app::{RpcClient, RpcServer, service_definition::Add};
 use muxio::rpc::optional_traits::{RpcRequestPrebuffered, RpcResponsePrebuffered};
-use muxio_ws_rpc_demo_app::{RpcClient, RpcServer, service_definition::Add};
 use tokio::join;
 use tokio::net::TcpListener;
 
