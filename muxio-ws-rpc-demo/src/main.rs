@@ -143,11 +143,20 @@ async fn add(
     numbers: Vec<f64>,
 ) -> f64 {
     let payload = bitcode::encode(&AddRequestParams { numbers });
-    call_rpc(dispatcher, tx, 0x01, payload, |bytes| {
-        let decoded: AddResponseParams = bitcode::decode(&bytes).unwrap();
-        decoded.result
-    })
-    .await
+    let (_dispatcher, result) = call_rpc(
+        dispatcher,
+        tx,
+        0x01,
+        payload,
+        |bytes| {
+            let decoded: AddResponseParams = bitcode::decode(&bytes).unwrap();
+            decoded.result
+        },
+        true,
+    )
+    .await;
+
+    result
 }
 
 async fn call_rpc<T: Send + 'static, F: Fn(Vec<u8>) -> T + Send + Sync + 'static>(
@@ -156,7 +165,8 @@ async fn call_rpc<T: Send + 'static, F: Fn(Vec<u8>) -> T + Send + Sync + 'static
     method_id: u64,
     payload: Vec<u8>,
     handler: F,
-) -> T {
+    is_finalized: bool,
+) -> (Arc<Mutex<RpcDispatcher<'static>>>, T) {
     let (done_tx, done_rx) = oneshot::channel::<T>();
     let done_tx = Arc::new(Mutex::new(Some(done_tx)));
     let done_tx_clone = done_tx.clone();
@@ -169,7 +179,7 @@ async fn call_rpc<T: Send + 'static, F: Fn(Vec<u8>) -> T + Send + Sync + 'static
                 method_id,
                 param_bytes: Some(payload),
                 pre_buffered_payload_bytes: None,
-                is_finalized: true,
+                is_finalized,
             },
             1024,
             move |chunk| {
@@ -191,7 +201,8 @@ async fn call_rpc<T: Send + 'static, F: Fn(Vec<u8>) -> T + Send + Sync + 'static
         )
         .unwrap();
 
-    done_rx.await.unwrap()
+    let result = done_rx.await.unwrap();
+    (dispatcher, result)
 }
 
 async fn run_client(websocket_address: &str) {
