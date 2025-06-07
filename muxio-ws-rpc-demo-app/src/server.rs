@@ -50,6 +50,7 @@ impl RpcServer {
         .unwrap();
     }
 
+    // TODO: Add ability to register streaming handler
     /// Registers a new RPC method handler.
     pub async fn register<F>(&self, method_id: u64, handler: F)
     where
