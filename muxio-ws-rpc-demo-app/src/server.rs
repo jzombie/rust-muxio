@@ -30,24 +30,11 @@ impl RpcServer {
 
     /// Starts serving the RPC server with already registered handlers
     /// on the given address.
-    // pub async fn serve(self, address: &str) {
-    //     let app = Router::new().route(
-    //         "/ws",
-    //         get({
-    //             let handlers = self.handlers.clone();
-    //             move |ws, conn| Self::ws_handler(ws, conn, handlers.clone())
-    //         }),
-    //     );
+    pub async fn serve(self, address: &str) {
+        let listener = TcpListener::bind(address).await.unwrap();
+        self.serve_with_listener(listener).await;
+    }
 
-    //     let listener = TcpListener::bind(address).await.unwrap();
-    //     println!("Server running on {:?}", address);
-    //     axum::serve(
-    //         listener,
-    //         app.into_make_service_with_connect_info::<SocketAddr>(),
-    //     )
-    //     .await
-    //     .unwrap();
-    // }
     /// Starts serving the RPC server using a pre-bound TcpListener.
     /// Useful for dynamic ports or external socket management.
     pub async fn serve_with_listener(self, listener: TcpListener) -> SocketAddr {
@@ -69,6 +56,7 @@ impl RpcServer {
                 app.into_make_service_with_connect_info::<SocketAddr>(),
             )
             .await
+            // TODO: Don't unwrap
             .unwrap();
         });
 
