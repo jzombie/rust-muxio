@@ -72,6 +72,7 @@ impl RpcServer {
                 }
             };
 
+            // TODO: Figure out a common registration handler
             for request_id in request_ids {
                 // Finalized requests contain their full payloads are are easier to work
                 // with, though they will need to fully buffer before using
