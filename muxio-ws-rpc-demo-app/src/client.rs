@@ -64,7 +64,7 @@ impl RpcClient {
         tx: mpsc::UnboundedSender<WsMessage>,
         method_id: u64,
         payload: Vec<u8>,
-        handler: F,
+        response_handler: F,
         is_finalized: bool,
     ) -> (Arc<Mutex<RpcDispatcher<'static>>>, T) {
         let (done_tx, done_rx) = oneshot::channel::<T>();
@@ -87,7 +87,7 @@ impl RpcClient {
                 },
                 Some(move |evt| {
                     if let RpcStreamEvent::PayloadChunk { bytes, .. } = evt {
-                        let result = handler(bytes);
+                        let result = response_handler(bytes);
                         let done_tx_clone2 = done_tx_clone.clone();
                         tokio::spawn(async move {
                             let mut tx_lock = done_tx_clone2.lock().await;
