@@ -1,24 +1,22 @@
 mod client;
 mod server;
 mod service_definition;
+use bitcode;
 use client::RpcClient;
 use server::RpcServer;
-use service_definition::{AddRequestParams, AddResponseParams};
+use service_definition::Add;
 
-async fn add(rpc_client: &RpcClient, numbers: Vec<f64>) -> f64 {
+async fn add(rpc_client: &RpcClient, numbers: Vec<f64>) -> Result<f64, bitcode::Error> {
     let dispatcher = rpc_client.dispatcher.clone();
     let tx = rpc_client.tx.clone();
 
-    let payload = bitcode::encode(&AddRequestParams { numbers });
+    let payload = Add::encode_request(numbers);
     let (_dispatcher, result) = RpcClient::call_rpc(
         dispatcher,
         tx,
-        0x01, // TODO: Don't harcode
+        Add::METHOD_ID,
         payload,
-        |bytes| {
-            let decoded: AddResponseParams = bitcode::decode(&bytes).unwrap();
-            decoded.result
-        },
+        Add::decode_response,
         true,
     )
     .await;
@@ -35,8 +33,8 @@ async fn main() {
     let rpc_client = RpcClient::new("ws://127.0.0.1:3000/ws").await;
 
     let result = add(&rpc_client, vec![1.0, 2.0, 3.0]).await;
-    println!("Result from add(): {}", result);
+    println!("Result from add(): {:?}", result);
 
     let result = add(&rpc_client, vec![8.0, 3.0, 7.0]).await;
-    println!("Result from add(): {}", result);
+    println!("Result from add(): {:?}", result);
 }

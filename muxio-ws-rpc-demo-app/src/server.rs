@@ -1,4 +1,4 @@
-use crate::service_definition::{AddRequestParams, AddResponseParams};
+use crate::service_definition::Add;
 use axum::{
     Router,
     extract::ConnectInfo,
@@ -90,11 +90,11 @@ impl RpcServer {
                 };
 
                 let response = match request.method_id {
-                    // TODO: Don't hardcode
-                    0x01 => {
-                        let req: AddRequestParams = bitcode::decode(payload).unwrap();
+                    Add::METHOD_ID => {
+                        // let req: AddRequestParams = bitcode::decode(payload).unwrap();
+                        let req = Add::decode_request(payload.to_vec()).unwrap();
                         let sum = req.numbers.iter().sum();
-                        let encoded = bitcode::encode(&AddResponseParams { result: sum });
+                        let encoded = Add::encode_response(sum);
 
                         RpcResponse {
                             request_header_id: request_id,
