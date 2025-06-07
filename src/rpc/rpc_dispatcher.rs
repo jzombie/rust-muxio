@@ -11,20 +11,47 @@ use crate::utils::increment_u32_id;
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
+/// Manages RPC request dispatching and response handling over a framed transport.
+///
+/// `RpcDispatcher` serves as a runtime coordinator for encoding outbound
+/// RPC requests, emitting them as framed streams, and handling inbound
+/// RPC responses via a shared request queue.
+///
+/// This dispatcher operates in a **non-async** model using **layered callbacks**.
+/// It is compatible with **WASM** and **multithreaded runtimes**, and supports:
+/// - Chunked streaming of request/response payloads
+/// - Request correlation via `header_id`
+/// - Mid-stream cancellation
+///
+/// Internally, it wraps a `RpcRespondableSession` and maintains a synchronized
+/// request queue for tracking inbound response metadata and payloads.
 pub struct RpcDispatcher<'a> {
-    rpc_session: RpcRespondableSession<'a>,
+    /// Core session responsible for managing stream lifecycles and handlers.
+    rpc_respondable_session: RpcRespondableSession<'a>,
+
+    // TODO: Document how this must be unique per session
+    /// Monotonic ID generator for outbound RPC request headers.
     next_header_id: u32,
+
+    /// Queue of currently active inbound responses from remote peers.
+    ///
+    /// Each entry is `(header_id, RpcRequest)` and is updated via stream
+    /// events triggered by the session handler. This queue is shared to
+    /// allow external inspection or draining of finalized responses.
     rpc_request_queue: Arc<Mutex<VecDeque<(u32, RpcRequest)>>>,
 }
 
 impl<'a> RpcDispatcher<'a> {
-    /// Creates a new `RpcDispatcher` and sets a catch-all response handler
-    /// to capture incoming stream events for all requests.
+    /// Constructs a new `RpcDispatcher`, initializes the internal session,
+    /// and installs a default response handler that populates the request queue.
+    ///
+    /// The handler collects incoming response stream events and maintains
+    /// them in a shared, thread-safe queue for downstream access.
     pub fn new() -> Self {
-        let rpc_session = RpcRespondableSession::new();
+        let rpc_respondable_session = RpcRespondableSession::new();
 
         let mut instance = Self {
-            rpc_session,
+            rpc_respondable_session,
             next_header_id: increment_u32_id(),
             rpc_request_queue: Arc::new(Mutex::new(VecDeque::new())),
         };
@@ -34,18 +61,51 @@ impl<'a> RpcDispatcher<'a> {
         instance
     }
 
-    /// Initializes a global response handler that listens to all incoming
-    /// `RpcStreamEvent`s and tracks each in a shared queue.
+    /// Internal helper to register a global response event handler.
     ///
-    /// - Buffers metadata in the header as parameters.
-    /// - Buffers chunks as pre-payload.
-    /// - Marks request as finalized when stream ends.
+    /// This callback listens for all incoming response stream events and updates
+    /// the internal `rpc_request_queue` by `rpc_header_id`. It is installed as a
+    /// global fallback handler to track all incoming responses, even those without
+    /// a dedicated handler.
+    ///
+    /// Behavior:
+    /// - On `Header`: pushes a new `RpcRequest` into the queue.
+    /// - On `PayloadChunk`: appends bytes to the matching request’s payload.
+    /// - On `End`: marks the request as finalized.
+    ///
+    /// ## Thread Safety and Poisoning
+    ///
+    /// The queue is protected by a `Mutex`. If this mutex has been poisoned
+    /// (i.e., a previous thread panicked while holding the lock), this method
+    /// will `panic!` immediately. This is a deliberate design choice:
+    ///
+    /// - A poisoned queue likely means shared state is inconsistent or partially mutated.
+    /// - Continuing execution in this situation could lead to data loss, incorrect routing,
+    ///   or undefined behavior.
+    /// - Crashing fast provides better safety and debugging signals in production or test.
+    ///
+    /// If graceful recovery is ever desired, this behavior should be restructured
+    /// behind a configurable panic policy or error reporting mechanism.
     fn init_catch_all_response_handler(&mut self) {
         let rpc_request_queue_ref = Arc::clone(&self.rpc_request_queue);
 
-        self.rpc_session
+        self.rpc_respondable_session
             .set_catch_all_response_handler(Box::new(move |event: RpcStreamEvent| {
-                let mut queue = rpc_request_queue_ref.lock().unwrap();
+                let Ok(mut queue) = rpc_request_queue_ref.lock() else {
+                    // If the lock is poisoned, it likely means another thread panicked while
+                    // holding the mutex. The internal state of the request queue may now be
+                    // inconsistent or partially mutated.
+                    //
+                    // Continuing execution could result in incorrect dispatch behavior,
+                    // undefined state transitions, or silent data loss.
+                    //
+                    // This should be treated as a critical failure and escalated appropriately.
+                    panic!(
+                        "[RpcDispatcher] Critical: Request queue mutex poisoned. \
+                        Dispatcher may be in an inconsistent state. \
+                        Event dropped to avoid undefined behavior."
+                    );
+                };
 
                 // TODO: Delete from queue if request is canceled mid-flight
                 match event {
@@ -112,12 +172,21 @@ impl<'a> RpcDispatcher<'a> {
             }));
     }
 
-    /// Issues an outbound RPC `call` with a request header and optional
-    /// payload. If the request is pre-buffered, it is sent immediately.
+    /// Initiates an outbound RPC `Call` with a structured `RpcRequest`.
     ///
-    /// - `on_emit`: callback to emit bytes.
-    /// - `on_response`: handler for processing responses.
-    /// - `pre_buffer_response`: whether to pre-buffer response handling.
+    /// The method constructs a `RpcHeader`, serializes its metadata,
+    /// and begins the transmission via a `RpcStreamEncoder`.
+    ///
+    /// - If a payload is provided, it is sent immediately after the header.
+    /// - If `is_finalized` is set, the stream is ended immediately.
+    /// - A response handler can optionally be registered for correlated responses.
+    ///
+    /// # Arguments
+    /// - `rpc_request`: Encoded request with method ID and metadata
+    /// - `max_chunk_size`: Max frame size before splitting into multiple frames
+    /// - `on_emit`: Callback to transmit the encoded frames
+    /// - `on_response`: Optional response stream handler
+    /// - `pre_buffer_response`: If true, buffer all chunks into one event
     pub fn call<E, R>(
         &mut self,
         rpc_request: RpcRequest,
@@ -149,7 +218,7 @@ impl<'a> RpcDispatcher<'a> {
         };
 
         // Directly pass the closure as `on_emit` without borrowing it
-        let mut encoder = self.rpc_session.init_respondable_request(
+        let mut encoder = self.rpc_respondable_session.init_respondable_request(
             request_header,
             max_chunk_size,
             on_emit,
@@ -171,11 +240,16 @@ impl<'a> RpcDispatcher<'a> {
         Ok(encoder)
     }
 
-    /// Sends a response stream for a given incoming request header.
-    /// May include metadata and/or pre-buffered payload. Ends the stream
-    /// immediately if the response is finalized.
+    /// Constructs and sends a response stream for a previously received request.
     ///
-    /// - `on_emit`: callback to emit bytes.
+    /// The `RpcResponse` must match a valid request by `request_header_id`.
+    /// Optionally, it may include a result status byte or payload. If
+    /// `is_finalized` is true, the stream is immediately ended.
+    ///
+    /// # Arguments
+    /// - `rpc_response`: Structured reply referencing a known request
+    /// - `max_chunk_size`: Chunking threshold for large response payloads
+    /// - `on_emit`: Callback to transmit the encoded response stream
     pub fn respond<E>(
         &mut self,
         rpc_response: RpcResponse,
@@ -197,9 +271,11 @@ impl<'a> RpcDispatcher<'a> {
             },
         };
 
-        let mut response_encoder =
-            self.rpc_session
-                .start_reply_stream(rpc_response_header, max_chunk_size, on_emit)?;
+        let mut response_encoder = self.rpc_respondable_session.start_reply_stream(
+            rpc_response_header,
+            max_chunk_size,
+            on_emit,
+        )?;
 
         if let Some(pre_buffered_payload_bytes) = rpc_response.pre_buffered_payload_bytes {
             response_encoder.push_bytes(&pre_buffered_payload_bytes)?;
@@ -213,13 +289,32 @@ impl<'a> RpcDispatcher<'a> {
         Ok(response_encoder)
     }
 
-    /// Feeds raw bytes into the underlying `RpcRespondableSession` and
-    /// returns a list of currently active request header IDs in the queue.
+    /// Feeds incoming byte stream data into the `RpcRespondableSession` for
+    /// decoding and stream reassembly. This method should be called whenever
+    /// new bytes are received from the transport layer (e.g. socket).
     ///
-    /// Errors if decode fails or mutex is poisoned.
+    /// Internally, this triggers stream event callbacks—such as header,
+    /// payload, and end events—that populate and update the internal
+    /// `rpc_request_queue` used for tracking in-flight requests.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<u32>` containing the active request `header_id`s currently
+    /// stored in the shared `rpc_request_queue`. These represent all requests
+    /// that:
+    /// - Have received at least a `Header` frame, and
+    /// - Have not yet been deleted or fully handled.
+    ///
+    /// This list is useful for downstream logic to inspect which requests are
+    /// pending, in-progress, or ready for consumption.
+    ///
+    /// # Errors
+    ///
+    /// - Returns `FrameDecodeError` if the incoming frame is invalid or if
+    ///   the `rpc_request_queue` mutex is poisoned.
     pub fn receive_bytes(&mut self, bytes: &[u8]) -> Result<Vec<u32>, FrameDecodeError> {
         // Process the incoming bytes
-        self.rpc_session.receive_bytes(bytes)?;
+        self.rpc_respondable_session.receive_bytes(bytes)?;
 
         // List of request header IDs which are currently in progress
         let queue = self
@@ -232,8 +327,11 @@ impl<'a> RpcDispatcher<'a> {
         Ok(active_request_header_ids)
     }
 
-    /// Attempts to acquire the queue lock and return the full queue guard
-    /// if the request ID exists. Caller must re-check inside the guard.
+    /// Attempts to retrieve a lock on the request queue if the given
+    /// `header_id` exists in it.
+    ///
+    /// Returns the full `MutexGuard` to the queue, not just the matched entry.
+    /// Caller is responsible for re-checking the queue contents under the guard.
     pub fn get_rpc_request(
         &self,
         header_id: u32,
@@ -249,7 +347,8 @@ impl<'a> RpcDispatcher<'a> {
         }
     }
 
-    /// Checks whether a request is finalized by looking it up in the queue.
+    /// Returns `true` if the request with `header_id` has received a
+    /// complete stream (`End` event observed), or `None` if it is missing.
     pub fn is_rpc_request_finalized(&self, header_id: u32) -> Option<bool> {
         let queue = self.rpc_request_queue.lock().ok()?;
         queue
@@ -258,8 +357,10 @@ impl<'a> RpcDispatcher<'a> {
             .map(|(_, req)| req.is_finalized)
     }
 
-    /// Removes a request from the queue if present and transfers ownership
-    /// of the `RpcRequest` to the caller.
+    /// Removes the request with `header_id` from the internal queue and
+    /// transfers ownership of the `RpcRequest` to the caller.
+    ///
+    /// Returns `None` if the request was not found.
     pub fn delete_rpc_request(&self, header_id: u32) -> Option<RpcRequest> {
         let mut queue = self.rpc_request_queue.lock().ok()?;
 
