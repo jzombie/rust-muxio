@@ -1,7 +1,5 @@
-use muxio_ws_rpc_demo_app::{
-    RpcClient, RpcServer, add,
-    service_definition::{Add, RpcMethodPrebuffered},
-};
+use muxio::rpc::optional_traits::{RpcRequestPrebuffered, RpcResponsePrebuffered};
+use muxio_ws_rpc_demo_app::{RpcClient, RpcServer, add, service_definition::Add};
 use tokio::join;
 use tokio::net::TcpListener;
 
@@ -13,7 +11,7 @@ async fn main() {
 
     let server = RpcServer::new();
     server
-        .register(Add::METHOD_ID, |bytes| {
+        .register(<Add as RpcRequestPrebuffered>::METHOD_ID, |bytes| {
             let req = Add::decode_request(bytes).unwrap();
             let result = req.numbers.iter().sum();
             Add::encode_response(result)

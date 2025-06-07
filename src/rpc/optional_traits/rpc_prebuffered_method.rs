@@ -1,20 +1,6 @@
 use std::io;
 
-// TODO: Migrate to an `rcp_codec` module along with an optional streaming interface
-// TODO: Seprate between request and response structs (i.e. a pre-buffered request may use a streaming response, etc.)
-
-/// Defines the codec contract for a single RPC method using pre-buffered payloads.
-///
-/// While the underlying transport layer may operate in a streaming fashion,
-/// this trait assumes that the complete request and response payloads are
-/// fully received (or generated) before being decoded or encoded.
-///
-/// Implementors define how high-level request/response types are serialized into
-/// and deserialized from binary formats, such as Bitcode, JSON, or Protobuf.
-///
-/// This trait is best suited for RPC methods where the payloads are small
-/// enough to be buffered in memory as a single contiguous blob.
-pub trait RpcMethodPrebuffered {
+pub trait RpcRequestPrebuffered {
     /// A unique identifier for the RPC method.
     const METHOD_ID: u64;
 
@@ -27,15 +13,6 @@ pub trait RpcMethodPrebuffered {
     /// The deserialized request struct (e.g., `AddRequestParams`).
     type DecodedRequest;
 
-    /// The high-level output type returned from the response encoder (e.g., `f64`).
-    type Output;
-
-    /// The serialized response payload type (e.g., `Vec<u8>`).
-    type EncodedResponse;
-
-    /// The deserialized response struct (e.g., `AddResponseParams`).
-    type DecodedResponse;
-
     /// Encodes the user input into a serialized request payload.
     ///
     /// # Arguments
@@ -47,6 +24,20 @@ pub trait RpcMethodPrebuffered {
     /// # Arguments
     /// * `bytes` - Serialized request payload.
     fn decode_request(bytes: Vec<u8>) -> Result<Self::DecodedRequest, io::Error>;
+}
+
+pub trait RpcResponsePrebuffered {
+    /// A unique identifier for the RPC method.
+    const METHOD_ID: u64;
+
+    /// The high-level output type returned from the response encoder (e.g., `f64`).
+    type Output;
+
+    /// The serialized response payload type (e.g., `Vec<u8>`).
+    type EncodedResponse;
+
+    /// The deserialized response struct (e.g., `AddResponseParams`).
+    type DecodedResponse;
 
     /// Encodes the response value into a serialized payload.
     ///
