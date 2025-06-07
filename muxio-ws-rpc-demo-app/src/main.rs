@@ -13,7 +13,7 @@ async fn add(rpc_client: &RpcClient, numbers: Vec<f64>) -> f64 {
     let (_dispatcher, result) = RpcClient::call_rpc(
         dispatcher,
         tx,
-        0x01,
+        0x01, // TODO: Don't harcode
         payload,
         |bytes| {
             let decoded: AddResponseParams = bitcode::decode(&bytes).unwrap();

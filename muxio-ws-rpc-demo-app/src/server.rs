@@ -73,6 +73,8 @@ impl RpcServer {
             };
 
             for request_id in request_ids {
+                // Finalized requests contain their full payloads are are easier to work
+                // with, though they will need to fully buffer before using
                 if !dispatcher
                     .is_rpc_request_finalized(request_id)
                     .unwrap_or(false)
@@ -88,6 +90,7 @@ impl RpcServer {
                 };
 
                 let response = match request.method_id {
+                    // TODO: Don't hardcode
                     0x01 => {
                         let req: AddRequestParams = bitcode::decode(payload).unwrap();
                         let sum = req.numbers.iter().sum();
