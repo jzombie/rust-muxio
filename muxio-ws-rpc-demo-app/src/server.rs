@@ -9,16 +9,37 @@ use axum::{
 use bytes::Bytes;
 use futures_util::{SinkExt, StreamExt};
 use muxio::rpc::{RpcDispatcher, RpcResponse, RpcResultStatus};
-use std::net::SocketAddr;
-use tokio::{net::TcpListener, sync::mpsc::unbounded_channel};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use tokio::{
+    net::TcpListener,
+    sync::{Mutex, mpsc::unbounded_channel},
+};
 
-pub struct RpcServer {}
+type RpcHandler = Box<dyn Fn(Vec<u8>) -> Vec<u8> + Send + Sync + 'static>;
+
+pub struct RpcServer {
+    handlers: Arc<Mutex<HashMap<u64, RpcHandler>>>,
+}
 
 impl RpcServer {
-    /// Initializes the RPC server and starts serving WebSocket connections
+    /// Creates a new `RpcServer` instance with no routes started.
+    pub fn new() -> Self {
+        RpcServer {
+            handlers: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+
+    /// Starts serving the RPC server with already registered handlers
     /// on the given address.
-    pub async fn init(address: &str) -> RpcServer {
-        let app = Router::new().route("/ws", get(Self::ws_handler));
+    pub async fn serve(self, address: &str) {
+        let app = Router::new().route(
+            "/ws",
+            get({
+                let handlers = self.handlers.clone();
+                move |ws, conn| Self::ws_handler(ws, conn, handlers.clone())
+            }),
+        );
+
         let listener = TcpListener::bind(address).await.unwrap();
         println!("Server running on {:?}", address);
         axum::serve(
@@ -27,22 +48,32 @@ impl RpcServer {
         )
         .await
         .unwrap();
+    }
 
-        Self {}
+    /// Registers a new RPC method handler.
+    pub async fn register<F>(&self, method_id: u64, handler: F)
+    where
+        F: Fn(Vec<u8>) -> Vec<u8> + Send + Sync + 'static,
+    {
+        self.handlers
+            .lock()
+            .await
+            .insert(method_id, Box::new(handler));
     }
 
     /// WebSocket route handler that sets up the WebSocket connection.
     async fn ws_handler(
         ws: WebSocketUpgrade,
         ConnectInfo(addr): ConnectInfo<SocketAddr>,
+        handlers: Arc<Mutex<HashMap<u64, RpcHandler>>>,
     ) -> impl IntoResponse {
         println!("Client connected: {}", addr);
-        ws.on_upgrade(Self::handle_socket)
+        ws.on_upgrade(move |socket| Self::handle_socket(socket, handlers))
     }
 
     /// Handles the actual WebSocket connection lifecycle, dispatching incoming
-    /// RPC messages and sending appropriate responses using the `Muxio` dispatcher.
-    async fn handle_socket(socket: WebSocket) {
+    /// RPC messages and sending appropriate responses using the muxio dispatcher.
+    async fn handle_socket(socket: WebSocket, handlers: Arc<Mutex<HashMap<u64, RpcHandler>>>) {
         let (mut sender, mut receiver) = socket.split();
         let (tx, mut rx) = unbounded_channel::<Message>();
         let (recv_tx, mut recv_rx) = unbounded_channel::<Option<Result<Message, axum::Error>>>();
@@ -77,10 +108,7 @@ impl RpcServer {
                 }
             };
 
-            // TODO: Figure out a common registration handler
             for request_id in request_ids {
-                // Finalized requests contain their full payloads are are easier to work
-                // with, though they will need to fully buffer before using
                 if !dispatcher
                     .is_rpc_request_finalized(request_id)
                     .unwrap_or(false)
@@ -95,28 +123,24 @@ impl RpcServer {
                     continue;
                 };
 
-                let response = match request.method_id {
-                    Add::METHOD_ID => {
-                        // let req: AddRequestParams = bitcode::decode(payload).unwrap();
-                        let req = Add::decode_request(payload.to_vec()).unwrap();
-                        let sum = req.numbers.iter().sum();
-                        let encoded = Add::encode_response(sum);
-
-                        RpcResponse {
-                            request_header_id: request_id,
-                            method_id: 0x01,
-                            result_status: Some(RpcResultStatus::Success.value()),
-                            pre_buffered_payload_bytes: Some(encoded),
-                            is_finalized: true,
-                        }
+                let response = if let Some(handler) = handlers.lock().await.get(&request.method_id)
+                {
+                    let encoded = handler(payload.clone());
+                    RpcResponse {
+                        request_header_id: request_id,
+                        method_id: request.method_id,
+                        result_status: Some(RpcResultStatus::Success.value()),
+                        pre_buffered_payload_bytes: Some(encoded),
+                        is_finalized: true,
                     }
-                    _ => RpcResponse {
+                } else {
+                    RpcResponse {
                         request_header_id: request_id,
                         method_id: request.method_id,
                         result_status: Some(RpcResultStatus::SystemError.value()),
                         pre_buffered_payload_bytes: None,
                         is_finalized: true,
-                    },
+                    }
                 };
 
                 let tx_clone = tx.clone();

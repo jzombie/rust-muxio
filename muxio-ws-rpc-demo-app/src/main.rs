@@ -26,9 +26,22 @@ async fn add(rpc_client: &RpcClient, numbers: Vec<f64>) -> Result<f64, bitcode::
 
 #[tokio::main]
 async fn main() {
-    tokio::spawn(RpcServer::init("127.0.0.1:3000"));
+    let server = RpcServer::new();
+    server
+        .register(Add::METHOD_ID, |bytes| {
+            let req = Add::decode_request(bytes).unwrap();
+            let result = req.numbers.iter().sum();
+            Add::encode_response(result)
+        })
+        .await;
 
-    // sleep(Duration::from_millis(300)).await;
+    // Spawn server in the background
+    let server_task = tokio::spawn(async move {
+        server.serve("127.0.0.1:3000").await;
+    });
+
+    // Optional delay to ensure server is up before client connects
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
     let rpc_client = RpcClient::new("ws://127.0.0.1:3000/ws").await;
 
@@ -37,4 +50,7 @@ async fn main() {
 
     let result = add(&rpc_client, vec![8.0, 3.0, 7.0]).await;
     println!("Result from add(): {:?}", result);
+
+    // Optionally wait for server task if needed:
+    // let _ = server_task.await;
 }
