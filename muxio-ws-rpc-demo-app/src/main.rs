@@ -2,19 +2,13 @@ mod client;
 mod server;
 mod service_definition;
 use client::RpcClient;
-use muxio::rpc::RpcDispatcher;
 use server::run_server;
 use service_definition::{AddRequestParams, AddResponseParams};
-use std::sync::Arc;
-use tokio::sync::Mutex;
-use tokio::sync::mpsc;
-use tokio_tungstenite::tungstenite::protocol::Message as WsMessage;
 
-async fn add(
-    dispatcher: Arc<Mutex<RpcDispatcher<'static>>>,
-    tx: mpsc::UnboundedSender<WsMessage>,
-    numbers: Vec<f64>,
-) -> f64 {
+async fn add(rpc_client: &RpcClient, numbers: Vec<f64>) -> f64 {
+    let dispatcher = rpc_client.dispatcher.clone();
+    let tx = rpc_client.tx.clone();
+
     let payload = bitcode::encode(&AddRequestParams { numbers });
     let (_dispatcher, result) = RpcClient::call_rpc(
         dispatcher,
@@ -40,12 +34,9 @@ async fn main() {
 
     let rpc_client = RpcClient::new("ws://127.0.0.1:3000/ws").await;
 
-    let dispatcher = rpc_client.dispatcher.clone();
-    let tx = rpc_client.tx.clone();
-
-    let result = add(dispatcher.clone(), tx.clone(), vec![1.0, 2.0, 3.0]).await;
+    let result = add(&rpc_client, vec![1.0, 2.0, 3.0]).await;
     println!("Result from add(): {}", result);
 
-    let result = add(dispatcher.clone(), tx.clone(), vec![8.0, 3.0, 7.0]).await;
+    let result = add(&rpc_client, vec![8.0, 3.0, 7.0]).await;
     println!("Result from add(): {}", result);
 }
