@@ -2,7 +2,7 @@ mod client;
 mod server;
 mod service_definition;
 use client::RpcClient;
-use server::run_server;
+use server::RpcServer;
 use service_definition::{AddRequestParams, AddResponseParams};
 
 async fn add(rpc_client: &RpcClient, numbers: Vec<f64>) -> f64 {
@@ -28,7 +28,7 @@ async fn add(rpc_client: &RpcClient, numbers: Vec<f64>) -> f64 {
 
 #[tokio::main]
 async fn main() {
-    tokio::spawn(run_server("127.0.0.1:3000"));
+    tokio::spawn(RpcServer::init("127.0.0.1:3000"));
 
     // sleep(Duration::from_millis(300)).await;
 
