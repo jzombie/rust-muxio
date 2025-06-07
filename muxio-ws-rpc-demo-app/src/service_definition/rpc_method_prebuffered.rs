@@ -1,5 +1,8 @@
 use std::io;
 
+// TODO: Migrate to an `rcp_codec` module alond with an optional streaming interface
+// TODO: Seprate between request and response structs (i.e. a pre-buffered request may use a streaming response, etc.)
+
 /// Defines the codec contract for a single RPC method using pre-buffered payloads.
 ///
 /// While the underlying transport layer may operate in a streaming fashion,
