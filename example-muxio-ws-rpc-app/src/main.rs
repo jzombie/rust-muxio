@@ -1,5 +1,5 @@
 use example_muxio_ws_rpc_app::{
-    RpcClient, RpcServer,
+    RpcCall, RpcClient, RpcServer,
     service_definition::{Add, Mult},
 };
 use muxio::rpc::optional_traits::{RpcRequestPrebuffered, RpcResponsePrebuffered};

@@ -7,13 +7,18 @@ pub use server::RpcServer;
 pub use service_definition::{Add, Mult};
 use std::io;
 
-// TODO: Create Call trait
-impl Add {
-    pub async fn call(rpc_client: &RpcClient, numbers: Vec<f64>) -> Result<f64, io::Error> {
+#[async_trait::async_trait]
+pub trait RpcCall: RpcRequestPrebuffered + RpcResponsePrebuffered + Sized + Send + Sync {
+    async fn call(rpc_client: &RpcClient, input: Self::Input) -> Result<Self::Output, io::Error>;
+}
+
+#[async_trait::async_trait]
+impl RpcCall for Add {
+    async fn call(rpc_client: &RpcClient, input: Self::Input) -> Result<Self::Output, io::Error> {
         let dispatcher = rpc_client.dispatcher.clone();
         let tx = rpc_client.tx.clone();
 
-        let payload = Add::encode_request(numbers);
+        let payload = Add::encode_request(input);
         let (_dispatcher, result) = RpcClient::call_rpc(
             dispatcher,
             tx,
@@ -28,13 +33,13 @@ impl Add {
     }
 }
 
-// TODO: Create Call trait
-impl Mult {
-    pub async fn call(rpc_client: &RpcClient, numbers: Vec<f64>) -> Result<f64, io::Error> {
+#[async_trait::async_trait]
+impl RpcCall for Mult {
+    async fn call(rpc_client: &RpcClient, input: Self::Input) -> Result<Self::Output, io::Error> {
         let dispatcher = rpc_client.dispatcher.clone();
         let tx = rpc_client.tx.clone();
 
-        let payload = Mult::encode_request(numbers);
+        let payload = Mult::encode_request(input);
         let (_dispatcher, result) = RpcClient::call_rpc(
             dispatcher,
             tx,
