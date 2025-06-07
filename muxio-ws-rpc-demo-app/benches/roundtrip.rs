@@ -37,12 +37,34 @@ fn bench_roundtrip(c: &mut Criterion) {
     });
 
     // Benchmark only the actual call
-    c.bench_function("rpc_add_roundtrip", |b| {
+    c.bench_function("rpc_add_roundtrip_batch_10", |b| {
         b.to_async(&rt).iter(|| async {
-            let result = muxio_ws_rpc_demo_app::add(&client, vec![1.0, 2.0, 3.0])
-                .await
-                .unwrap();
-            black_box(result);
+            let fut1 = muxio_ws_rpc_demo_app::add(&client, vec![1.0, 2.0, 3.0]);
+            let fut2 = muxio_ws_rpc_demo_app::add(&client, vec![1.0, 2.0, 3.0]);
+            let fut3 = muxio_ws_rpc_demo_app::add(&client, vec![1.0, 2.0, 3.0]);
+            let fut4 = muxio_ws_rpc_demo_app::add(&client, vec![1.0, 2.0, 3.0]);
+            let fut5 = muxio_ws_rpc_demo_app::add(&client, vec![1.0, 2.0, 3.0]);
+            let fut6 = muxio_ws_rpc_demo_app::add(&client, vec![1.0, 2.0, 3.0]);
+            let fut7 = muxio_ws_rpc_demo_app::add(&client, vec![1.0, 2.0, 3.0]);
+            let fut8 = muxio_ws_rpc_demo_app::add(&client, vec![1.0, 2.0, 3.0]);
+            let fut9 = muxio_ws_rpc_demo_app::add(&client, vec![1.0, 2.0, 3.0]);
+            let fut10 = muxio_ws_rpc_demo_app::add(&client, vec![1.0, 2.0, 3.0]);
+
+            let (r1, r2, r3, r4, r5, r6, r7, r8, r9, r10) =
+                join!(fut1, fut2, fut3, fut4, fut5, fut6, fut7, fut8, fut9, fut10);
+
+            black_box((
+                r1.unwrap(),
+                r2.unwrap(),
+                r3.unwrap(),
+                r4.unwrap(),
+                r5.unwrap(),
+                r6.unwrap(),
+                r7.unwrap(),
+                r8.unwrap(),
+                r9.unwrap(),
+                r10.unwrap(),
+            ));
         });
     });
 }
