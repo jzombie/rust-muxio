@@ -1,15 +1,11 @@
-use crate::service_definition::{AddRequestParams, AddResponseParams};
 use bytes::Bytes;
 use futures_util::{SinkExt, StreamExt};
 use muxio::rpc::{RpcDispatcher, RpcRequest, rpc_internals::RpcStreamEvent};
 use std::sync::Arc;
-use tokio::{
-    sync::{
-        Mutex,
-        mpsc::{self, unbounded_channel},
-        oneshot,
-    },
-    time::{Duration, sleep},
+use tokio::sync::{
+    Mutex,
+    mpsc::{self, unbounded_channel},
+    oneshot,
 };
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message as WsMessage};
 
@@ -19,8 +15,7 @@ pub struct RpcClient {
 }
 
 impl RpcClient {
-    pub async fn run_client(websocket_address: &str) -> RpcClient {
-        sleep(Duration::from_millis(300)).await;
+    pub async fn new(websocket_address: &str) -> RpcClient {
         let (ws_stream, _) = connect_async(websocket_address)
             .await
             .expect("Failed to connect");
@@ -31,8 +26,6 @@ impl RpcClient {
             unbounded_channel::<Option<Result<WsMessage, tokio_tungstenite::tungstenite::Error>>>();
 
         let dispatcher = Arc::new(Mutex::new(RpcDispatcher::new()));
-        let dispatcher_clone = dispatcher.clone();
-        let tx_clone = tx.clone();
 
         // Receive loop
         tokio::spawn(async move {

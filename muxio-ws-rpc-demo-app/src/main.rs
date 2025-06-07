@@ -35,7 +35,10 @@ async fn add(
 #[tokio::main]
 async fn main() {
     tokio::spawn(run_server("127.0.0.1:3000"));
-    let rpc_client = RpcClient::run_client("ws://127.0.0.1:3000/ws").await;
+
+    // sleep(Duration::from_millis(300)).await;
+
+    let rpc_client = RpcClient::new("ws://127.0.0.1:3000/ws").await;
 
     let result = add(rpc_client.dispatcher, rpc_client.tx, vec![1.0, 2.0, 3.0]).await;
     println!("Result from add(): {}", result);
