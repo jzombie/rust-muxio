@@ -1,21 +1,11 @@
 use crate::service_definition::{AddRequestParams, AddResponseParams};
-use axum::{
-    Router,
-    extract::ConnectInfo,
-    extract::ws::{Message, WebSocket, WebSocketUpgrade},
-    response::IntoResponse,
-    routing::get,
-};
-use bitcode::{Decode, Encode};
 use bytes::Bytes;
 use futures_util::{SinkExt, StreamExt};
 use muxio::rpc::{
-    RpcDispatcher, RpcRequest, RpcResponse, RpcResultStatus, rpc_internals::RpcStreamEvent,
+    RpcDispatcher, RpcRequest, rpc_internals::RpcStreamEvent,
 };
-use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::{
-    net::TcpListener,
     sync::{
         Mutex,
         mpsc::{self, unbounded_channel},

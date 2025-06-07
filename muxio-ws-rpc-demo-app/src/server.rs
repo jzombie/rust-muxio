@@ -6,24 +6,16 @@ use axum::{
     response::IntoResponse,
     routing::get,
 };
-use bitcode::{Decode, Encode};
 use bytes::Bytes;
 use futures_util::{SinkExt, StreamExt};
 use muxio::rpc::{
-    RpcDispatcher, RpcRequest, RpcResponse, RpcResultStatus, rpc_internals::RpcStreamEvent,
+    RpcDispatcher, RpcResponse, RpcResultStatus,
 };
 use std::net::SocketAddr;
-use std::sync::Arc;
 use tokio::{
     net::TcpListener,
-    sync::{
-        Mutex,
-        mpsc::{self, unbounded_channel},
-        oneshot,
-    },
-    time::{Duration, sleep},
+    sync::mpsc::unbounded_channel,
 };
-use tokio_tungstenite::{connect_async, tungstenite::protocol::Message as WsMessage};
 
 pub async fn run_server(address: &str) {
     let app = Router::new().route("/ws", get(ws_handler));
