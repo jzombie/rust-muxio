@@ -1,4 +1,7 @@
-use example_muxio_ws_rpc_app::{RpcClient, RpcServer, service_definition::Add};
+use example_muxio_ws_rpc_app::{
+    RpcClient, RpcServer,
+    service_definition::{Add, Mult},
+};
 use muxio::rpc::optional_traits::{RpcRequestPrebuffered, RpcResponsePrebuffered};
 use tokio::join;
 use tokio::net::TcpListener;
@@ -17,6 +20,13 @@ async fn main() {
             Add::encode_response(result)
         })
         .await;
+    server
+        .register(<Mult as RpcRequestPrebuffered>::METHOD_ID, |bytes| {
+            let req = Mult::decode_request(bytes).unwrap();
+            let result = req.iter().product();
+            Mult::encode_response(result)
+        })
+        .await;
 
     // Spawn the server using the pre-bound listener
     let _server_task = tokio::spawn({
@@ -32,11 +42,13 @@ async fn main() {
     // Use the actual bound address for the client
     let rpc_client = RpcClient::new(&format!("ws://{}/ws", addr)).await;
 
-    let (res1, res2) = join!(
+    let (res1, res2, res3) = join!(
         Add::call(&rpc_client, vec![1.0, 2.0, 3.0]),
-        Add::call(&rpc_client, vec![8.0, 3.0, 7.0])
+        Add::call(&rpc_client, vec![8.0, 3.0, 7.0]),
+        Mult::call(&rpc_client, vec![8.0, 3.0, 7.0])
     );
 
     println!("Result from first add(): {:?}", res1);
     println!("Result from second add(): {:?}", res2);
+    println!("Result from first mult(): {:?}", res3);
 }
