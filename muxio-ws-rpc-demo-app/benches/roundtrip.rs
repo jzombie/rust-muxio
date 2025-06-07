@@ -1,15 +1,15 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use muxio_ws_rpc_demo_app::{
-    RpcClient, RpcServer, add,
+    RpcClient, RpcServer,
     service_definition::{Add, RpcApi},
 };
-use std::time::Duration;
-use tokio::{net::TcpListener, runtime::Runtime};
+use std::{hint::black_box, time::Duration};
+use tokio::{join, net::TcpListener, runtime::Runtime};
 
 fn bench_roundtrip(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 
-    // Set up server and client once, outside of `b.iter`
+    // Set up server + client once
     let (client, _server_task) = rt.block_on(async {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
@@ -36,12 +36,13 @@ fn bench_roundtrip(c: &mut Criterion) {
         (client, server_task)
     });
 
+    // Benchmark only the actual call
     c.bench_function("rpc_add_roundtrip", |b| {
-        b.iter(|| {
-            rt.block_on(async {
-                let result = add(&client, vec![1.0, 2.0, 3.0]).await.unwrap();
-                assert_eq!(result, 6.0);
-            });
+        b.to_async(&rt).iter(|| async {
+            let result = muxio_ws_rpc_demo_app::add(&client, vec![1.0, 2.0, 3.0])
+                .await
+                .unwrap();
+            black_box(result);
         });
     });
 }
