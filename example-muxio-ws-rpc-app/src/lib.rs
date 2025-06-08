@@ -78,7 +78,7 @@ where
     let dispatcher = rpc_client.dispatcher();
     let tx = rpc_client.sender();
 
-    let result = C::call_rpc(
+    let transport_result = C::call_rpc(
         dispatcher,
         tx,
         <T as RpcRequestPrebuffered>::METHOD_ID,
@@ -88,7 +88,17 @@ where
     )
     .await?;
 
-    Ok(result?)
+    // Error propagation is handled in two steps using two named variables:
+    //
+    // 1. `transport_result`: Result<Result<T::Output, io::Error>, io::Error>
+    //    - This comes from the transport layer (e.g., socket communication).
+    //    - The outer Result represents transport-level errors (e.g., channel closed).
+    //
+    // 2. `rpc_result`: T::Output
+    //    - This unwraps the inner Result from `transport_result`.
+    //    - If the remote RPC logic failed, this propagates that application-level error.
+    let rpc_result = transport_result?;
+    Ok(rpc_result)
 }
 
 /// Trait for types that represent callable prebuffered RPC methods.
