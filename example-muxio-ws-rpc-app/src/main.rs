@@ -13,20 +13,21 @@ async fn main() {
     let addr = listener.local_addr().unwrap();
 
     let server = RpcServer::new();
-    server
-        .register(<Add as RpcRequestPrebuffered>::METHOD_ID, |bytes| {
+
+    // Register server method
+    // Note: If not using `join!`, each `register` call must be awaited.
+    join!(
+        server.register(<Add as RpcRequestPrebuffered>::METHOD_ID, |bytes| {
             let req = Add::decode_request(bytes).unwrap();
             let result = req.iter().sum();
             Add::encode_response(result)
-        })
-        .await;
-    server
-        .register(<Mult as RpcRequestPrebuffered>::METHOD_ID, |bytes| {
+        }),
+        server.register(<Mult as RpcRequestPrebuffered>::METHOD_ID, |bytes| {
             let req = Mult::decode_request(bytes).unwrap();
             let result = req.iter().product();
             Mult::encode_response(result)
         })
-        .await;
+    );
 
     // Spawn the server using the pre-bound listener
     let _server_task = tokio::spawn({
@@ -42,6 +43,7 @@ async fn main() {
     // Use the actual bound address for the client
     let rpc_client = RpcClient::new(&format!("ws://{}/ws", addr)).await;
 
+    // `join!` will await all responses before proceeding
     let (res1, res2, res3) = join!(
         Add::call(&rpc_client, vec![1.0, 2.0, 3.0]),
         Add::call(&rpc_client, vec![8.0, 3.0, 7.0]),
