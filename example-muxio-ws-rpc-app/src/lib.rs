@@ -14,15 +14,28 @@ use tokio::sync::mpsc::UnboundedSender;
 use tokio_tungstenite::tungstenite::protocol::Message as WsMessage;
 
 /// Abstracts the RPC transport mechanism.
+///
+/// This trait enables usage of any client type that implements the required
+/// RPC communication functionality. It allows runtime selection and injection
+/// of client implementations across different environments (e.g. native vs wasm).
 #[async_trait::async_trait]
 pub trait RpcTransport {
+    /// Abstract dispatcher type that manages multiplexed request state.
     type Dispatcher: Send + 'static;
+
+    /// Abstract sender type responsible for outgoing messages.
     type Sender;
+
+    /// Mutex abstraction that can be customized for different runtimes.
     type Mutex<T: Send>: Send + Sync;
 
+    /// Returns a shared reference to the dispatcher.
     fn dispatcher(&self) -> Arc<Self::Mutex<Self::Dispatcher>>;
+
+    /// Returns the sender.
     fn sender(&self) -> Self::Sender;
 
+    /// Generalized RPC call that transports a request and waits for its result.
     async fn call_rpc<T, F>(
         dispatcher: Arc<Self::Mutex<Self::Dispatcher>>,
         sender: Self::Sender,
@@ -36,6 +49,7 @@ pub trait RpcTransport {
         F: Fn(Vec<u8>) -> T + Send + Sync + 'static;
 }
 
+/// Native implementation of `RpcTransport` for `RpcClient`
 #[async_trait::async_trait]
 impl RpcTransport for RpcClient {
     type Dispatcher = RpcDispatcher<'static>;
@@ -50,6 +64,7 @@ impl RpcTransport for RpcClient {
         self.tx.clone()
     }
 
+    /// Delegates the call to the actual `RpcClient::call_rpc` implementation.
     async fn call_rpc<T, F>(
         dispatcher: Arc<Self::Mutex<Self::Dispatcher>>,
         sender: Self::Sender,
@@ -79,7 +94,8 @@ impl RpcTransport for RpcClient {
 /// Calls a prebuffered RPC method defined by the `RpcRequestPrebuffered` and
 /// `RpcResponsePrebuffered` traits using a generic RPC transport.
 ///
-/// The output type must be `'static` to comply with async executor bounds.
+/// This layer exists to decouple call-site logic from the encoding/decoding and
+/// transport mechanics, allowing for easier composition and testability.
 pub async fn call_prebuffered_rpc<T, C>(
     rpc_client: &C,
     input: T::Input,
@@ -108,8 +124,9 @@ where
 
 /// Trait for types that represent callable prebuffered RPC methods.
 ///
-/// This trait delegates to the generic `call_prebuffered_rpc` function using
-/// the associated `Input` and `Output` types.
+/// This trait forms the final layer of abstraction, allowing downstream
+/// users to write `T::call(&client, input)` without dealing with traits
+/// or transport logic explicitly.
 #[async_trait::async_trait]
 pub trait RpcCallPrebuffered:
     RpcRequestPrebuffered + RpcResponsePrebuffered + Sized + Send + Sync
