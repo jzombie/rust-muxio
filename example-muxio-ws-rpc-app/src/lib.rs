@@ -16,14 +16,15 @@ use tokio_tungstenite::tungstenite::protocol::Message as WsMessage;
 /// Abstracts the RPC transport mechanism.
 #[async_trait::async_trait]
 pub trait RpcTransport {
-    type Dispatcher;
+    type Dispatcher: Send + 'static;
     type Sender;
+    type Mutex<T: Send>: Send + Sync;
 
-    fn dispatcher(&self) -> Arc<Mutex<Self::Dispatcher>>;
+    fn dispatcher(&self) -> Arc<Self::Mutex<Self::Dispatcher>>;
     fn sender(&self) -> Self::Sender;
 
     async fn call_rpc<T, F>(
-        dispatcher: Arc<Mutex<Self::Dispatcher>>,
+        dispatcher: Arc<Self::Mutex<Self::Dispatcher>>,
         sender: Self::Sender,
         method_id: u64,
         payload: Vec<u8>,
@@ -39,8 +40,9 @@ pub trait RpcTransport {
 impl RpcTransport for RpcClient {
     type Dispatcher = RpcDispatcher<'static>;
     type Sender = UnboundedSender<WsMessage>;
+    type Mutex<T: Send> = Mutex<T>;
 
-    fn dispatcher(&self) -> Arc<Mutex<Self::Dispatcher>> {
+    fn dispatcher(&self) -> Arc<Self::Mutex<Self::Dispatcher>> {
         self.dispatcher.clone()
     }
 
@@ -49,7 +51,7 @@ impl RpcTransport for RpcClient {
     }
 
     async fn call_rpc<T, F>(
-        dispatcher: Arc<Mutex<Self::Dispatcher>>,
+        dispatcher: Arc<Self::Mutex<Self::Dispatcher>>,
         sender: Self::Sender,
         method_id: u64,
         payload: Vec<u8>,
@@ -86,6 +88,7 @@ where
     T: RpcRequestPrebuffered + RpcResponsePrebuffered + Send + Sync + 'static,
     T::Output: Send + 'static,
     C: RpcTransport + Send + Sync,
+    C::Dispatcher: Send,
 {
     let dispatcher = rpc_client.dispatcher();
     let tx = rpc_client.sender();
