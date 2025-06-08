@@ -1,5 +1,7 @@
 use std::io;
 
+// TODO: Move these out of the main `Muxio` crate, as this crate should be considered lower-level
+
 // These are optional helper traits that define a convention for encoding and
 // decoding RPC method data using pre-buffered (i.e., fully materialized) payloads.
 //
