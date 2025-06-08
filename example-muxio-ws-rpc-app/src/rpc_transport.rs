@@ -9,7 +9,7 @@ use std::sync::Arc;
 /// of client implementations across different environments (e.g. native vs wasm).
 #[async_trait::async_trait]
 pub trait RpcTransport {
-    /// Abstract dispatcher type that manages multiplexed request state.
+    /// Must be `RpcDispatcher<'static>` or compatible with it.
     type Dispatcher: Send + 'static;
 
     /// Abstract sender type responsible for outgoing messages.
@@ -24,7 +24,7 @@ pub trait RpcTransport {
     /// Returns the sender.
     fn sender(&self) -> Self::Sender;
 
-    /// Generalized RPC call that transports a request and waits for its result.
+    /// Generalized RPC call that transports a request.
     async fn call_rpc<T, F>(
         dispatcher: Arc<Self::Mutex<Self::Dispatcher>>,
         sender: Self::Sender,
