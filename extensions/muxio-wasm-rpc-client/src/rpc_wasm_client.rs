@@ -24,6 +24,9 @@ pub fn muxio_receive_socket_frame_uint8(inbound_data: Uint8Array) -> Result<(), 
     MUXIO_CLIENT_TX_REF.with(|cell| {
         if let Some(tx) = cell.borrow().as_ref() {
             let _ = tx.unbounded_send(inbound_bytes);
+
+            // TODO: Remove
+            web_sys::console::log_1(&"emit...".into());
         } else {
             console::error_1(&"Client TX not initialized".into());
         }
@@ -33,18 +36,15 @@ pub fn muxio_receive_socket_frame_uint8(inbound_data: Uint8Array) -> Result<(), 
 }
 
 // TODO: Refactor accordingly
-fn start_recv_loop(mut rx: UnboundedReceiver<Vec<u8>>) {
-    spawn_local(async move {
-        while let Some(bytes) = rx.next().await {
-            muxio_emit_socket_frame_bytes(bytes.as_slice());
+// fn start_recv_loop(mut rx: UnboundedReceiver<Vec<u8>>) {
+//     spawn_local(async move {
+//         while let Some(bytes) = rx.next().await {
+//             web_sys::console::log_1(&"receive...".into());
 
-            // TODO: Send to Rust WASM
-
-            // let s = format!("Received: {:?}", msg);
-            // console::log_1(&s.into());
-        }
-    });
-}
+//             muxio_emit_socket_frame_bytes(bytes.as_slice()); // <-- ✅ ACTUALLY emits
+//         }
+//     });
+// }
 
 pub struct RpcWasmClient {
     // TODO: There's probably no reason to use Arc or Mutex here since the client is single-threaded
@@ -58,7 +58,7 @@ impl RpcWasmClient {
 
         let (tx, rx) = unbounded_channel::<Vec<u8>>();
 
-        start_recv_loop(rx);
+        // start_recv_loop(rx);
 
         // TODO: Handle accordingly
         // Store tx in TLS
@@ -71,6 +71,7 @@ impl RpcWasmClient {
 
     // TODO: Use common trait signature
     pub async fn call_rpc<T: Send + 'static, F: Fn(Vec<u8>) -> T + Send + Sync + 'static>(
+        // TODO: Use &self?
         dispatcher: Arc<Mutex<RpcDispatcher<'static>>>,
         mut tx: UnboundedSender<Vec<u8>>,
         method_id: u64,
@@ -78,6 +79,9 @@ impl RpcWasmClient {
         response_handler: F,
         is_finalized: bool,
     ) -> (Arc<Mutex<RpcDispatcher<'static>>>, T) {
+        // TODO: Remove
+        web_sys::console::log_1(&"Call RPC...".into());
+
         let (done_tx, done_rx) = oneshot::channel::<T>();
         let done_tx = Arc::new(Mutex::new(Some(done_tx)));
         let done_tx_clone = done_tx.clone();
@@ -95,7 +99,10 @@ impl RpcWasmClient {
                 1024, // TODO: Don't hardcode
                 move |chunk| {
                     // let _ = tx.send(WsMessage::Binary(Bytes::copy_from_slice(chunk)));
-                    let _ = tx.send(chunk.to_vec());
+                    // let _ = tx.send(chunk.to_vec());
+
+                    // web_sys::console::log_1(&"emit...".into());
+                    muxio_emit_socket_frame_bytes(chunk);
                 },
                 Some(move |evt| {
                     if let RpcStreamEvent::PayloadChunk { bytes, .. } = evt {

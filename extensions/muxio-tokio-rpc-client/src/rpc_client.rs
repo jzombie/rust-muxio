@@ -61,6 +61,7 @@ impl RpcClient {
     }
 
     pub async fn call_rpc<T: Send + 'static, F: Fn(Vec<u8>) -> T + Send + Sync + 'static>(
+        // TODO: Use &self?
         dispatcher: Arc<Mutex<RpcDispatcher<'static>>>,
         tx: mpsc::UnboundedSender<WsMessage>,
         method_id: u64,

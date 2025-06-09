@@ -172,6 +172,9 @@ where
     C: RpcClientInterface + Send + Sync,
     C::Dispatcher: Send,
 {
+    // TODO: Remove
+    web_sys::console::log_1(&"Call prebuffered...".into());
+
     let dispatcher = rpc_client.dispatcher();
     let tx = rpc_client.sender();
 
