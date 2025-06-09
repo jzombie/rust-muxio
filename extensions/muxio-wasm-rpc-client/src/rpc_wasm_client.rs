@@ -11,6 +11,7 @@ use wasm_bindgen_futures::spawn_local;
 use web_sys::console;
 
 pub struct RpcWasmClient {
+    // TODO: Should these be made public?
     pub dispatcher: Arc<std::sync::Mutex<RpcDispatcher<'static>>>,
     pub emit_callback: Arc<dyn Fn(Vec<u8>) + Send + Sync>,
 }
