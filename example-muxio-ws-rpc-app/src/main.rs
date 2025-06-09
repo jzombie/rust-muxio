@@ -1,5 +1,5 @@
 use example_muxio_ws_rpc_app::service_definition::{Add, Mult};
-use muxio_service_traits::{RpcCallPrebuffered, RpcRequestPrebuffered, RpcResponsePrebuffered};
+use muxio_service_traits::{RpcCallPrebuffered, RpcMethodPrebuffered};
 use muxio_tokio_rpc_client::RpcClient;
 use muxio_tokio_rpc_server::RpcServer;
 use tokio::join;
@@ -16,12 +16,12 @@ async fn main() {
     // Register server method
     // Note: If not using `join!`, each `register` call must be awaited.
     join!(
-        server.register(<Add as RpcRequestPrebuffered>::METHOD_ID, |bytes| {
+        server.register(Add::METHOD_ID, |bytes| {
             let req = Add::decode_request(bytes).unwrap();
             let result = req.iter().sum();
             Add::encode_response(result)
         }),
-        server.register(<Mult as RpcRequestPrebuffered>::METHOD_ID, |bytes| {
+        server.register(Mult::METHOD_ID, |bytes| {
             let req = Mult::decode_request(bytes).unwrap();
             let result = req.iter().product();
             Mult::encode_response(result)

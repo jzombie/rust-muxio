@@ -21,7 +21,7 @@ use web_sys::console;
 
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender, unbounded as unbounded_channel};
 
-use muxio_service_traits::{RpcClientInterface, RpcRequestPrebuffered, RpcResponsePrebuffered};
+use muxio_service_traits::{RpcClientInterface, RpcMethodPrebuffered};
 
 use std::io;
 
@@ -170,7 +170,7 @@ pub async fn call_prebuffered_rpc<T, C>(
     input: T::Input,
 ) -> Result<T::Output, io::Error>
 where
-    T: RpcRequestPrebuffered + RpcResponsePrebuffered + Send + Sync + 'static,
+    T: RpcMethodPrebuffered + Send + Sync + 'static,
     T::Output: Send + 'static,
     C: RpcClientInterface + Send + Sync,
     // C::Dispatcher: Send,
@@ -180,7 +180,7 @@ where
 
     let transport_result = rpc_client
         .call_rpc(
-            <T as RpcRequestPrebuffered>::METHOD_ID,
+            <T as RpcMethodPrebuffered>::METHOD_ID,
             T::encode_request(input),
             T::decode_response,
             true,

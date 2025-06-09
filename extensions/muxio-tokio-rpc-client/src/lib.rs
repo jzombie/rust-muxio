@@ -1,10 +1,8 @@
 mod rpc_client;
-use muxio::rpc::RpcDispatcher;
 use muxio::rpc::rpc_internals::RpcStreamEncoder;
-use muxio_service_traits::{RpcClientInterface, RpcRequestPrebuffered, RpcResponsePrebuffered};
+use muxio_service_traits::{RpcClientInterface, RpcMethodPrebuffered};
 pub use rpc_client::RpcClient;
 use std::io;
-use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio_tungstenite::tungstenite::protocol::Message as WsMessage;
@@ -54,7 +52,7 @@ pub async fn call_prebuffered_rpc<T, C>(
     input: T::Input,
 ) -> Result<T::Output, io::Error>
 where
-    T: RpcRequestPrebuffered + RpcResponsePrebuffered + Send + Sync + 'static,
+    T: RpcMethodPrebuffered + Send + Sync + 'static,
     T::Output: Send + 'static,
     C: RpcClientInterface + Send + Sync,
     // C::Dispatcher: Send,
@@ -64,7 +62,7 @@ where
 
     let transport_result = rpc_client
         .call_rpc(
-            <T as RpcRequestPrebuffered>::METHOD_ID,
+            <T as RpcMethodPrebuffered>::METHOD_ID,
             T::encode_request(input),
             T::decode_response,
             true,

@@ -1,8 +1,6 @@
 use bitcode::{Decode, Encode};
-use muxio_service_traits::{RpcRequestPrebuffered, RpcResponsePrebuffered};
+use muxio_service_traits::RpcMethodPrebuffered;
 use std::io;
-
-const MULT_METHOD_ID: u64 = 0x02;
 
 #[derive(Encode, Decode, PartialEq, Debug)]
 struct MultRequestParams {
@@ -16,10 +14,11 @@ struct MultResponseParams {
 
 pub struct Mult;
 
-impl RpcRequestPrebuffered for Mult {
-    const METHOD_ID: u64 = MULT_METHOD_ID;
+impl RpcMethodPrebuffered for Mult {
+    const METHOD_ID: u64 = 0x02;
 
     type Input = Vec<f64>;
+    type Output = f64;
 
     fn encode_request(numbers: Self::Input) -> Vec<u8> {
         bitcode::encode(&MultRequestParams { numbers })
@@ -31,12 +30,6 @@ impl RpcRequestPrebuffered for Mult {
 
         Ok(raw.numbers)
     }
-}
-
-impl RpcResponsePrebuffered for Mult {
-    const METHOD_ID: u64 = MULT_METHOD_ID;
-
-    type Output = f64;
 
     fn encode_response(result: Self::Output) -> Vec<u8> {
         bitcode::encode(&MultResponseParams { result })
