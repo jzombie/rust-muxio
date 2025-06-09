@@ -63,6 +63,8 @@ impl RpcClient {
         RpcClient { dispatcher, tx }
     }
 
+    // TODO: Use Result type
+    // TODO: Use common trait signature
     pub async fn call_rpc<T: Send + 'static, F: Fn(Vec<u8>) -> T + Send + Sync + 'static>(
         &self,
         method_id: u64,

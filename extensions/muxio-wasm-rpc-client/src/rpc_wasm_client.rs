@@ -72,6 +72,7 @@ impl RpcWasmClient {
         Self { dispatcher, tx }
     }
 
+    // TODO: Use Result type
     // TODO: Use common trait signature
     pub async fn call_rpc<T, F>(
         &self,
@@ -87,6 +88,7 @@ impl RpcWasmClient {
         T: Send + 'static,
         F: Fn(Vec<u8>) -> T + Send + Sync + 'static,
     {
+        // TODO: Remove
         web_sys::console::log_1(&"Call RPC...".into());
 
         let tx = self.tx.clone();
