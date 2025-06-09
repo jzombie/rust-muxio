@@ -19,40 +19,41 @@ use muxio_service_traits::{RpcClientInterface, RpcRequestPrebuffered, RpcRespons
 
 use std::io;
 
+// TODO: Uncomment
 // TODO: Implement and move into `RpcClient`
-#[async_trait::async_trait]
-impl RpcClientInterface for RpcWasmClient {
-    type Dispatcher = RpcDispatcher<'static>;
-    type Sender = UnboundedSender<Vec<u8>>;
-    type Mutex<T: Send> = Mutex<T>;
+// #[async_trait::async_trait]
+// impl RpcClientInterface for RpcWasmClient {
+//     type Dispatcher = RpcDispatcher<'static>;
+//     type Sender = UnboundedSender<Vec<u8>>;
+//     type Mutex<T: Send> = Mutex<T>;
 
-    fn dispatcher(&self) -> Arc<Self::Mutex<Self::Dispatcher>> {
-        self.dispatcher.clone()
-    }
+//     fn dispatcher(&self) -> Arc<Self::Mutex<Self::Dispatcher>> {
+//         self.dispatcher.clone()
+//     }
 
-    fn sender(&self) -> Self::Sender {
-        self.tx.clone()
-    }
+//     fn sender(&self) -> Self::Sender {
+//         self.tx.clone()
+//     }
 
-    /// Delegates the call to the actual `RpcClient::call_rpc` implementation.
-    async fn call_rpc<T, F>(
-        rpc_client: &RpcWasmClient,
-        method_id: u64,
-        payload: Vec<u8>,
-        response_handler: F,
-        is_finalized: bool,
-    ) -> Result<T, io::Error>
-    where
-        T: Send + 'static,
-        F: Fn(Vec<u8>) -> T + Send + Sync + 'static,
-    {
-        let (_dispatcher, result) = rpc_client
-            .call_rpc(method_id, payload, response_handler, is_finalized)
-            .await;
+//     /// Delegates the call to the actual `RpcClient::call_rpc` implementation.
+//     async fn call_rpc<T, F>(
+//         rpc_client: &RpcWasmClient,
+//         method_id: u64,
+//         payload: Vec<u8>,
+//         response_handler: F,
+//         is_finalized: bool,
+//     ) -> Result<T, io::Error>
+//     where
+//         T: Send + 'static,
+//         F: Fn(Vec<u8>) -> T + Send + Sync + 'static,
+//     {
+//         let (_dispatcher, result) = rpc_client
+//             .call_rpc(method_id, payload, response_handler, is_finalized)
+//             .await;
 
-        Ok(result)
-    }
-}
+//         Ok(result)
+//     }
+// }
 
 // TODO: "Original" implementation
 // pub async fn call_prebuffered_rpc(
@@ -155,40 +156,40 @@ impl RpcClientInterface for RpcWasmClient {
 // }
 
 // TODO: Dedupe
-pub async fn call_prebuffered_rpc<T, C>(
-    rpc_client: &C,
-    input: T::Input,
-) -> Result<T::Output, io::Error>
-where
-    T: RpcRequestPrebuffered + RpcResponsePrebuffered + Send + Sync + 'static,
-    T::Output: Send + 'static,
-    C: RpcClientInterface + Send + Sync,
-    C::Dispatcher: Send,
-{
-    // TODO: Remove
-    web_sys::console::log_1(&"Call prebuffered...".into());
+// pub async fn call_prebuffered_rpc<T, C>(
+//     rpc_client: &C,
+//     input: T::Input,
+// ) -> Result<T::Output, io::Error>
+// where
+//     T: RpcRequestPrebuffered + RpcResponsePrebuffered + Send + Sync + 'static,
+//     T::Output: Send + 'static,
+//     C: RpcClientInterface + Send + Sync,
+//     C::Dispatcher: Send,
+// {
+//     // TODO: Remove
+//     web_sys::console::log_1(&"Call prebuffered...".into());
 
-    // let dispatcher = rpc_client.dispatcher();
-    // let tx = rpc_client.sender();
+//     // let dispatcher = rpc_client.dispatcher();
+//     // let tx = rpc_client.sender();
 
-    let transport_result = rpc_client
-        .call_rpc(
-            <T as RpcRequestPrebuffered>::METHOD_ID,
-            T::encode_request(input),
-            T::decode_response,
-            true,
-        )
-        .await?;
+//     let transport_result = rpc_client
+//         .call_rpc(
+//             <T as RpcRequestPrebuffered>::METHOD_ID,
+//             T::encode_request(input),
+//             T::decode_response,
+//             true,
+//         )
+//         .await?;
 
-    // Error propagation is handled in two steps using two named variables:
-    //
-    // 1. `transport_result`: Result<Result<T::Output, io::Error>, io::Error>
-    //    - This comes from the transport layer (e.g., socket communication).
-    //    - The outer Result represents transport-level errors (e.g., channel closed).
-    //
-    // 2. `rpc_result`: T::Output
-    //    - This unwraps the inner Result from `transport_result`.
-    //    - If the remote RPC logic failed, this propagates that application-level error.
-    let rpc_result = transport_result?;
-    Ok(rpc_result)
-}
+//     // Error propagation is handled in two steps using two named variables:
+//     //
+//     // 1. `transport_result`: Result<Result<T::Output, io::Error>, io::Error>
+//     //    - This comes from the transport layer (e.g., socket communication).
+//     //    - The outer Result represents transport-level errors (e.g., channel closed).
+//     //
+//     // 2. `rpc_result`: T::Output
+//     //    - This unwraps the inner Result from `transport_result`.
+//     //    - If the remote RPC logic failed, this propagates that application-level error.
+//     let rpc_result = transport_result?;
+//     Ok(rpc_result)
+// }

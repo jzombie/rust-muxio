@@ -98,7 +98,7 @@ impl RpcClient {
             }
         });
 
-        let encoder = dispatcher
+        let rpc_stream_encoder = dispatcher
             .lock()
             .await
             .call(
@@ -117,6 +117,6 @@ impl RpcClient {
 
         let result = done_rx.await.expect("oneshot receive failed");
 
-        (encoder, result)
+        (rpc_stream_encoder, result)
     }
 }

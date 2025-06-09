@@ -73,27 +73,51 @@ impl RpcWasmClient {
     }
 
     // TODO: Use common trait signature
-    pub async fn call_rpc<T: Send + 'static, F: Fn(Vec<u8>) -> T + Send + Sync + 'static>(
+    pub async fn call_rpc<T, F>(
         &self,
         method_id: u64,
         payload: Vec<u8>,
         response_handler: F,
         is_finalized: bool,
-    ) -> (RpcStreamEncoder, T) {
-        // TODO: Remove
+    ) -> (
+        RpcStreamEncoder<Box<dyn for<'a> FnMut(&'a [u8]) + Send + 'static>>,
+        T,
+    )
+    where
+        T: Send + 'static,
+        F: Fn(Vec<u8>) -> T + Send + Sync + 'static,
+    {
         web_sys::console::log_1(&"Call RPC...".into());
 
-        let mut tx = self.tx.clone();
-
+        let tx = self.tx.clone();
         let (done_tx, done_rx) = oneshot::channel::<T>();
         let done_tx = Arc::new(Mutex::new(Some(done_tx)));
         let done_tx_clone = done_tx.clone();
 
-        // TODO: Return the encoder
+        // Box the send_fn closure
+        let send_fn: Box<dyn for<'a> FnMut(&'a [u8]) + Send + 'static> = Box::new(move |chunk| {
+            let _ = tx.unbounded_send(chunk.to_vec());
+            web_sys::console::log_1(&"emit...".into());
+        });
+
+        // Box the optional receive handler
+        let recv_fn: Box<dyn FnMut(RpcStreamEvent) + Send + 'static> = Box::new(move |evt| {
+            if let RpcStreamEvent::PayloadChunk { bytes, .. } = evt {
+                let result = response_handler(bytes);
+                let done_tx_clone2 = done_tx_clone.clone();
+
+                spawn_local(async move {
+                    if let Some(tx) = done_tx_clone2.lock().unwrap().take() {
+                        let _ = tx.send(result);
+                    }
+                });
+            }
+        });
+
         let rpc_stream_encoder = self
             .dispatcher
             .lock()
-            .unwrap() // TODO: Use result type
+            .unwrap()
             .call(
                 RpcRequest {
                     method_id,
@@ -101,36 +125,15 @@ impl RpcWasmClient {
                     pre_buffered_payload_bytes: None,
                     is_finalized,
                 },
-                1024, // TODO: Don't hardcode
-                move |chunk| {
-                    // let _ = tx.send(WsMessage::Binary(Bytes::copy_from_slice(chunk)));
-                    let _ = tx.send(chunk.to_vec());
-
-                    web_sys::console::log_1(&"emit...".into());
-                    // muxio_emit_socket_frame_bytes(chunk);
-                },
-                Some(move |evt| {
-                    if let RpcStreamEvent::PayloadChunk { bytes, .. } = evt {
-                        let result = response_handler(bytes);
-                        let done_tx_clone2 = done_tx_clone.clone();
-
-                        if let Some(tx) = done_tx_clone2.lock().unwrap().take() {
-                            let _ = tx.send(result);
-                        }
-                        // let done_tx_clone2 = done_tx_clone.clone();
-                        // tokio::spawn(async move {
-                        //     let mut tx_lock = done_tx_clone2.lock().await;
-                        //     if let Some(tx) = tx_lock.take() {
-                        //         let _ = tx.send(result);
-                        //     }
-                        // });
-                    }
-                }),
+                1024, // TODO: don't hardcode
+                send_fn,
+                Some(recv_fn),
                 true,
             )
-            .unwrap();
+            .expect("dispatcher.call failed");
 
-        let result = done_rx.await.unwrap();
+        let result = done_rx.await.expect("oneshot receive failed");
+
         (rpc_stream_encoder, result)
     }
 }
