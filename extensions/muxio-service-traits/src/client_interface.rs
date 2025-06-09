@@ -7,26 +7,12 @@ use std::sync::Arc;
 /// of client implementations across different environments (e.g. native vs wasm).
 #[async_trait::async_trait]
 pub trait RpcClientInterface {
-    // TODO: Refernce external lib method in docs, if possible
-    /// Must be `RpcDispatcher<'static>` or compatible with it.
-    type Dispatcher: Send + 'static;
-
-    /// Abstract sender type responsible for outgoing messages.
+    type Client;
     type Sender;
-
-    /// Mutex abstraction that can be customized for different runtimes.
     type Mutex<T: Send>: Send + Sync;
 
-    /// Returns a shared reference to the dispatcher.
-    fn dispatcher(&self) -> Arc<Self::Mutex<Self::Dispatcher>>;
-
-    /// Returns the sender.
-    fn sender(&self) -> Self::Sender;
-
-    /// Generalized RPC call that transports a request.
     async fn call_rpc<T, F>(
-        dispatcher: Arc<Self::Mutex<Self::Dispatcher>>,
-        sender: Self::Sender,
+        &self,
         method_id: u64,
         payload: Vec<u8>,
         response_handler: F,

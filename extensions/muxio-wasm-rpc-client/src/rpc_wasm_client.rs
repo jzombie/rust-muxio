@@ -4,7 +4,10 @@ use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender, unbounded as un
 use futures::channel::oneshot;
 use futures::stream::StreamExt;
 use js_sys::Uint8Array;
-use muxio::rpc::{RpcDispatcher, RpcRequest, rpc_internals::RpcStreamEvent};
+use muxio::rpc::{
+    RpcDispatcher, RpcRequest,
+    rpc_internals::{RpcStreamEncoder, RpcStreamEvent},
+};
 use std::sync::{Arc, Mutex};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
@@ -36,15 +39,15 @@ pub fn muxio_receive_socket_frame_uint8(inbound_data: Uint8Array) -> Result<(), 
 }
 
 // TODO: Refactor accordingly
-// fn start_recv_loop(mut rx: UnboundedReceiver<Vec<u8>>) {
-//     spawn_local(async move {
-//         while let Some(bytes) = rx.next().await {
-//             web_sys::console::log_1(&"receive...".into());
+fn start_recv_loop(mut rx: UnboundedReceiver<Vec<u8>>) {
+    spawn_local(async move {
+        while let Some(bytes) = rx.next().await {
+            web_sys::console::log_1(&"receive...".into());
 
-//             muxio_emit_socket_frame_bytes(bytes.as_slice()); // <-- ✅ ACTUALLY emits
-//         }
-//     });
-// }
+            muxio_emit_socket_frame_bytes(bytes.as_slice()); // <-- ✅ ACTUALLY emits
+        }
+    });
+}
 
 pub struct RpcWasmClient {
     // TODO: There's probably no reason to use Arc or Mutex here since the client is single-threaded
@@ -58,7 +61,7 @@ impl RpcWasmClient {
 
         let (tx, rx) = unbounded_channel::<Vec<u8>>();
 
-        // start_recv_loop(rx);
+        start_recv_loop(rx);
 
         // TODO: Handle accordingly
         // Store tx in TLS
@@ -71,22 +74,24 @@ impl RpcWasmClient {
 
     // TODO: Use common trait signature
     pub async fn call_rpc<T: Send + 'static, F: Fn(Vec<u8>) -> T + Send + Sync + 'static>(
-        // TODO: Use &self?
-        dispatcher: Arc<Mutex<RpcDispatcher<'static>>>,
-        mut tx: UnboundedSender<Vec<u8>>,
+        &self,
         method_id: u64,
         payload: Vec<u8>,
         response_handler: F,
         is_finalized: bool,
-    ) -> (Arc<Mutex<RpcDispatcher<'static>>>, T) {
+    ) -> (RpcStreamEncoder, T) {
         // TODO: Remove
         web_sys::console::log_1(&"Call RPC...".into());
+
+        let mut tx = self.tx.clone();
 
         let (done_tx, done_rx) = oneshot::channel::<T>();
         let done_tx = Arc::new(Mutex::new(Some(done_tx)));
         let done_tx_clone = done_tx.clone();
 
-        dispatcher
+        // TODO: Return the encoder
+        let rpc_stream_encoder = self
+            .dispatcher
             .lock()
             .unwrap() // TODO: Use result type
             .call(
@@ -99,10 +104,10 @@ impl RpcWasmClient {
                 1024, // TODO: Don't hardcode
                 move |chunk| {
                     // let _ = tx.send(WsMessage::Binary(Bytes::copy_from_slice(chunk)));
-                    // let _ = tx.send(chunk.to_vec());
+                    let _ = tx.send(chunk.to_vec());
 
-                    // web_sys::console::log_1(&"emit...".into());
-                    muxio_emit_socket_frame_bytes(chunk);
+                    web_sys::console::log_1(&"emit...".into());
+                    // muxio_emit_socket_frame_bytes(chunk);
                 },
                 Some(move |evt| {
                     if let RpcStreamEvent::PayloadChunk { bytes, .. } = evt {
@@ -126,6 +131,6 @@ impl RpcWasmClient {
             .unwrap();
 
         let result = done_rx.await.unwrap();
-        (dispatcher, result)
+        (rpc_stream_encoder, result)
     }
 }

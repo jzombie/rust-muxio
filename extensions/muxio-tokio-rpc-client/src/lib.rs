@@ -13,22 +13,12 @@ use tokio_tungstenite::tungstenite::protocol::Message as WsMessage;
 // TODO: Move into `RpcClient`
 #[async_trait::async_trait]
 impl RpcClientInterface for RpcClient {
-    type Dispatcher = RpcDispatcher<'static>;
+    type Client = RpcClient;
     type Sender = UnboundedSender<WsMessage>;
     type Mutex<T: Send> = Mutex<T>;
 
-    fn dispatcher(&self) -> Arc<Self::Mutex<Self::Dispatcher>> {
-        self.dispatcher.clone()
-    }
-
-    fn sender(&self) -> Self::Sender {
-        self.tx.clone()
-    }
-
-    /// Delegates the call to the actual `RpcClient::call_rpc` implementation.
     async fn call_rpc<T, F>(
-        dispatcher: Arc<Self::Mutex<Self::Dispatcher>>,
-        sender: Self::Sender,
+        &self,
         method_id: u64,
         payload: Vec<u8>,
         response_handler: F,
@@ -38,15 +28,9 @@ impl RpcClientInterface for RpcClient {
         T: Send + 'static,
         F: Fn(Vec<u8>) -> T + Send + Sync + 'static,
     {
-        let (_dispatcher, result) = RpcClient::call_rpc(
-            dispatcher,
-            sender,
-            method_id,
-            payload,
-            response_handler,
-            is_finalized,
-        )
-        .await;
+        let (_, result) = self
+            .call_rpc(method_id, payload, response_handler, is_finalized)
+            .await;
 
         Ok(result)
     }
@@ -66,20 +50,19 @@ where
     T: RpcRequestPrebuffered + RpcResponsePrebuffered + Send + Sync + 'static,
     T::Output: Send + 'static,
     C: RpcClientInterface + Send + Sync,
-    C::Dispatcher: Send,
+    // C::Dispatcher: Send,
 {
-    let dispatcher = rpc_client.dispatcher();
-    let tx = rpc_client.sender();
+    // let dispatcher = rpc_client.dispatcher();
+    // let tx = rpc_client.sender();
 
-    let transport_result = C::call_rpc(
-        dispatcher,
-        tx,
-        <T as RpcRequestPrebuffered>::METHOD_ID,
-        T::encode_request(input),
-        T::decode_response,
-        true,
-    )
-    .await?;
+    let transport_result = rpc_client
+        .call_rpc(
+            <T as RpcRequestPrebuffered>::METHOD_ID,
+            T::encode_request(input),
+            T::decode_response,
+            true,
+        )
+        .await?;
 
     // Error propagation is handled in two steps using two named variables:
     //

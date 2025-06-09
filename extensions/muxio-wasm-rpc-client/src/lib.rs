@@ -36,8 +36,7 @@ impl RpcClientInterface for RpcWasmClient {
 
     /// Delegates the call to the actual `RpcClient::call_rpc` implementation.
     async fn call_rpc<T, F>(
-        dispatcher: Arc<Self::Mutex<Self::Dispatcher>>,
-        sender: Self::Sender,
+        rpc_client: &RpcWasmClient,
         method_id: u64,
         payload: Vec<u8>,
         response_handler: F,
@@ -47,15 +46,9 @@ impl RpcClientInterface for RpcWasmClient {
         T: Send + 'static,
         F: Fn(Vec<u8>) -> T + Send + Sync + 'static,
     {
-        let (_dispatcher, result) = RpcWasmClient::call_rpc(
-            dispatcher,
-            sender,
-            method_id,
-            payload,
-            response_handler,
-            is_finalized,
-        )
-        .await;
+        let (_dispatcher, result) = rpc_client
+            .call_rpc(method_id, payload, response_handler, is_finalized)
+            .await;
 
         Ok(result)
     }
@@ -175,18 +168,17 @@ where
     // TODO: Remove
     web_sys::console::log_1(&"Call prebuffered...".into());
 
-    let dispatcher = rpc_client.dispatcher();
-    let tx = rpc_client.sender();
+    // let dispatcher = rpc_client.dispatcher();
+    // let tx = rpc_client.sender();
 
-    let transport_result = C::call_rpc(
-        dispatcher,
-        tx,
-        <T as RpcRequestPrebuffered>::METHOD_ID,
-        T::encode_request(input),
-        T::decode_response,
-        true,
-    )
-    .await?;
+    let transport_result = rpc_client
+        .call_rpc(
+            <T as RpcRequestPrebuffered>::METHOD_ID,
+            T::encode_request(input),
+            T::decode_response,
+            true,
+        )
+        .await?;
 
     // Error propagation is handled in two steps using two named variables:
     //
