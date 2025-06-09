@@ -43,7 +43,7 @@ impl RpcClientInterface for RpcClient {
     }
 }
 
-// TODO: Refactor
+// TODO: Refactor (and dedupe)
 /// Calls a prebuffered RPC method defined by the `RpcRequestPrebuffered` and
 /// `RpcResponsePrebuffered` traits using a generic RPC transport.
 ///
