@@ -421,6 +421,7 @@ dependencies = [
  "futures",
  "futures-util",
  "muxio",
+ "muxio-tokio-rpc-client",
  "muxio-tokio-rpc-server",
  "tokio",
  "tokio-tungstenite",
@@ -782,6 +783,17 @@ dependencies = [
  "once_cell",
  "rand",
  "tokio",
+]
+
+[[package]]
+name = "muxio-tokio-rpc-client"
+version = "0.1.0-alpha"
+dependencies = [
+ "bytes",
+ "futures-util",
+ "muxio",
+ "tokio",
+ "tokio-tungstenite",
 ]
 
 [[package]]

@@ -14,6 +14,7 @@ tokio-tungstenite = "0.26.2"
 muxio = { path = "../" }
 async-trait = "0.1.88"
 muxio-tokio-rpc-server = { path = "../extensions/muxio-tokio-rpc-server" }
+muxio-tokio-rpc-client = { path = "../extensions/muxio-tokio-rpc-client" }
 
 [[bench]]
 name = "roundtrip"
