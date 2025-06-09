@@ -416,16 +416,13 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "bitcode",
- "bytes",
  "criterion",
  "futures",
- "futures-util",
  "muxio",
  "muxio-service-traits",
  "muxio-tokio-rpc-client",
  "muxio-tokio-rpc-server",
  "tokio",
- "tokio-tungstenite",
 ]
 
 [[package]]

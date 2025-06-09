@@ -6,10 +6,7 @@ publish = false
 
 [dependencies]
 bitcode = "0.6.6"
-bytes = "1.10.1"
-futures-util = "0.3.31"
 tokio = { version = "1.45.1", features = ["full"] }
-tokio-tungstenite = "0.26.2"
 muxio = { path = "../" }
 async-trait = "0.1.88"
 muxio-tokio-rpc-server = { path = "../extensions/muxio-tokio-rpc-server" }
