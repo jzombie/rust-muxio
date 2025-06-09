@@ -9,6 +9,7 @@ use std::sync::Arc;
 /// of client implementations across different environments (e.g. native vs wasm).
 #[async_trait::async_trait]
 pub trait RpcTransport {
+    // TODO: Refernce external lib method in docs, if possible
     /// Must be `RpcDispatcher<'static>` or compatible with it.
     type Dispatcher: Send + 'static;
 
