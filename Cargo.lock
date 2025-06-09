@@ -421,6 +421,7 @@ dependencies = [
  "futures",
  "futures-util",
  "muxio",
+ "muxio-service-traits",
  "muxio-tokio-rpc-client",
  "muxio-tokio-rpc-server",
  "tokio",
@@ -786,12 +787,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "muxio-service-traits"
+version = "0.1.0-alpha"
+dependencies = [
+ "async-trait",
+]
+
+[[package]]
 name = "muxio-tokio-rpc-client"
 version = "0.1.0-alpha"
 dependencies = [
+ "async-trait",
  "bytes",
  "futures-util",
  "muxio",
+ "muxio-service-traits",
  "tokio",
  "tokio-tungstenite",
 ]

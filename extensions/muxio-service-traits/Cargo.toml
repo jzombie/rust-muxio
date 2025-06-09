@@ -1,0 +1,8 @@
+[package]
+name = "muxio-service-traits"
+version = "0.1.0-alpha"
+edition = "2024"
+publish = false
+
+[dependencies]
+async-trait = "0.1.88"

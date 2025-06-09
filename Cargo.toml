@@ -21,6 +21,7 @@ members = [
     ".",
     "example-muxio-ws-rpc-app",
     "extensions/muxio-tokio-rpc-client",
-    "extensions/muxio-tokio-rpc-server"
+    "extensions/muxio-tokio-rpc-server",
+    "extensions/muxio-service-traits",
 ]
 resolver = "2"

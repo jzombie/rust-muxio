@@ -5,8 +5,10 @@ edition = "2024"
 publish = false
 
 [dependencies]
+async-trait = "0.1.88"
 bytes = "1.10.1"
 futures-util = "0.3.31"
 tokio = { version = "1.45.1", features = ["full"] }
 tokio-tungstenite = "0.26.2"
 muxio = { path = "../../" }
+muxio-service-traits = { path = "../muxio-service-traits" }

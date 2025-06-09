@@ -1,4 +1,3 @@
-pub mod optional_traits;
 mod rpc_dispatcher;
 pub mod rpc_internals;
 mod rpc_request_response;

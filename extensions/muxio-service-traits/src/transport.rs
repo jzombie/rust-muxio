@@ -1,7 +1,7 @@
 use std::io;
 use std::sync::Arc;
 
-// TODO: Refactor
+// TODO: Refactor and rename (`RpcClientInterface`?)
 /// Abstracts the RPC transport mechanism.
 ///
 /// This trait enables usage of any client type that implements the required

@@ -1,5 +1,5 @@
 use bitcode::{Decode, Encode};
-use muxio::rpc::optional_traits::{RpcRequestPrebuffered, RpcResponsePrebuffered};
+use muxio_service_traits::{RpcRequestPrebuffered, RpcResponsePrebuffered};
 use std::io;
 
 const MULT_METHOD_ID: u64 = 0x02;
