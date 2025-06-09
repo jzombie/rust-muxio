@@ -1,6 +1,6 @@
 mod rpc_client;
 use muxio::rpc::RpcDispatcher;
-use muxio_service_traits::{RpcRequestPrebuffered, RpcResponsePrebuffered, RpcTransport};
+use muxio_service_traits::{RpcClientInterface, RpcRequestPrebuffered, RpcResponsePrebuffered};
 pub use rpc_client::RpcClient;
 use std::io;
 use std::sync::Arc;
@@ -8,9 +8,8 @@ use tokio::sync::Mutex;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio_tungstenite::tungstenite::protocol::Message as WsMessage;
 
-/// Native implementation of `RpcTransport` for `RpcClient`
 #[async_trait::async_trait]
-impl RpcTransport for RpcClient {
+impl RpcClientInterface for RpcClient {
     type Dispatcher = RpcDispatcher<'static>;
     type Sender = UnboundedSender<WsMessage>;
     type Mutex<T: Send> = Mutex<T>;
@@ -63,7 +62,7 @@ pub async fn call_prebuffered_rpc<T, C>(
 where
     T: RpcRequestPrebuffered + RpcResponsePrebuffered + Send + Sync + 'static,
     T::Output: Send + 'static,
-    C: RpcTransport + Send + Sync,
+    C: RpcClientInterface + Send + Sync,
     C::Dispatcher: Send,
 {
     let dispatcher = rpc_client.dispatcher();

@@ -1,5 +1,5 @@
 pub mod service_definition;
-use muxio_service_traits::{RpcRequestPrebuffered, RpcResponsePrebuffered, RpcTransport};
+use muxio_service_traits::{RpcClientInterface, RpcRequestPrebuffered, RpcResponsePrebuffered};
 use muxio_tokio_rpc_client::call_prebuffered_rpc;
 pub use service_definition::{Add, Mult};
 use std::io;
@@ -13,7 +13,7 @@ use std::io;
 pub trait RpcCallPrebuffered:
     RpcRequestPrebuffered + RpcResponsePrebuffered + Sized + Send + Sync
 {
-    async fn call<C: RpcTransport + Send + Sync>(
+    async fn call<C: RpcClientInterface + Send + Sync>(
         rpc_client: &C,
         input: Self::Input,
     ) -> Result<Self::Output, io::Error>;
@@ -21,7 +21,7 @@ pub trait RpcCallPrebuffered:
 
 #[async_trait::async_trait]
 impl RpcCallPrebuffered for Add {
-    async fn call<C: RpcTransport + Send + Sync>(
+    async fn call<C: RpcClientInterface + Send + Sync>(
         rpc_client: &C,
         input: Self::Input,
     ) -> Result<Self::Output, io::Error> {
@@ -31,7 +31,7 @@ impl RpcCallPrebuffered for Add {
 
 #[async_trait::async_trait]
 impl RpcCallPrebuffered for Mult {
-    async fn call<C: RpcTransport + Send + Sync>(
+    async fn call<C: RpcClientInterface + Send + Sync>(
         rpc_client: &C,
         input: Self::Input,
     ) -> Result<Self::Output, io::Error> {

@@ -1,14 +1,12 @@
 use std::io;
 use std::sync::Arc;
 
-// TODO: Refactor and rename (`RpcClientInterface`?)
-/// Abstracts the RPC transport mechanism.
-///
+// TODO: Put behind a feature flag for "rpc-client"?
 /// This trait enables usage of any client type that implements the required
 /// RPC communication functionality. It allows runtime selection and injection
 /// of client implementations across different environments (e.g. native vs wasm).
 #[async_trait::async_trait]
-pub trait RpcTransport {
+pub trait RpcClientInterface {
     // TODO: Refernce external lib method in docs, if possible
     /// Must be `RpcDispatcher<'static>` or compatible with it.
     type Dispatcher: Send + 'static;
