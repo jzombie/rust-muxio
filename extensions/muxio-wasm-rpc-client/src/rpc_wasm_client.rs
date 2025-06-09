@@ -1,5 +1,4 @@
 use crate::socket_transport::muxio_emit_socket_frame_bytes;
-use futures::SinkExt;
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender, unbounded as unbounded_channel};
 use futures::channel::oneshot;
 use futures::stream::StreamExt;
@@ -8,27 +7,27 @@ use muxio::rpc::{
     RpcDispatcher, RpcRequest,
     rpc_internals::{RpcStreamEncoder, RpcStreamEvent},
 };
-use std::sync::{Arc, Mutex};
+use std::cell::RefCell;
+use std::rc::Rc;
+use std::sync::Arc;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::console;
 
 thread_local! {
-    static MUXIO_CLIENT_TX_REF: std::cell::RefCell<Option<UnboundedSender<Vec<u8>>>> =
-        std::cell::RefCell::new(None);
+    static MUXIO_CLIENT_TX_REF: RefCell<Option<UnboundedSender<Vec<u8>>>> =
+        RefCell::new(None);
+    static MUXIO_CLIENT_RX_REF: RefCell<Option<Rc<RefCell<UnboundedReceiver<Vec<u8>>>>>> =
+        RefCell::new(None);
 }
 
-// TODO: Refactor accordingly
 #[wasm_bindgen]
 pub fn muxio_receive_socket_frame_uint8(inbound_data: Uint8Array) -> Result<(), JsValue> {
     let inbound_bytes = inbound_data.to_vec();
 
-    // Forward to client channel
     MUXIO_CLIENT_TX_REF.with(|cell| {
         if let Some(tx) = cell.borrow().as_ref() {
             let _ = tx.unbounded_send(inbound_bytes);
-
-            // TODO: Remove
             web_sys::console::log_1(&"emit...".into());
         } else {
             console::error_1(&"Client TX not initialized".into());
@@ -38,42 +37,44 @@ pub fn muxio_receive_socket_frame_uint8(inbound_data: Uint8Array) -> Result<(), 
     Ok(())
 }
 
-// TODO: Refactor accordingly
-fn start_recv_loop(mut rx: UnboundedReceiver<Vec<u8>>) {
+fn start_recv_loop(rx: Rc<RefCell<UnboundedReceiver<Vec<u8>>>>) {
     spawn_local(async move {
-        while let Some(bytes) = rx.next().await {
-            web_sys::console::log_1(&"receive...".into());
-
-            muxio_emit_socket_frame_bytes(bytes.as_slice()); // <-- ✅ ACTUALLY emits
+        loop {
+            let maybe_bytes = rx.borrow_mut().next().await;
+            if let Some(bytes) = maybe_bytes {
+                web_sys::console::log_1(&"receive...".into());
+                muxio_emit_socket_frame_bytes(bytes.as_slice());
+            } else {
+                break;
+            }
         }
     });
 }
 
 pub struct RpcWasmClient {
-    // TODO: There's probably no reason to use Arc or Mutex here since the client is single-threaded
-    pub dispatcher: Arc<Mutex<RpcDispatcher<'static>>>,
+    pub dispatcher: Arc<std::sync::Mutex<RpcDispatcher<'static>>>,
     pub tx: UnboundedSender<Vec<u8>>,
 }
 
 impl RpcWasmClient {
     pub async fn new() -> RpcWasmClient {
-        let dispatcher = Arc::new(Mutex::new(RpcDispatcher::new()));
-
+        let dispatcher = Arc::new(std::sync::Mutex::new(RpcDispatcher::new()));
         let (tx, rx) = unbounded_channel::<Vec<u8>>();
+        let rx_rc = Rc::new(RefCell::new(rx));
 
-        start_recv_loop(rx);
-
-        // TODO: Handle accordingly
-        // Store tx in TLS
         MUXIO_CLIENT_TX_REF.with(|cell| {
             *cell.borrow_mut() = Some(tx.clone());
         });
 
+        MUXIO_CLIENT_RX_REF.with(|cell| {
+            *cell.borrow_mut() = Some(rx_rc.clone());
+        });
+
+        start_recv_loop(rx_rc);
+
         Self { dispatcher, tx }
     }
 
-    // TODO: Use Result type
-    // TODO: Use common trait signature
     pub async fn call_rpc<T, F>(
         &self,
         method_id: u64,
@@ -88,23 +89,18 @@ impl RpcWasmClient {
         T: Send + 'static,
         F: Fn(Vec<u8>) -> T + Send + Sync + 'static,
     {
-        // TODO: Remove
         web_sys::console::log_1(&"Call RPC...".into());
 
         let tx = self.tx.clone();
         let (done_tx, done_rx) = oneshot::channel::<T>();
-        let done_tx = Arc::new(Mutex::new(Some(done_tx)));
+        let done_tx = Arc::new(std::sync::Mutex::new(Some(done_tx)));
         let done_tx_clone = done_tx.clone();
 
-        // Box the send_fn closure
         let send_fn: Box<dyn for<'a> FnMut(&'a [u8]) + Send + 'static> = Box::new(move |chunk| {
             let _ = tx.unbounded_send(chunk.to_vec());
-
-            // TODO: Remove
             web_sys::console::log_1(&"emit...".into());
         });
 
-        // Box the optional receive handler
         let recv_fn: Box<dyn FnMut(RpcStreamEvent) + Send + 'static> = Box::new(move |evt| {
             if let RpcStreamEvent::PayloadChunk { bytes, .. } = evt {
                 let result = response_handler(bytes);
@@ -129,7 +125,7 @@ impl RpcWasmClient {
                     pre_buffered_payload_bytes: None,
                     is_finalized,
                 },
-                1024, // TODO: Don't hardcode
+                1024,
                 send_fn,
                 Some(recv_fn),
                 true,
