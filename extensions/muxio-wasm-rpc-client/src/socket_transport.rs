@@ -2,7 +2,7 @@ use js_sys::Uint8Array;
 use wasm_bindgen::prelude::*;
 use web_sys::console;
 
-// use super::MUXIO_CLIENT_DISPATCHER_REF;
+use super::MUXIO_CLIENT_DISPATCHER_REF;
 
 #[wasm_bindgen]
 extern "C" {
@@ -29,21 +29,21 @@ pub fn muxio_emit_socket_frame_bytes(bytes: &[u8]) {
 // ///
 // /// This function should be called by JS whenever a new binary message is received.
 // /// It decodes the incoming `Uint8Array` and passes it to the internal RPC dispatcher.
-// #[wasm_bindgen]
-// pub fn muxio_receive_socket_frame_uint8(inbound_data: Uint8Array) -> Result<(), JsValue> {
-//     // Convert Uint8Array to Vec<u8>
-//     let inbound_bytes = inbound_data.to_vec();
+#[wasm_bindgen]
+pub fn muxio_receive_socket_frame_uint8(inbound_data: Uint8Array) -> Result<(), JsValue> {
+    // Convert Uint8Array to Vec<u8>
+    let inbound_bytes = inbound_data.to_vec();
 
-//     MUXIO_CLIENT_DISPATCHER_REF.with(|cell| {
-//         if let Some(client_dispatcher) = cell.borrow_mut().as_mut() {
-//             client_dispatcher.receive_bytes(&inbound_bytes).unwrap();
-//         } else {
-//             console::error_1(&"Dispatcher not initialized".into());
-//         }
-//     });
+    MUXIO_CLIENT_DISPATCHER_REF.with(|cell| {
+        if let Some(client_dispatcher) = cell.borrow_mut().as_mut() {
+            client_dispatcher.receive_bytes(&inbound_bytes).unwrap();
+        } else {
+            console::error_1(&"Dispatcher not initialized".into());
+        }
+    });
 
-//     Ok(())
-// }
+    Ok(())
+}
 
 /// JS-facing hook for handling socket connection establishment.
 ///
