@@ -134,13 +134,13 @@ impl RpcServer {
                 let Some(request) = dispatcher.delete_rpc_request(request_id) else {
                     continue;
                 };
-                let Some(payload) = &request.param_bytes else {
+                let Some(param_bytes) = &request.param_bytes else {
                     continue;
                 };
 
                 let response = if let Some(handler) = handlers.lock().await.get(&request.method_id)
                 {
-                    let encoded = handler(payload.clone());
+                    let encoded = handler(param_bytes.clone());
                     RpcResponse {
                         request_header_id: request_id,
                         method_id: request.method_id,
