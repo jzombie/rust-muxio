@@ -36,4 +36,18 @@ dot -Tsvg mods.dot -o mods.svg
 This library is written in a non-async style, using synchronous control flow with callbacks. Despite not depending on async/await, it supports streaming, interleaving, and cancellation through a layered transport kit design. This enables integration with both single-threaded and multi-threaded runtimes, including compatibility with WASM environments where true async tasks may be limited.
 
   > The runtime model prioritizes low-overhead, deterministic execution, where events are driven by explicit invocations (e.g., ]TODO: List examples]), and callbacks handle downstream I/O or response logic. This architecture supports efficient integration with event-driven systems without imposing runtime-specific constraints.
-  
+
+## Detect Unused Packages
+
+Install prerequisites:
+
+```sh
+rustup install nightly
+cargo install cargo-udeps
+```
+
+Run it on the full workspace:
+
+```sh
+cargo +nightly udeps --workspace
+```
