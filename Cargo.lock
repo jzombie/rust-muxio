@@ -816,6 +816,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "muxio-wasm-rpc-client"
+version = "0.1.0-alpha"
+dependencies = [
+ "futures",
+ "js-sys",
+ "muxio",
+ "wasm-bindgen",
+ "web-sys",
+]
+
+[[package]]
 name = "num-traits"
 version = "0.2.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
