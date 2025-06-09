@@ -13,7 +13,7 @@ use muxio::rpc::{
 use std::sync::{Arc, Mutex};
 use web_sys::console;
 
-use std::sync::mpsc;
+use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender, unbounded as unbounded_channel};
 
 use muxio_service_traits::RpcClientInterface;
 
@@ -23,7 +23,7 @@ use std::io;
 #[async_trait::async_trait]
 impl RpcClientInterface for RpcWasmClient {
     type Dispatcher = RpcDispatcher<'static>;
-    type Sender = mpsc::Sender<Vec<u8>>;
+    type Sender = UnboundedSender<Vec<u8>>;
     type Mutex<T: Send> = Mutex<T>;
 
     fn dispatcher(&self) -> Arc<Self::Mutex<Self::Dispatcher>> {

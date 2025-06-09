@@ -1,23 +1,35 @@
-use super::MUXIO_CLIENT_DISPATCHER_REF;
-use super::muxio_emit_socket_frame_bytes;
+use futures::SinkExt;
+use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender, unbounded as unbounded_channel};
 use futures::channel::oneshot;
-use muxio::rpc::{
-    RpcDispatcher, RpcRequest, RpcResponse, RpcResultStatus, rpc_internals::RpcStreamEvent,
-};
-use std::sync::{Arc, Mutex, mpsc};
+use futures::stream::StreamExt;
+use muxio::rpc::{RpcDispatcher, RpcRequest, rpc_internals::RpcStreamEvent};
+use std::sync::{Arc, Mutex};
+use wasm_bindgen_futures::spawn_local;
 use web_sys::console;
+
+// TODO: Refactor accordingly
+fn start_recv_loop(mut rx: UnboundedReceiver<Vec<u8>>) {
+    spawn_local(async move {
+        while let Some(msg) = rx.next().await {
+            let s = format!("Received: {:?}", msg);
+            console::log_1(&s.into());
+        }
+    });
+}
 
 pub struct RpcWasmClient {
     // TODO: There's probably no reason to use Arc or Mutex here since the client is single-threaded
     pub dispatcher: Arc<Mutex<RpcDispatcher<'static>>>,
-    pub tx: mpsc::Sender<Vec<u8>>,
+    pub tx: UnboundedSender<Vec<u8>>,
 }
 
 impl RpcWasmClient {
     pub async fn new() -> RpcWasmClient {
         let dispatcher = Arc::new(Mutex::new(RpcDispatcher::new()));
 
-        let (tx, mut rx) = mpsc::channel::<Vec<u8>>();
+        let (tx, rx) = unbounded_channel::<Vec<u8>>();
+
+        start_recv_loop(rx);
 
         Self { dispatcher, tx }
     }
@@ -25,7 +37,7 @@ impl RpcWasmClient {
     // TODO: Use common trait signature
     pub async fn call_rpc<T: Send + 'static, F: Fn(Vec<u8>) -> T + Send + Sync + 'static>(
         dispatcher: Arc<Mutex<RpcDispatcher<'static>>>,
-        tx: mpsc::Sender<Vec<u8>>,
+        mut tx: UnboundedSender<Vec<u8>>,
         method_id: u64,
         payload: Vec<u8>,
         response_handler: F,
