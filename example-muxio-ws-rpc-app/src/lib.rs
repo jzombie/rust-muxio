@@ -1,5 +1,4 @@
 mod client;
-mod server;
 pub mod service_definition;
 
 pub use client::RpcClient;
@@ -7,7 +6,6 @@ use muxio::rpc::{
     RpcDispatcher,
     optional_traits::{RpcRequestPrebuffered, RpcResponsePrebuffered},
 };
-pub use server::RpcServer;
 pub use service_definition::{Add, Mult};
 use std::io;
 mod rpc_transport;
