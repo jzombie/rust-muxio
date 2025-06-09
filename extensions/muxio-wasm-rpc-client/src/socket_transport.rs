@@ -36,7 +36,11 @@ pub fn muxio_receive_socket_frame_uint8(inbound_data: Uint8Array) -> Result<(), 
 
     MUXIO_CLIENT_DISPATCHER_REF.with(|cell| {
         if let Some(client_dispatcher) = cell.borrow_mut().as_mut() {
-            client_dispatcher.receive_bytes(&inbound_bytes).unwrap();
+            client_dispatcher
+                .lock()
+                .unwrap()
+                .receive_bytes(&inbound_bytes)
+                .unwrap();
         } else {
             console::error_1(&"Dispatcher not initialized".into());
         }

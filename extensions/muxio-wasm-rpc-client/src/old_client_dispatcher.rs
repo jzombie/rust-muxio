@@ -1,7 +1,10 @@
 // TODO: Remove
 
+use crate::RpcWasmClient;
+use crate::muxio_emit_socket_frame_bytes;
 use muxio::rpc::RpcDispatcher;
 use std::cell::RefCell;
+use std::sync::{Arc, Mutex};
 
 thread_local! {
     /// A thread-local, optionally-initialized client dispatcher used to manage
@@ -16,7 +19,7 @@ thread_local! {
     /// The `'static` lifetime is used due to the absence of scoped lifetimes
     /// in the WASM module and ensures compatibility with long-lived global
     /// callbacks like event streams from JS.
-    pub static MUXIO_CLIENT_DISPATCHER_REF: RefCell<Option<RpcDispatcher<'static>>> = RefCell::new(None);
+    pub static MUXIO_CLIENT_DISPATCHER_REF: RefCell<Option<Arc<Mutex<RpcDispatcher<'static>>>>> = RefCell::new(None);
 }
 
 /// Initializes the global MUXIO client dispatcher if it has not already
@@ -30,7 +33,9 @@ thread_local! {
 pub fn init_client_dispatcher() {
     MUXIO_CLIENT_DISPATCHER_REF.with(|cell| {
         if cell.borrow().is_none() {
-            let client_dispatcher = RpcDispatcher::new();
+            let rpc_wasm_client = RpcWasmClient::new(|bytes| muxio_emit_socket_frame_bytes(&bytes));
+
+            let client_dispatcher = rpc_wasm_client.dispatcher;
             *cell.borrow_mut() = Some(client_dispatcher);
         }
     });

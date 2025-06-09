@@ -24,7 +24,7 @@ pub async fn call_muxio(
 
     MUXIO_CLIENT_DISPATCHER_REF.with(|cell| {
         if let Some(dispatcher) = cell.borrow_mut().as_mut() {
-            let _ = dispatcher.call(
+            let _ = dispatcher.lock().unwrap().call(
                 RpcRequest {
                     method_id,
                     param_bytes,
