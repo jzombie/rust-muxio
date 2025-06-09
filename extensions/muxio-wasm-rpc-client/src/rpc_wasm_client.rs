@@ -99,6 +99,8 @@ impl RpcWasmClient {
         // Box the send_fn closure
         let send_fn: Box<dyn for<'a> FnMut(&'a [u8]) + Send + 'static> = Box::new(move |chunk| {
             let _ = tx.unbounded_send(chunk.to_vec());
+
+            // TODO: Remove
             web_sys::console::log_1(&"emit...".into());
         });
 
@@ -127,7 +129,7 @@ impl RpcWasmClient {
                     pre_buffered_payload_bytes: None,
                     is_finalized,
                 },
-                1024, // TODO: don't hardcode
+                1024, // TODO: Don't hardcode
                 send_fn,
                 Some(recv_fn),
                 true,
