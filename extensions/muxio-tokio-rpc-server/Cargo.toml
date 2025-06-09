@@ -1,0 +1,13 @@
+[package]
+name = "muxio-tokio-rpc-server"
+version = "0.1.0-alpha"
+edition = "2024"
+publish = false
+
+[dependencies]
+axum = { version = "0.8.4", features = ["ws"] }
+bytes = "1.10.1"
+futures-util = "0.3.31"
+tokio = { version = "1.45.1", features = ["full"] }
+tokio-tungstenite = "0.26.2"
+muxio = { path = "../../" }

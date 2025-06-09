@@ -1,3 +1,5 @@
+// TODO: Move this out of the main `Muxio` crate, as this crate should be considered lower-level
+
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum RpcResultStatus {

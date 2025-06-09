@@ -1,17 +1,17 @@
 [package]
-name = "muxio-ws-rpc-demo-app"
+name = "example-muxio-ws-rpc-app"
 version = "0.1.0"
 edition = "2024"
 publish = false
 
 [dependencies]
-axum = { version = "0.8.4", features = ["ws"] }
 bitcode = "0.6.6"
-bytes = "1.10.1"
-futures-util = "0.3.31"
 tokio = { version = "1.45.1", features = ["full"] }
-tokio-tungstenite = "0.26.2"
 muxio = { path = "../" }
+async-trait = "0.1.88"
+muxio-tokio-rpc-server = { path = "../extensions/muxio-tokio-rpc-server" }
+muxio-tokio-rpc-client = { path = "../extensions/muxio-tokio-rpc-client" }
+muxio-service-traits = { path = "../extensions/muxio-service-traits" }
 
 [[bench]]
 name = "roundtrip"

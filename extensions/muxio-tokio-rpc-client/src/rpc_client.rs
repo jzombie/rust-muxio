@@ -18,6 +18,7 @@ impl RpcClient {
     pub async fn new(websocket_address: &str) -> RpcClient {
         let (ws_stream, _) = connect_async(websocket_address)
             .await
+            // TODO: Use Result type
             .expect("Failed to connect");
         let (mut sender, mut receiver) = ws_stream.split();
 
