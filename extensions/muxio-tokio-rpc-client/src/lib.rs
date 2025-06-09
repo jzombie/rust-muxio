@@ -1,5 +1,6 @@
 mod rpc_client;
 use muxio::rpc::RpcDispatcher;
+use muxio::rpc::rpc_internals::RpcStreamEncoder;
 use muxio_service_traits::{RpcClientInterface, RpcRequestPrebuffered, RpcResponsePrebuffered};
 pub use rpc_client::RpcClient;
 use std::io;
@@ -23,12 +24,18 @@ impl RpcClientInterface for RpcClient {
         payload: Vec<u8>,
         response_handler: F,
         is_finalized: bool,
-    ) -> Result<T, io::Error>
+    ) -> Result<
+        (
+            RpcStreamEncoder<Box<dyn for<'a> FnMut(&'a [u8]) + Send + 'static>>,
+            T,
+        ),
+        io::Error,
+    >
     where
         T: Send + 'static,
         F: Fn(Vec<u8>) -> T + Send + Sync + 'static,
     {
-        let (_, result) = self
+        let result = self
             .call_rpc(method_id, payload, response_handler, is_finalized)
             .await;
 
@@ -64,15 +71,7 @@ where
         )
         .await?;
 
-    // Error propagation is handled in two steps using two named variables:
-    //
-    // 1. `transport_result`: Result<Result<T::Output, io::Error>, io::Error>
-    //    - This comes from the transport layer (e.g., socket communication).
-    //    - The outer Result represents transport-level errors (e.g., channel closed).
-    //
-    // 2. `rpc_result`: T::Output
-    //    - This unwraps the inner Result from `transport_result`.
-    //    - If the remote RPC logic failed, this propagates that application-level error.
-    let rpc_result = transport_result?;
-    Ok(rpc_result)
+    let (_, rpc_result) = transport_result;
+
+    rpc_result
 }

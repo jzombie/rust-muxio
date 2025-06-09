@@ -6,3 +6,4 @@ publish = false
 
 [dependencies]
 async-trait = "0.1.88"
+muxio = { path = "../../" }
