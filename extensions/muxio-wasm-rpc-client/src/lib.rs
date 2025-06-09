@@ -8,7 +8,8 @@ mod rpc_wasm_client;
 pub use rpc_wasm_client::*;
 
 use muxio::rpc::{
-    RpcDispatcher, RpcRequest, RpcResponse, RpcResultStatus, rpc_internals::RpcStreamEvent,
+    RpcDispatcher, RpcRequest, RpcResponse, RpcResultStatus,
+    rpc_internals::{RpcStreamEncoder, RpcStreamEvent},
 };
 use std::sync::{Arc, Mutex};
 use web_sys::console;
@@ -22,38 +23,36 @@ use std::io;
 // TODO: Uncomment
 // TODO: Implement and move into `RpcClient`
 // #[async_trait::async_trait]
-// impl RpcClientInterface for RpcWasmClient {
-//     type Dispatcher = RpcDispatcher<'static>;
-//     type Sender = UnboundedSender<Vec<u8>>;
-//     type Mutex<T: Send> = Mutex<T>;
+#[async_trait::async_trait]
+impl RpcClientInterface for RpcWasmClient {
+    type Client = RpcWasmClient;
+    type Sender = UnboundedSender<Vec<u8>>;
+    type Mutex<T: Send> = Mutex<T>;
 
-//     fn dispatcher(&self) -> Arc<Self::Mutex<Self::Dispatcher>> {
-//         self.dispatcher.clone()
-//     }
+    async fn call_rpc<T, F>(
+        &self,
+        method_id: u64,
+        payload: Vec<u8>,
+        response_handler: F,
+        is_finalized: bool,
+    ) -> Result<
+        (
+            RpcStreamEncoder<Box<dyn for<'a> FnMut(&'a [u8]) + Send + 'static>>,
+            T,
+        ),
+        io::Error,
+    >
+    where
+        T: Send + 'static,
+        F: Fn(Vec<u8>) -> T + Send + Sync + 'static,
+    {
+        let result = self
+            .call_rpc(method_id, payload, response_handler, is_finalized)
+            .await;
 
-//     fn sender(&self) -> Self::Sender {
-//         self.tx.clone()
-//     }
-
-//     /// Delegates the call to the actual `RpcClient::call_rpc` implementation.
-//     async fn call_rpc<T, F>(
-//         rpc_client: &RpcWasmClient,
-//         method_id: u64,
-//         payload: Vec<u8>,
-//         response_handler: F,
-//         is_finalized: bool,
-//     ) -> Result<T, io::Error>
-//     where
-//         T: Send + 'static,
-//         F: Fn(Vec<u8>) -> T + Send + Sync + 'static,
-//     {
-//         let (_dispatcher, result) = rpc_client
-//             .call_rpc(method_id, payload, response_handler, is_finalized)
-//             .await;
-
-//         Ok(result)
-//     }
-// }
+        Ok(result)
+    }
+}
 
 // TODO: "Original" implementation
 // pub async fn call_prebuffered_rpc(
