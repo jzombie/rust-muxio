@@ -1,8 +1,8 @@
 // mod client_dispatcher;
 // pub use client_dispatcher::*;
 
-// mod socket_transport;
-// pub use socket_transport::*;
+mod socket_transport;
+pub use socket_transport::*;
 
 mod rpc_wasm_client;
 pub use rpc_wasm_client::*;
@@ -15,7 +15,7 @@ use web_sys::console;
 
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender, unbounded as unbounded_channel};
 
-use muxio_service_traits::RpcClientInterface;
+use muxio_service_traits::{RpcClientInterface, RpcRequestPrebuffered, RpcResponsePrebuffered};
 
 use std::io;
 
@@ -160,3 +160,40 @@ impl RpcClientInterface for RpcWasmClient {
 //         }
 //     })
 // }
+
+// TODO: Dedupe
+pub async fn call_prebuffered_rpc<T, C>(
+    rpc_client: &C,
+    input: T::Input,
+) -> Result<T::Output, io::Error>
+where
+    T: RpcRequestPrebuffered + RpcResponsePrebuffered + Send + Sync + 'static,
+    T::Output: Send + 'static,
+    C: RpcClientInterface + Send + Sync,
+    C::Dispatcher: Send,
+{
+    let dispatcher = rpc_client.dispatcher();
+    let tx = rpc_client.sender();
+
+    let transport_result = C::call_rpc(
+        dispatcher,
+        tx,
+        <T as RpcRequestPrebuffered>::METHOD_ID,
+        T::encode_request(input),
+        T::decode_response,
+        true,
+    )
+    .await?;
+
+    // Error propagation is handled in two steps using two named variables:
+    //
+    // 1. `transport_result`: Result<Result<T::Output, io::Error>, io::Error>
+    //    - This comes from the transport layer (e.g., socket communication).
+    //    - The outer Result represents transport-level errors (e.g., channel closed).
+    //
+    // 2. `rpc_result`: T::Output
+    //    - This unwraps the inner Result from `transport_result`.
+    //    - If the remote RPC logic failed, this propagates that application-level error.
+    let rpc_result = transport_result?;
+    Ok(rpc_result)
+}

@@ -1,18 +1,47 @@
+use crate::socket_transport::muxio_emit_socket_frame_bytes;
 use futures::SinkExt;
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender, unbounded as unbounded_channel};
 use futures::channel::oneshot;
 use futures::stream::StreamExt;
+use js_sys::Uint8Array;
 use muxio::rpc::{RpcDispatcher, RpcRequest, rpc_internals::RpcStreamEvent};
 use std::sync::{Arc, Mutex};
+use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::console;
+
+thread_local! {
+    static MUXIO_CLIENT_TX_REF: std::cell::RefCell<Option<UnboundedSender<Vec<u8>>>> =
+        std::cell::RefCell::new(None);
+}
+
+// TODO: Refactor accordingly
+#[wasm_bindgen]
+pub fn muxio_receive_socket_frame_uint8(inbound_data: Uint8Array) -> Result<(), JsValue> {
+    let inbound_bytes = inbound_data.to_vec();
+
+    // Forward to client channel
+    MUXIO_CLIENT_TX_REF.with(|cell| {
+        if let Some(tx) = cell.borrow().as_ref() {
+            let _ = tx.unbounded_send(inbound_bytes);
+        } else {
+            console::error_1(&"Client TX not initialized".into());
+        }
+    });
+
+    Ok(())
+}
 
 // TODO: Refactor accordingly
 fn start_recv_loop(mut rx: UnboundedReceiver<Vec<u8>>) {
     spawn_local(async move {
-        while let Some(msg) = rx.next().await {
-            let s = format!("Received: {:?}", msg);
-            console::log_1(&s.into());
+        while let Some(bytes) = rx.next().await {
+            muxio_emit_socket_frame_bytes(bytes.as_slice());
+
+            // TODO: Send to Rust WASM
+
+            // let s = format!("Received: {:?}", msg);
+            // console::log_1(&s.into());
         }
     });
 }
@@ -30,6 +59,12 @@ impl RpcWasmClient {
         let (tx, rx) = unbounded_channel::<Vec<u8>>();
 
         start_recv_loop(rx);
+
+        // TODO: Handle accordingly
+        // Store tx in TLS
+        MUXIO_CLIENT_TX_REF.with(|cell| {
+            *cell.borrow_mut() = Some(tx.clone());
+        });
 
         Self { dispatcher, tx }
     }

@@ -1,3 +1,4 @@
+use super::RpcClientInterface;
 use std::io;
 
 // These are optional helper traits that define a convention for encoding and
@@ -12,6 +13,21 @@ use std::io;
 // request or response body, making them unsuitable for streaming scenarios.
 // In cases requiring incremental transmission, alternative traits or interfaces
 // should be used instead.
+
+/// Trait for types that represent callable prebuffered RPC methods.
+///
+/// This trait forms the final layer of abstraction, allowing downstream
+/// users to write `T::call(&client, input)` without dealing with traits
+/// or transport logic explicitly.
+#[async_trait::async_trait]
+pub trait RpcCallPrebuffered:
+    RpcRequestPrebuffered + RpcResponsePrebuffered + Sized + Send + Sync
+{
+    async fn call<C: RpcClientInterface + Send + Sync>(
+        rpc_client: &C,
+        input: Self::Input,
+    ) -> Result<Self::Output, io::Error>;
+}
 
 pub trait RpcRequestPrebuffered {
     /// A unique identifier for the RPC method.
