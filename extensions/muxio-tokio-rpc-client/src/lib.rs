@@ -35,11 +35,11 @@ impl RpcClientInterface for RpcClient {
         T: Send + 'static,
         F: Fn(Vec<u8>) -> T + Send + Sync + 'static,
     {
-        let result = self
+        let transport_result = self
             .call_rpc(method_id, payload, response_handler, is_finalized)
             .await;
 
-        Ok(result)
+        Ok(transport_result)
     }
 }
 
