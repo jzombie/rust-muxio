@@ -13,26 +13,23 @@ use web_sys::console;
 pub struct RpcWasmClient {
     pub dispatcher: Arc<std::sync::Mutex<RpcDispatcher<'static>>>,
     pub emit_callback: Arc<dyn Fn(Vec<u8>) + Send + Sync>,
-    pub receive_callback: Arc<dyn Fn(Vec<u8>) + Send + Sync>,
 }
 
 impl RpcWasmClient {
-    pub fn new(
-        emit_callback: impl Fn(Vec<u8>) + Send + Sync + 'static,
-        receive_callback: impl Fn(Vec<u8>) + Send + Sync + 'static,
-    ) -> RpcWasmClient {
+    pub fn new(emit_callback: impl Fn(Vec<u8>) + Send + Sync + 'static) -> RpcWasmClient {
         let dispatcher = Arc::new(std::sync::Mutex::new(RpcDispatcher::new()));
 
         RpcWasmClient {
             dispatcher,
             emit_callback: Arc::new(emit_callback),
-            receive_callback: Arc::new(receive_callback),
         }
     }
 
     pub fn receive_inbound(&self, bytes: Vec<u8>) {
         web_sys::console::log_1(&"receive...".into());
-        (self.receive_callback)(bytes);
+        if let Err(e) = self.dispatcher.lock().unwrap().receive_bytes(&bytes) {
+            web_sys::console::error_1(&format!("Dispatcher error: {:?}", e).into());
+        }
     }
 
     pub async fn call_rpc<T, F>(
@@ -96,11 +93,4 @@ impl RpcWasmClient {
 
         (rpc_stream_encoder, result)
     }
-}
-
-#[wasm_bindgen]
-pub fn muxio_receive_socket_frame_uint8(inbound_data: Uint8Array) -> Result<(), JsValue> {
-    console::log_1(&"muxio_receive_socket_frame_uint8 called".into());
-    // JS must call `.receive_inbound(...)` on the actual client instance.
-    Ok(())
 }
