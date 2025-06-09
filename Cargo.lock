@@ -819,9 +819,11 @@ dependencies = [
 name = "muxio-wasm-rpc-client"
 version = "0.1.0-alpha"
 dependencies = [
+ "async-trait",
  "futures",
  "js-sys",
  "muxio",
+ "muxio-service-traits",
  "wasm-bindgen",
  "web-sys",
 ]

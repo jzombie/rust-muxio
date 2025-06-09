@@ -8,6 +8,9 @@ use tokio::sync::Mutex;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio_tungstenite::tungstenite::protocol::Message as WsMessage;
 
+// TODO: Use feature flag for tokio vs. non-tokio here?
+
+// TODO: Move into `RpcClient`
 #[async_trait::async_trait]
 impl RpcClientInterface for RpcClient {
     type Dispatcher = RpcDispatcher<'static>;
