@@ -1,6 +1,6 @@
 // TODO: Remove
-mod old_client_dispatcher;
-pub use old_client_dispatcher::*;
+mod static_client;
+pub use static_client::*;
 
 // TODO: Remove
 mod old_call_muxio;

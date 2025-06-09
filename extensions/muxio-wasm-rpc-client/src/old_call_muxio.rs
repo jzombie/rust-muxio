@@ -1,11 +1,11 @@
-use super::MUXIO_CLIENT_DISPATCHER_REF;
+use super::MUXIO_STATIC_RPC_CLIENT_REF;
 use super::muxio_emit_socket_frame_bytes;
 use futures::channel::oneshot;
 use muxio::rpc::{RpcRequest, RpcResponse, RpcResultStatus, rpc_internals::RpcStreamEvent};
 use std::sync::{Arc, Mutex};
 use web_sys::console;
 
-// TODO: Remove
+// TODO: Remove (use `call_rpc` instead)
 // TODO: Enable transport to be defined as a parameter
 pub async fn call_muxio(
     method_id: u64,
@@ -22,9 +22,9 @@ pub async fn call_muxio(
     let result_status_cloned = Arc::clone(&result_status);
     let result_bytes_cloned = Arc::clone(&result_bytes);
 
-    MUXIO_CLIENT_DISPATCHER_REF.with(|cell| {
-        if let Some(dispatcher) = cell.borrow_mut().as_mut() {
-            let _ = dispatcher.lock().unwrap().call(
+    MUXIO_STATIC_RPC_CLIENT_REF.with(|cell| {
+        if let Some(rpc_wasm_client) = cell.borrow_mut().as_mut() {
+            let _ = rpc_wasm_client.dispatcher.lock().unwrap().call(
                 RpcRequest {
                     method_id,
                     param_bytes,
