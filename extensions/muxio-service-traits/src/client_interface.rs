@@ -1,6 +1,5 @@
 use muxio::rpc::rpc_internals::RpcStreamEncoder;
 use std::io;
-use std::sync::Arc;
 
 #[async_trait::async_trait]
 pub trait RpcClientInterface {
