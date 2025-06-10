@@ -1,6 +1,6 @@
 TODO: Mention something about "layered transport kit"
 
-TODO: Standardize reading and writing to: `read_bytes` and `write_bytes`
+TODO: Ensure reading and writing is standardized to: `read_bytes` and `write_bytes`
 
 # Core Design Goals
 
