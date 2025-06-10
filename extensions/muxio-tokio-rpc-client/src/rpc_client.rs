@@ -122,7 +122,7 @@ impl RpcClientInterface for RpcClient {
                     pre_buffered_payload_bytes: None,
                     is_finalized,
                 },
-                1024,
+                1024, // TODO: Don't hardcode
                 send_fn,
                 Some(recv_fn),
                 true,
