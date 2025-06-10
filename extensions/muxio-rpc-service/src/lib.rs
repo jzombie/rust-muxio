@@ -5,6 +5,7 @@ pub use client_interface::*;
 use std::io;
 pub mod constants;
 pub use constants::*;
+use xxhash_rust::const_xxh3::xxh3_64 as const_xxh3_64;
 
 /// Performs a one-shot (pre-buffered) RPC call using a method that conforms to
 /// the `RpcMethodPrebuffered` interface.
@@ -61,4 +62,17 @@ where
     {
         call_prebuffered_rpc::<T, C>(rpc_client, input).await
     }
+}
+
+// inside your crate
+pub const fn method_id_hash(name: &str) -> u64 {
+    const_xxh3_64(name.as_bytes())
+}
+
+#[macro_export]
+macro_rules! rpc_method_id {
+    ($name:literal) => {{
+        const ID: u64 = $crate::method_id_hash($name);
+        ID
+    }};
 }

@@ -1,5 +1,5 @@
 use bitcode::{Decode, Encode};
-use muxio_rpc_service::RpcMethodPrebuffered;
+use muxio_rpc_service::{RpcMethodPrebuffered, rpc_method_id};
 use std::io;
 
 #[derive(Encode, Decode, PartialEq, Debug)]
@@ -15,7 +15,7 @@ struct MultResponseParams {
 pub struct Mult;
 
 impl RpcMethodPrebuffered for Mult {
-    const METHOD_ID: u64 = 0x02;
+    const METHOD_ID: u64 = rpc_method_id!("mult");
 
     type Input = Vec<f64>;
     type Output = f64;

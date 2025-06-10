@@ -1,5 +1,5 @@
 use bitcode::{Decode, Encode};
-use muxio_rpc_service::RpcMethodPrebuffered;
+use muxio_rpc_service::{RpcMethodPrebuffered, rpc_method_id};
 use std::io;
 
 #[derive(Encode, Decode, PartialEq, Debug)]
@@ -15,7 +15,7 @@ struct AddResponseParams {
 pub struct Add;
 
 impl RpcMethodPrebuffered for Add {
-    const METHOD_ID: u64 = 0x01;
+    const METHOD_ID: u64 = rpc_method_id!("add");
 
     type Input = Vec<f64>;
     type Output = f64;
