@@ -17,10 +17,10 @@ fn bench_roundtrip(c: &mut Criterion) {
 
         let server = RpcServer::new();
         server
-            .register(Add::METHOD_ID, |bytes| {
-                let req = Add::decode_request(bytes).unwrap();
+            .register(Add::METHOD_ID, |bytes| async move {
+                let req = Add::decode_request(bytes)?;
                 let result = req.iter().sum();
-                Add::encode_response(result)
+                Ok(Add::encode_response(result))
             })
             .await;
 
