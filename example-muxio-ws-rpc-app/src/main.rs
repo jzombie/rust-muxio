@@ -19,13 +19,13 @@ async fn main() {
         // Note: If not using `join!`, each `register` call must be awaited.
         let _ = join!(
             server.register_prebuffered(Add::METHOD_ID, |bytes| async move {
-                let req = Add::decode_request(bytes)?;
+                let req = Add::decode_request(&bytes)?;
                 let result = req.iter().sum();
                 let resp = Add::encode_response(result)?;
                 Ok(resp)
             }),
             server.register_prebuffered(Mult::METHOD_ID, |bytes| async move {
-                let req = Mult::decode_request(bytes)?;
+                let req = Mult::decode_request(&bytes)?;
                 let result = req.iter().product();
                 let resp = Mult::encode_response(result)?;
                 Ok(resp)

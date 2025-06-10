@@ -24,7 +24,7 @@ impl RpcMethodPrebuffered for Mult {
         Ok(bitcode::encode(&MultRequestParams { numbers }))
     }
 
-    fn decode_request(bytes: Vec<u8>) -> Result<Self::Input, io::Error> {
+    fn decode_request(bytes: &[u8]) -> Result<Self::Input, io::Error> {
         let req_params: MultRequestParams = bitcode::decode::<MultRequestParams>(&bytes)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
@@ -35,7 +35,7 @@ impl RpcMethodPrebuffered for Mult {
         Ok(bitcode::encode(&MultResponseParams { result }))
     }
 
-    fn decode_response(bytes: Vec<u8>) -> Result<Self::Output, io::Error> {
+    fn decode_response(bytes: &[u8]) -> Result<Self::Output, io::Error> {
         let resp_params = bitcode::decode::<MultResponseParams>(&bytes)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 

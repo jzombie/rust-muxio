@@ -72,13 +72,13 @@ impl RpcClientInterface for RpcClient {
     async fn call_rpc<T, F>(
         &self,
         method_id: u64,
-        payload: Vec<u8>,
+        payload: &[u8],
         response_handler: F,
         is_finalized: bool,
     ) -> Result<(RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>, T), std::io::Error>
     where
         T: Send + 'static,
-        F: Fn(Vec<u8>) -> T + Send + Sync + 'static,
+        F: Fn(&[u8]) -> T + Send + Sync + 'static,
     {
         let (done_tx, done_rx) = oneshot::channel::<T>();
         let done_tx = Arc::new(Mutex::new(Some(done_tx)));
@@ -92,7 +92,7 @@ impl RpcClientInterface for RpcClient {
 
         let recv_fn: Box<dyn FnMut(RpcStreamEvent) + Send + 'static> = Box::new(move |evt| {
             if let RpcStreamEvent::PayloadChunk { bytes, .. } = evt {
-                let result = response_handler(bytes);
+                let result = response_handler(&bytes);
                 let done_tx_clone2 = done_tx_clone.clone();
                 tokio::spawn(async move {
                     let mut tx_lock = done_tx_clone2.lock().await;
@@ -111,7 +111,7 @@ impl RpcClientInterface for RpcClient {
             .call(
                 RpcRequest {
                     method_id,
-                    param_bytes: Some(payload),
+                    param_bytes: Some(payload.to_vec()),
                     prebuffered_payload_bytes: None,
                     is_finalized,
                 },

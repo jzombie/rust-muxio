@@ -44,7 +44,7 @@ pub trait RpcMethodPrebuffered {
     ///
     /// # Arguments
     /// * `bytes` - Serialized request payload.
-    fn decode_request(bytes: Vec<u8>) -> Result<Self::Input, io::Error>;
+    fn decode_request(bytes: &[u8]) -> Result<Self::Input, io::Error>;
 
     /// Encodes the response value into a byte array.
     fn encode_response(output: Self::Output) -> Result<Vec<u8>, io::Error>;
@@ -53,5 +53,5 @@ pub trait RpcMethodPrebuffered {
     ///
     /// # Arguments
     /// * `bytes` - Serialized response payload.
-    fn decode_response(bytes: Vec<u8>) -> Result<Self::Output, io::Error>;
+    fn decode_response(bytes: &[u8]) -> Result<Self::Output, io::Error>;
 }

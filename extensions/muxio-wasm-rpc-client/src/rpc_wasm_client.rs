@@ -38,13 +38,13 @@ impl RpcClientInterface for RpcWasmClient {
     async fn call_rpc<T, F>(
         &self,
         method_id: u64,
-        payload: Vec<u8>,
+        payload: &[u8],
         response_handler: F,
         is_finalized: bool,
     ) -> Result<(RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>, T), std::io::Error>
     where
         T: Send + 'static,
-        F: Fn(Vec<u8>) -> T + Send + Sync + 'static,
+        F: Fn(&[u8]) -> T + Send + Sync + 'static,
     {
         web_sys::console::log_1(&"Call RPC...".into());
 
@@ -60,7 +60,7 @@ impl RpcClientInterface for RpcWasmClient {
 
         let recv_fn: Box<dyn FnMut(RpcStreamEvent) + Send + 'static> = Box::new(move |evt| {
             if let RpcStreamEvent::PayloadChunk { bytes, .. } = evt {
-                let result = response_handler(bytes);
+                let result = response_handler(&bytes);
                 let done_tx_clone2 = done_tx_clone.clone();
 
                 spawn_local(async move {
@@ -78,7 +78,7 @@ impl RpcClientInterface for RpcWasmClient {
             .call(
                 RpcRequest {
                     method_id,
-                    param_bytes: Some(payload),
+                    param_bytes: Some(payload.to_vec()),
                     prebuffered_payload_bytes: None,
                     is_finalized,
                 },

@@ -17,11 +17,11 @@ pub trait RpcClientInterface {
     async fn call_rpc<T, F>(
         &self,
         method_id: u64,
-        payload: Vec<u8>,
+        payload: &[u8],
         response_handler: F,
         is_finalized: bool,
     ) -> Result<(RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>, T), std::io::Error>
     where
         T: Send + 'static,
-        F: Fn(Vec<u8>) -> T + Send + Sync + 'static;
+        F: Fn(&[u8]) -> T + Send + Sync + 'static;
 }
