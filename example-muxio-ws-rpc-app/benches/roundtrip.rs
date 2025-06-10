@@ -17,12 +17,13 @@ fn bench_roundtrip(c: &mut Criterion) {
 
         let server = RpcServer::new();
         server
-            .register(Add::METHOD_ID, |bytes| async move {
+            .register_prebuffered(Add::METHOD_ID, |bytes| async move {
                 let req = Add::decode_request(bytes)?;
                 let result = req.iter().sum();
                 Ok(Add::encode_response(result))
             })
-            .await;
+            .await
+            .ok();
 
         let server_task = tokio::spawn({
             let server = server;

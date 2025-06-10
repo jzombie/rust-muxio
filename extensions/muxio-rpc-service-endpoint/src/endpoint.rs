@@ -28,8 +28,7 @@ impl RpcServiceEndpoint {
         }
     }
 
-    // TODO: Rename to `register_prebuffered`
-    pub async fn register<F, Fut>(
+    pub async fn register_prebuffered<F, Fut>(
         &self,
         method_id: u64,
         handler: F,

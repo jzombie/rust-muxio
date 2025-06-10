@@ -22,7 +22,6 @@ use tokio::{
 
 // TODO: Move to `muxio-rpc-service-endpoint`
 use std::future::Future;
-use std::pin::Pin;
 
 pub struct RpcServer {
     endpoint: RpcServiceEndpoint,
@@ -70,29 +69,7 @@ impl RpcServer {
         Ok(addr)
     }
 
-    // TODO: Enable inner method to return result type
-    // TODO: Add ability to register streaming handler
-    /// Registers a new RPC method handler.
-    // pub async fn register<F, Fut>(&self, method_id: u64, handler: F)
-    // where
-    //     F: Fn(Vec<u8>) -> Fut + Send + Sync + 'static,
-    //     Fut: Future<Output = Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>>>
-    //         + Send
-    //         + 'static,
-    // {
-    //     let wrapped = move |bytes: Vec<u8>| {
-    //         Box::pin(handler(bytes)) as Pin<Box<dyn Future<Output = _> + Send>>
-    //     };
-
-    //     self.endpoint
-    //         .prebuffered_handlers
-    //         .lock()
-    //         .await
-    //         .insert(method_id, Box::new(wrapped));
-    // }
-
-    // TODO: Rename to `register_prebuffered`
-    pub async fn register<F, Fut>(
+    pub async fn register_prebuffered<F, Fut>(
         &self,
         method_id: u64,
         handler: F,
@@ -103,7 +80,7 @@ impl RpcServer {
             + Send
             + 'static,
     {
-        self.endpoint.register(method_id, handler).await
+        self.endpoint.register_prebuffered(method_id, handler).await
     }
 
     /// WebSocket route handler that sets up the WebSocket connection.
