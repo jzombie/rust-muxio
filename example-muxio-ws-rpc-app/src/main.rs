@@ -21,12 +21,14 @@ async fn main() {
             server.register_prebuffered(Add::METHOD_ID, |bytes| async move {
                 let req = Add::decode_request(bytes)?;
                 let result = req.iter().sum();
-                Ok(Add::encode_response(result))
+                let resp = Add::encode_response(result)?;
+                Ok(resp)
             }),
             server.register_prebuffered(Mult::METHOD_ID, |bytes| async move {
                 let req = Mult::decode_request(bytes)?;
                 let result = req.iter().product();
-                Ok(Mult::encode_response(result))
+                let resp = Mult::encode_response(result)?;
+                Ok(resp)
             })
         );
 

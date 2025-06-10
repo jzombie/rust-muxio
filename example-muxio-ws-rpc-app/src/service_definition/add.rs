@@ -20,8 +20,8 @@ impl RpcMethodPrebuffered for Add {
     type Input = Vec<f64>;
     type Output = f64;
 
-    fn encode_request(numbers: Self::Input) -> Vec<u8> {
-        bitcode::encode(&AddRequestParams { numbers })
+    fn encode_request(numbers: Self::Input) -> Result<Vec<u8>, io::Error> {
+        Ok(bitcode::encode(&AddRequestParams { numbers }))
     }
 
     fn decode_request(bytes: Vec<u8>) -> Result<Self::Input, io::Error> {
@@ -31,8 +31,8 @@ impl RpcMethodPrebuffered for Add {
         Ok(req_params.numbers)
     }
 
-    fn encode_response(result: Self::Output) -> Vec<u8> {
-        bitcode::encode(&AddResponseParams { result })
+    fn encode_response(result: Self::Output) -> Result<Vec<u8>, io::Error> {
+        Ok(bitcode::encode(&AddResponseParams { result }))
     }
 
     fn decode_response(bytes: Vec<u8>) -> Result<Self::Output, io::Error> {

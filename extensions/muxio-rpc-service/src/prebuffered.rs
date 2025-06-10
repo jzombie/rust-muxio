@@ -38,7 +38,7 @@ pub trait RpcMethodPrebuffered {
     type Output;
 
     /// Encodes the request into a byte array.
-    fn encode_request(input: Self::Input) -> Vec<u8>;
+    fn encode_request(input: Self::Input) -> Result<Vec<u8>, io::Error>;
 
     /// Decodes raw request bytes into a typed request struct.
     ///
@@ -47,7 +47,7 @@ pub trait RpcMethodPrebuffered {
     fn decode_request(bytes: Vec<u8>) -> Result<Self::Input, io::Error>;
 
     /// Encodes the response value into a byte array.
-    fn encode_response(output: Self::Output) -> Vec<u8>;
+    fn encode_response(output: Self::Output) -> Result<Vec<u8>, io::Error>;
 
     /// Decodes raw response bytes into a typed response struct or value.
     ///

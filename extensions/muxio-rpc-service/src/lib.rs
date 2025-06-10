@@ -33,7 +33,7 @@ where
     let (_, rpc_result) = rpc_client
         .call_rpc(
             T::METHOD_ID,
-            T::encode_request(input),
+            T::encode_request(input)?,
             T::decode_response,
             true,
         )
