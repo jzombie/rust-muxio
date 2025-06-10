@@ -91,7 +91,6 @@ impl RpcClientInterface for RpcClient {
         let done_tx = Arc::new(Mutex::new(Some(done_tx)));
         let done_tx_clone = done_tx.clone();
 
-        let dispatcher = self.dispatcher.clone();
         let tx = self.tx.clone();
 
         let send_fn: Box<dyn for<'a> FnMut(&'a [u8]) + Send + 'static> = Box::new(move |chunk| {
@@ -111,7 +110,9 @@ impl RpcClientInterface for RpcClient {
             }
         });
 
-        let rpc_stream_encoder = dispatcher
+        let rpc_stream_encoder = self
+            .dispatcher
+            .clone()
             .lock()
             .await
             .call(
@@ -133,31 +134,3 @@ impl RpcClientInterface for RpcClient {
         Ok((rpc_stream_encoder, result))
     }
 }
-
-// TODO: Can this be de-duped instead of wrapped?
-// #[async_trait::async_trait]
-// impl RpcClientInterface for RpcClient {
-//     async fn call_rpc<T, F>(
-//         &self,
-//         method_id: u64,
-//         payload: Vec<u8>,
-//         response_handler: F,
-//         is_finalized: bool,
-//     ) -> Result<
-//         (
-//             RpcStreamEncoder<Box<dyn for<'a> FnMut(&'a [u8]) + Send + 'static>>,
-//             T,
-//         ),
-//         io::Error,
-//     >
-//     where
-//         T: Send + 'static,
-//         F: Fn(Vec<u8>) -> T + Send + Sync + 'static,
-//     {
-//         let transport_result = self
-//             .call_rpc(method_id, payload, response_handler, is_finalized)
-//             .await;
-
-//         Ok(transport_result)
-//     }
-// }
