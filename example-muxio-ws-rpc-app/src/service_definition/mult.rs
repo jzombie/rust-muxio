@@ -1,5 +1,7 @@
 use bitcode::{Decode, Encode};
-use muxio_rpc_service::RpcMethodPrebuffered;
+use muxio_rpc_service::{
+    RpcCallPrebuffered, RpcClientInterface, RpcMethodPrebuffered, call_prebuffered_rpc,
+};
 use std::io;
 
 #[derive(Encode, Decode, PartialEq, Debug)]
@@ -40,5 +42,15 @@ impl RpcMethodPrebuffered for Mult {
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
         Ok(raw.result)
+    }
+}
+
+#[async_trait::async_trait]
+impl RpcCallPrebuffered for Mult {
+    async fn call<C: RpcClientInterface + Send + Sync>(
+        rpc_client: &C,
+        input: Self::Input,
+    ) -> Result<Self::Output, io::Error> {
+        call_prebuffered_rpc::<Mult, C>(rpc_client, input).await
     }
 }
