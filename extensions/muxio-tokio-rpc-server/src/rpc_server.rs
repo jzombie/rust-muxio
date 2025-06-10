@@ -121,7 +121,7 @@ impl RpcServer {
 
         while let Some(Some(Ok(Message::Binary(bytes)))) = recv_rx.recv().await {
             // TODO: Migrate the following to `muxio-rpc-endpoint`
-            let request_ids = match dispatcher.receive_bytes(&bytes) {
+            let request_ids = match dispatcher.read_bytes(&bytes) {
                 Ok(ids) => ids,
                 Err(e) => {
                     eprintln!("Failed to decode incoming bytes: {e:?}");

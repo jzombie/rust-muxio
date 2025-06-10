@@ -40,7 +40,7 @@ pub fn muxio_receive_socket_frame_uint8(inbound_data: Uint8Array) -> Result<(), 
                 .dispatcher
                 .lock()
                 .unwrap()
-                .receive_bytes(&inbound_bytes)
+                .read_bytes(&inbound_bytes)
                 .unwrap();
         } else {
             console::error_1(&"Dispatcher not initialized".into());

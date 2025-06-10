@@ -9,10 +9,10 @@
 // }
 
 // impl RpcEndpoint {
-//     pub fn receive_bytes(&self, bytes: &[u8]) {
+//     pub fn read_bytes(&self, bytes: &[u8]) {
 //         // 1. Handle one-shot and fully-buffered calls (TODO: Extract to a separate handler)
 //         {
-//             let request_ids = match self.dispatcher.receive_bytes(&bytes) {
+//             let request_ids = match self.dispatcher.read_bytes(&bytes) {
 //                 Ok(ids) => ids,
 //                 Err(e) => {
 //                     eprintln!("Failed to decode incoming bytes: {e:?}");

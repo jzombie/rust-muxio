@@ -60,7 +60,7 @@ where
 
     /// Accepts some bytes, returns zero or more encoded frames (ready to send).
     /// Buffers any leftover partial chunk internally.
-    pub fn push_bytes(&mut self, data: &[u8]) -> Result<usize, FrameEncodeError> {
+    pub fn write_bytes(&mut self, data: &[u8]) -> Result<usize, FrameEncodeError> {
         if self.is_canceled {
             return Err(FrameEncodeError::WriteAfterCancel);
         } else if self.is_ended {

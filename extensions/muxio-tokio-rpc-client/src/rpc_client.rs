@@ -59,7 +59,7 @@ impl RpcClient {
         let dispatcher_handle = dispatcher.clone();
         tokio::spawn(async move {
             while let Some(Some(Ok(WsMessage::Binary(bytes)))) = recv_rx.recv().await {
-                dispatcher_handle.lock().await.receive_bytes(&bytes).ok();
+                dispatcher_handle.lock().await.read_bytes(&bytes).ok();
             }
         });
 

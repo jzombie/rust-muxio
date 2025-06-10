@@ -15,7 +15,9 @@ fn cancel_stream_does_not_process_after_cancellation() {
     // Data to encode and decode
     let data = b"some regular data";
 
-    encoder.push_bytes(data).expect("encoder push bytes failed");
+    encoder
+        .write_bytes(data)
+        .expect("encoder push bytes failed");
 
     // Now simulate the canceling of the stream
     let result = encoder.cancel_stream();
@@ -34,14 +36,14 @@ fn cancel_stream_does_not_process_after_cancellation() {
 
     // Now that the stream is canceled, we should not process any further frames.
     // Try to push more data after canceling the stream
-    let result = encoder.push_bytes(b"more data after cancel");
+    let result = encoder.write_bytes(b"more data after cancel");
     assert!(matches!(result, Err(FrameEncodeError::WriteAfterCancel)));
 
     let mut decoder = FrameMuxStreamDecoder::new();
 
     let mut has_stream_termination = false;
 
-    for decode_result in decoder.pull_bytes(&outgoing_bytes) {
+    for decode_result in decoder.read_bytes(&outgoing_bytes) {
         if matches!(
             decode_result.unwrap().decode_error,
             Some(FrameDecodeError::ReadAfterCancel)
@@ -70,12 +72,10 @@ fn rpc_stream_aborts_on_cancel_frame() {
 
     // RefCell for processing received bytes on a simulated server
     let process_received_bytes =
-        RefCell::new(
-            |bytes: &[u8]| match server.receive_bytes(bytes, |_evt| {}) {
-                Ok(()) => {}
-                Err(err) => *decoder_error.borrow_mut() = Some(err),
-            },
-        );
+        RefCell::new(|bytes: &[u8]| match server.read_bytes(bytes, |_evt| {}) {
+            Ok(()) => {}
+            Err(err) => *decoder_error.borrow_mut() = Some(err),
+        });
 
     // Start a new RPC stream
     let mut enc = client
@@ -84,11 +84,11 @@ fn rpc_stream_aborts_on_cancel_frame() {
         })
         .expect("enc instantiation failed");
 
-    enc.push_bytes(b"testing 1 2 3")
+    enc.write_bytes(b"testing 1 2 3")
         .expect("enc push bytes failed");
-    enc.push_bytes(b"testing 4 5 6")
+    enc.write_bytes(b"testing 4 5 6")
         .expect("enc push bytes failed");
-    enc.push_bytes(b"testing 7 8 9")
+    enc.write_bytes(b"testing 7 8 9")
         .expect("enc push bytes failed");
     assert!(decoder_error.borrow().is_none());
 
@@ -100,7 +100,7 @@ fn rpc_stream_aborts_on_cancel_frame() {
         Some(FrameDecodeError::ReadAfterCancel)
     ));
 
-    enc.push_bytes(b"testing 7 8 9")
+    enc.write_bytes(b"testing 7 8 9")
         .expect_err("enc should no longer allow push bytes");
 }
 
@@ -120,12 +120,10 @@ fn rpc_stream_aborts_on_end_frame() {
 
     // RefCell for processing received bytes on a simulated server
     let process_received_bytes =
-        RefCell::new(
-            |bytes: &[u8]| match server.receive_bytes(bytes, |_evt| {}) {
-                Ok(()) => {}
-                Err(err) => *decoder_error.borrow_mut() = Some(err),
-            },
-        );
+        RefCell::new(|bytes: &[u8]| match server.read_bytes(bytes, |_evt| {}) {
+            Ok(()) => {}
+            Err(err) => *decoder_error.borrow_mut() = Some(err),
+        });
 
     // Start a new RPC stream
     let mut enc = client
@@ -134,18 +132,18 @@ fn rpc_stream_aborts_on_end_frame() {
         })
         .expect("enc instantiation failed");
 
-    enc.push_bytes(b"testing 1 2 3")
+    enc.write_bytes(b"testing 1 2 3")
         .expect("enc push bytes failed");
-    enc.push_bytes(b"testing 4 5 6")
+    enc.write_bytes(b"testing 4 5 6")
         .expect("enc push bytes failed");
-    enc.push_bytes(b"testing 7 8 9")
+    enc.write_bytes(b"testing 7 8 9")
         .expect("enc push bytes failed");
     assert!(decoder_error.borrow().is_none());
 
     // Send the cancel frame immediately to abort the stream
     enc.end_stream().expect("enc end stream failed");
 
-    enc.push_bytes(b"testing 7 8 9")
+    enc.write_bytes(b"testing 7 8 9")
         .expect_err("enc should no longer allow push bytes");
 
     enc.cancel_stream()
@@ -166,12 +164,12 @@ fn end_stream_auto_flushes_buffer() {
     let data = b"some regular data";
 
     // Push data into encoder, will emit chunks <= 10 bytes each
-    encoder.push_bytes(data).expect("encode data");
+    encoder.write_bytes(data).expect("encode data");
 
     // Finalize the stream
     encoder.end_stream().expect("end stream");
 
-    let push_past_result = encoder.push_bytes(b"additional data that should not be present");
+    let push_past_result = encoder.write_bytes(b"additional data that should not be present");
     assert!(matches!(
         push_past_result,
         Err(FrameEncodeError::WriteAfterEnd)
@@ -179,7 +177,7 @@ fn end_stream_auto_flushes_buffer() {
 
     let mut decoded_frames = vec![];
 
-    for result in decoder.pull_bytes(&outgoing_bytes) {
+    for result in decoder.read_bytes(&outgoing_bytes) {
         let frame = result.expect("frame decoding failed");
         decoded_frames.push(frame);
     }

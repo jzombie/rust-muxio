@@ -83,8 +83,8 @@ impl<'a> RpcRespondableSession<'a> {
         self.catch_all_response_handler = Some(Box::new(handler));
     }
 
-    pub fn receive_bytes(&mut self, bytes: &[u8]) -> Result<(), FrameDecodeError> {
-        self.rpc_session.receive_bytes(bytes, |evt| {
+    pub fn read_bytes(&mut self, bytes: &[u8]) -> Result<(), FrameDecodeError> {
+        self.rpc_session.read_bytes(bytes, |evt| {
             let id = match &evt {
                 RpcStreamEvent::Header { rpc_header_id, .. } => Some(*rpc_header_id),
                 RpcStreamEvent::PayloadChunk { rpc_header_id, .. } => Some(*rpc_header_id),

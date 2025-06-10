@@ -228,7 +228,7 @@ impl<'a> RpcDispatcher<'a> {
 
         // If the RPC request has a buffered payload, send it here
         if let Some(pre_buffered_payload_bytes) = rpc_request.pre_buffered_payload_bytes {
-            encoder.push_bytes(&pre_buffered_payload_bytes)?;
+            encoder.write_bytes(&pre_buffered_payload_bytes)?;
         }
 
         // If the RPC request is pre-finalized, close the stream
@@ -278,7 +278,7 @@ impl<'a> RpcDispatcher<'a> {
         )?;
 
         if let Some(pre_buffered_payload_bytes) = rpc_response.pre_buffered_payload_bytes {
-            response_encoder.push_bytes(&pre_buffered_payload_bytes)?;
+            response_encoder.write_bytes(&pre_buffered_payload_bytes)?;
         }
 
         if rpc_response.is_finalized {
@@ -312,9 +312,9 @@ impl<'a> RpcDispatcher<'a> {
     ///
     /// - Returns `FrameDecodeError` if the incoming frame is invalid or if
     ///   the `rpc_request_queue` mutex is poisoned.
-    pub fn receive_bytes(&mut self, bytes: &[u8]) -> Result<Vec<u32>, FrameDecodeError> {
+    pub fn read_bytes(&mut self, bytes: &[u8]) -> Result<Vec<u32>, FrameDecodeError> {
         // Process the incoming bytes
-        self.rpc_respondable_session.receive_bytes(bytes)?;
+        self.rpc_respondable_session.read_bytes(bytes)?;
 
         // List of request header IDs which are currently in progress
         let queue = self

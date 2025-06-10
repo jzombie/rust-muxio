@@ -1,5 +1,7 @@
 TODO: Mention something about "layered transport kit"
 
+TODO: Standardize reading and writing to: `read_bytes` and `write_bytes`
+
 # Core Design Goals
 
 - Binary, not JSON — zero assumptions about serialization (CBOR, f32, FlatBuffers, etc.)
