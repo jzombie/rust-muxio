@@ -1,11 +1,11 @@
-use super::MUXIO_CLIENT_DISPATCHER_REF;
+use super::MUXIO_STATIC_RPC_CLIENT_REF;
 use super::muxio_emit_socket_frame_bytes;
 use futures::channel::oneshot;
 use muxio::rpc::{RpcRequest, RpcResponse, RpcResultStatus, rpc_internals::RpcStreamEvent};
 use std::sync::{Arc, Mutex};
 use web_sys::console;
 
-// TODO: Refactor
+// TODO: Remove (use `call_rpc` instead)
 // TODO: Enable transport to be defined as a parameter
 pub async fn call_muxio(
     method_id: u64,
@@ -22,9 +22,9 @@ pub async fn call_muxio(
     let result_status_cloned = Arc::clone(&result_status);
     let result_bytes_cloned = Arc::clone(&result_bytes);
 
-    MUXIO_CLIENT_DISPATCHER_REF.with(|cell| {
-        if let Some(dispatcher) = cell.borrow_mut().as_mut() {
-            let _ = dispatcher.call(
+    MUXIO_STATIC_RPC_CLIENT_REF.with(|cell| {
+        if let Some(rpc_wasm_client) = cell.borrow_mut().as_mut() {
+            let _ = rpc_wasm_client.dispatcher.lock().unwrap().call(
                 RpcRequest {
                     method_id,
                     param_bytes,
@@ -83,25 +83,3 @@ pub async fn call_muxio(
         code => Err(format!("RPC error status: {}", code)),
     }
 }
-
-// TODO: Uncomment if ever wanting to call Muxio directly from JS
-// #[wasm_bindgen]
-// pub fn call_muxio_js(method_id: u64, param_bytes: &[u8], payload_bytes: &[u8]) -> Promise {
-//     let param_vec = match param_bytes.len() {
-//         0 => None,
-//         _ => Some(param_bytes.to_vec()),
-//     };
-
-//     let payload_vec = match payload_bytes.len() {
-//         0 => None,
-//         _ => Some(payload_bytes.to_vec()),
-
-//     };
-
-//     future_to_promise(async move {
-//         match call_muxio_inner(method_id, param_vec, payload_vec).await {
-//             Ok(bytes) => Ok(js_sys::Uint8Array::from(bytes.as_slice()).into()),
-//             Err(msg) => Err(JsValue::from_str(&msg)),
-//         }
-//     })
-// }

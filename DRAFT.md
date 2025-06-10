@@ -16,6 +16,8 @@ TODO: Mention something about "layered transport kit"
 
 - Metrics-capable — latency, jitter, throughput if needed
 
+- Client/Server agnostic (client should be able to have the same functionality a server has)
+
 ## Test Coverage 
 
 ```sh

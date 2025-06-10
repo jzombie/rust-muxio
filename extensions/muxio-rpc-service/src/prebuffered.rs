@@ -1,3 +1,4 @@
+use super::RpcClientInterface;
 use std::io;
 
 // These are optional helper traits that define a convention for encoding and
@@ -13,12 +14,28 @@ use std::io;
 // In cases requiring incremental transmission, alternative traits or interfaces
 // should be used instead.
 
-pub trait RpcRequestPrebuffered {
+/// Trait for types that represent callable prebuffered RPC methods.
+///
+/// This trait forms the final layer of abstraction, allowing downstream
+/// users to write `T::call(&client, input)` without dealing with traits
+/// or transport logic explicitly.
+#[async_trait::async_trait]
+pub trait RpcCallPrebuffered: RpcMethodPrebuffered + Sized + Send + Sync {
+    async fn call<C: RpcClientInterface + Send + Sync>(
+        rpc_client: &C,
+        input: Self::Input,
+    ) -> Result<Self::Output, io::Error>;
+}
+
+pub trait RpcMethodPrebuffered {
     /// A unique identifier for the RPC method.
     const METHOD_ID: u64;
 
     /// The high-level input type expected by the request encoder (e.g., `Vec<f64>`).
     type Input;
+
+    /// The high-level output type returned from the response encoder (e.g., `f64`).
+    type Output;
 
     /// Encodes the request into a byte array.
     fn encode_request(input: Self::Input) -> Vec<u8>;
@@ -28,14 +45,6 @@ pub trait RpcRequestPrebuffered {
     /// # Arguments
     /// * `bytes` - Serialized request payload.
     fn decode_request(bytes: Vec<u8>) -> Result<Self::Input, io::Error>;
-}
-
-pub trait RpcResponsePrebuffered {
-    /// A unique identifier for the RPC method.
-    const METHOD_ID: u64;
-
-    /// The high-level output type returned from the response encoder (e.g., `f64`).
-    type Output;
 
     /// Encodes the response value into a byte array.
     fn encode_response(output: Self::Output) -> Vec<u8>;

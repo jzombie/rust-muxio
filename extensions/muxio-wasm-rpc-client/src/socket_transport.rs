@@ -2,7 +2,7 @@ use js_sys::Uint8Array;
 use wasm_bindgen::prelude::*;
 use web_sys::console;
 
-use super::MUXIO_CLIENT_DISPATCHER_REF;
+use super::MUXIO_STATIC_RPC_CLIENT_REF;
 
 #[wasm_bindgen]
 extern "C" {
@@ -18,21 +18,30 @@ extern "C" {
 /// Converts the given Rust `&[u8]` into a `Uint8Array` and passes it to
 /// the JavaScript `muxio_emit_socket_frame_uint8` function.
 pub fn muxio_emit_socket_frame_bytes(bytes: &[u8]) {
+    // TODO: Remove
+    web_sys::console::log_1(&"Emit bytes...".into());
+
     muxio_emit_socket_frame_uint8(Uint8Array::from(bytes));
 }
 
-/// Handles an inbound socket frame received from the JavaScript layer.
-///
-/// This function should be called by JS whenever a new binary message is received.
-/// It decodes the incoming `Uint8Array` and passes it to the internal RPC dispatcher.
+// TODO: Refactor accordingly
+// /// Handles an inbound socket frame received from the JavaScript layer.
+// ///
+// /// This function should be called by JS whenever a new binary message is received.
+// /// It decodes the incoming `Uint8Array` and passes it to the internal RPC dispatcher.
 #[wasm_bindgen]
 pub fn muxio_receive_socket_frame_uint8(inbound_data: Uint8Array) -> Result<(), JsValue> {
     // Convert Uint8Array to Vec<u8>
     let inbound_bytes = inbound_data.to_vec();
 
-    MUXIO_CLIENT_DISPATCHER_REF.with(|cell| {
-        if let Some(client_dispatcher) = cell.borrow_mut().as_mut() {
-            client_dispatcher.receive_bytes(&inbound_bytes).unwrap();
+    MUXIO_STATIC_RPC_CLIENT_REF.with(|cell| {
+        if let Some(rpc_wasm_client) = cell.borrow_mut().as_mut() {
+            rpc_wasm_client
+                .dispatcher
+                .lock()
+                .unwrap()
+                .receive_bytes(&inbound_bytes)
+                .unwrap();
         } else {
             console::error_1(&"Dispatcher not initialized".into());
         }

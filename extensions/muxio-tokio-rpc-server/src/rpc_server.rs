@@ -1,3 +1,5 @@
+// TODO: Separate the Muxio server handler from the WebSocket server
+
 use axum::{
     Router,
     extract::ConnectInfo,
@@ -113,6 +115,9 @@ impl RpcServer {
         let mut dispatcher = RpcDispatcher::new();
 
         while let Some(Some(Ok(Message::Binary(bytes)))) = recv_rx.recv().await {
+            // TODO: This aspect can be refactored aways and used on *both*
+            // client and server as there should be no distinction between
+            // the two in Muxio.
             let request_ids = match dispatcher.receive_bytes(&bytes) {
                 Ok(ids) => ids,
                 Err(e) => {
@@ -132,13 +137,13 @@ impl RpcServer {
                 let Some(request) = dispatcher.delete_rpc_request(request_id) else {
                     continue;
                 };
-                let Some(payload) = &request.param_bytes else {
+                let Some(param_bytes) = &request.param_bytes else {
                     continue;
                 };
 
                 let response = if let Some(handler) = handlers.lock().await.get(&request.method_id)
                 {
-                    let encoded = handler(payload.clone());
+                    let encoded = handler(param_bytes.clone());
                     RpcResponse {
                         request_header_id: request_id,
                         method_id: request.method_id,

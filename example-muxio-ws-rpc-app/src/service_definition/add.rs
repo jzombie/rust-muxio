@@ -1,8 +1,6 @@
 use bitcode::{Decode, Encode};
-use muxio_service_traits::{RpcRequestPrebuffered, RpcResponsePrebuffered};
+use muxio_rpc_service::RpcMethodPrebuffered;
 use std::io;
-
-const ADD_METHOD_ID: u64 = 0x01;
 
 #[derive(Encode, Decode, PartialEq, Debug)]
 struct AddRequestParams {
@@ -16,10 +14,11 @@ struct AddResponseParams {
 
 pub struct Add;
 
-impl RpcRequestPrebuffered for Add {
-    const METHOD_ID: u64 = ADD_METHOD_ID;
+impl RpcMethodPrebuffered for Add {
+    const METHOD_ID: u64 = 0x01;
 
     type Input = Vec<f64>;
+    type Output = f64;
 
     fn encode_request(numbers: Self::Input) -> Vec<u8> {
         bitcode::encode(&AddRequestParams { numbers })
@@ -31,12 +30,6 @@ impl RpcRequestPrebuffered for Add {
 
         Ok(raw.numbers)
     }
-}
-
-impl RpcResponsePrebuffered for Add {
-    const METHOD_ID: u64 = ADD_METHOD_ID;
-
-    type Output = f64;
 
     fn encode_response(result: Self::Output) -> Vec<u8> {
         bitcode::encode(&AddResponseParams { result })

@@ -22,7 +22,7 @@ members = [
     "example-muxio-ws-rpc-app",
     "extensions/muxio-tokio-rpc-client",
     "extensions/muxio-tokio-rpc-server",
-    "extensions/muxio-service-traits",
+    "extensions/muxio-rpc-service",
     "extensions/muxio-wasm-rpc-client",
 ]
 resolver = "2"

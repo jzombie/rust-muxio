@@ -419,7 +419,7 @@ dependencies = [
  "criterion",
  "futures",
  "muxio",
- "muxio-service-traits",
+ "muxio-rpc-service",
  "muxio-tokio-rpc-client",
  "muxio-tokio-rpc-server",
  "tokio",
@@ -784,10 +784,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "muxio-service-traits"
+name = "muxio-rpc-service"
 version = "0.1.0-alpha"
 dependencies = [
  "async-trait",
+ "muxio",
 ]
 
 [[package]]
@@ -798,7 +799,7 @@ dependencies = [
  "bytes",
  "futures-util",
  "muxio",
- "muxio-service-traits",
+ "muxio-rpc-service",
  "tokio",
  "tokio-tungstenite",
 ]
@@ -819,10 +820,13 @@ dependencies = [
 name = "muxio-wasm-rpc-client"
 version = "0.1.0-alpha"
 dependencies = [
+ "async-trait",
  "futures",
  "js-sys",
  "muxio",
+ "muxio-rpc-service",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
  "web-sys",
 ]
 
@@ -1409,6 +1413,19 @@ dependencies = [
  "quote",
  "syn",
  "wasm-bindgen-shared",
+]
+
+[[package]]
+name = "wasm-bindgen-futures"
+version = "0.4.50"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "555d470ec0bc3bb57890405e5d4322cc9ea83cebb085523ced7be4144dac1e61"
+dependencies = [
+ "cfg-if",
+ "js-sys",
+ "once_cell",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]
