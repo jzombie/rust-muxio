@@ -1,5 +1,4 @@
 use muxio::rpc::rpc_internals::RpcStreamEncoder;
-use std::io;
 
 /// A transport-agnostic RPC client interface supporting both
 /// one-shot (pre-buffered) and streaming request workflows.

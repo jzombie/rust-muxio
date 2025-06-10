@@ -5,7 +5,6 @@ use muxio::rpc::{
     rpc_internals::{RpcStreamEncoder, RpcStreamEvent},
 };
 use muxio_rpc_service::RpcClientInterface;
-use std::io;
 use std::sync::Arc;
 use tokio::sync::{
     Mutex,
