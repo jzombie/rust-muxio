@@ -1,0 +1,1 @@
+pub const DEFAULT_SERVICE_MAX_CHUNK_SIZE: usize = 1024 * 64;

@@ -37,7 +37,7 @@ where
         // Add metadata to the buffer
         meta_buf.extend(metadata_bytes);
 
-        encoder.push_bytes(&meta_buf)?;
+        encoder.write_bytes(&meta_buf)?;
 
         Ok(Self { stream_id, encoder })
     }
@@ -46,8 +46,8 @@ where
         self.stream_id
     }
 
-    pub fn push_bytes(&mut self, data: &[u8]) -> Result<usize, FrameEncodeError> {
-        self.encoder.push_bytes(data)
+    pub fn write_bytes(&mut self, data: &[u8]) -> Result<usize, FrameEncodeError> {
+        self.encoder.write_bytes(data)
     }
 
     pub fn flush(&mut self) -> Result<usize, FrameEncodeError> {

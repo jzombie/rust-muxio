@@ -4,7 +4,7 @@ use muxio::rpc::{
     RpcDispatcher, RpcRequest,
     rpc_internals::{RpcStreamEncoder, RpcStreamEvent},
 };
-use muxio_rpc_service::RpcClientInterface;
+use muxio_rpc_service::{RpcClientInterface, constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE};
 use std::sync::Arc;
 use tokio::sync::{
     Mutex,
@@ -59,7 +59,7 @@ impl RpcClient {
         let dispatcher_handle = dispatcher.clone();
         tokio::spawn(async move {
             while let Some(Some(Ok(WsMessage::Binary(bytes)))) = recv_rx.recv().await {
-                dispatcher_handle.lock().await.receive_bytes(&bytes).ok();
+                dispatcher_handle.lock().await.read_bytes(&bytes).ok();
             }
         });
 
@@ -121,7 +121,7 @@ impl RpcClientInterface for RpcClient {
                     pre_buffered_payload_bytes: None,
                     is_finalized,
                 },
-                1024, // TODO: Don't hardcode
+                DEFAULT_SERVICE_MAX_CHUNK_SIZE, // TODO: Make configurable
                 send_fn,
                 Some(recv_fn),
                 true,

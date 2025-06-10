@@ -29,7 +29,7 @@ pub trait RpcCallPrebuffered: RpcMethodPrebuffered + Sized + Send + Sync {
 
 pub trait RpcMethodPrebuffered {
     /// A unique identifier for the RPC method.
-    const METHOD_ID: u64;
+    const METHOD_ID: u64; // TODO: Make helper for this to help avoid numeric collisions
 
     /// The high-level input type expected by the request encoder (e.g., `Vec<f64>`).
     type Input;

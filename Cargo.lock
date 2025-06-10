@@ -792,6 +792,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "muxio-rpc-service-endpoint"
+version = "0.1.0-alpha"
+
+[[package]]
 name = "muxio-tokio-rpc-client"
 version = "0.1.0-alpha"
 dependencies = [

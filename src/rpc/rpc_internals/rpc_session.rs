@@ -52,7 +52,7 @@ impl RpcSession {
     }
 
     /// Receives incoming bytes, decodes them, and invokes the provided callback for each event.
-    pub fn receive_bytes<H>(
+    pub fn read_bytes<H>(
         &mut self,
         input: &[u8],
         mut on_rpc_stream_event: H,
@@ -60,7 +60,7 @@ impl RpcSession {
     where
         H: RpcStreamEventHandler,
     {
-        let frames = self.frame_mux_stream_decoder.pull_bytes(input);
+        let frames = self.frame_mux_stream_decoder.read_bytes(input);
 
         for frame_result in frames {
             match frame_result {

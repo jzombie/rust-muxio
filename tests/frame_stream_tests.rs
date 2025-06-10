@@ -12,7 +12,7 @@ fn encoder_chunks_and_decoder_recovers() {
     });
 
     encoder
-        .push_bytes(b"abcdefghijk")
+        .write_bytes(b"abcdefghijk")
         .expect("push bytes failed");
     encoder.flush().expect("flush failed");
     encoder.end_stream().expect("end stream failed");
@@ -21,7 +21,7 @@ fn encoder_chunks_and_decoder_recovers() {
     let mut incoming_frames: Vec<DecodedFrame> = vec![];
 
     for outgoing_frame_bytes in outgoing_bytes.iter() {
-        for decoded_frame_result in decoder.pull_bytes(outgoing_frame_bytes) {
+        for decoded_frame_result in decoder.read_bytes(outgoing_frame_bytes) {
             if let Ok(decoded_frame) = decoded_frame_result {
                 incoming_frames.push(decoded_frame);
             } else {
@@ -59,11 +59,11 @@ fn decoder_handles_incomplete_input() {
     let mut decoder = FrameMuxStreamDecoder::new();
 
     {
-        let decoded_frames: Vec<_> = decoder.pull_bytes(split.0).collect();
+        let decoded_frames: Vec<_> = decoder.read_bytes(split.0).collect();
         assert_eq!(decoded_frames.len(), 0); // Incomplete frame
     }
 
-    let decoded_frames: Vec<_> = decoder.pull_bytes(split.1).collect();
+    let decoded_frames: Vec<_> = decoder.read_bytes(split.1).collect();
     assert_eq!(decoded_frames.len(), 1); // Now complete
 
     let out = decoded_frames[0].as_ref().expect("expected valid frame");
@@ -85,13 +85,13 @@ fn decoder_handles_interleaved_input_order() {
     });
 
     encoder1
-        .push_bytes(b"stream-one-data")
+        .write_bytes(b"stream-one-data")
         .expect("encoder1 push bytes failed");
     encoder1.flush().expect("encoder1 flush failed");
     encoder1.end_stream().expect("encoder1 end stream failed");
 
     encoder2
-        .push_bytes(b"stream-two-data")
+        .write_bytes(b"stream-two-data")
         .expect("encoder1 push bytes failed");
     encoder2.flush().expect("encoder2 flush failed");
     encoder2.end_stream().expect("encoder2 end stream failed");
@@ -124,7 +124,7 @@ fn decoder_handles_interleaved_input_order() {
     let mut incoming_frames = vec![];
 
     for outgoing_bytes in interleaved_outgoing_bytes {
-        for decoded_frame_result in decoder.pull_bytes(&outgoing_bytes) {
+        for decoded_frame_result in decoder.read_bytes(&outgoing_bytes) {
             incoming_frames.push(decoded_frame_result.unwrap());
         }
     }
@@ -153,7 +153,9 @@ fn decoder_reorders_out_of_order_frames() {
         outgoing_chunks.push(bytes.to_vec());
     });
 
-    encoder.push_bytes(b"abcdefghi").expect("push bytes failed"); // 9 bytes, should emit 3 chunks
+    encoder
+        .write_bytes(b"abcdefghi")
+        .expect("push bytes failed"); // 9 bytes, should emit 3 chunks
     encoder.flush().expect("flush failed"); // emit any partials
     encoder.end_stream().expect("end stream failed"); // emit end frame
 
@@ -165,7 +167,7 @@ fn decoder_reorders_out_of_order_frames() {
     let mut incoming_frames = vec![];
 
     for outgoing_chunk in shuffled_outgoing_chunks {
-        for decoded_result in decoder.pull_bytes(&outgoing_chunk) {
+        for decoded_result in decoder.read_bytes(&outgoing_chunk) {
             incoming_frames.push(decoded_result.unwrap());
         }
     }
@@ -191,7 +193,7 @@ fn encoder_emits_small_final_frame_on_end_stream() {
         outgoing_bytes.extend(bytes.to_vec());
     });
 
-    encoder.push_bytes(b"tiny").expect("push bytes failed");
+    encoder.write_bytes(b"tiny").expect("push bytes failed");
 
     encoder.flush().expect("flush failed");
     encoder.end_stream().expect("end stream failed");
@@ -200,7 +202,7 @@ fn encoder_emits_small_final_frame_on_end_stream() {
 
     let mut incoming_frames = vec![];
 
-    for decoded_frame_result in decoder.pull_bytes(&outgoing_bytes) {
+    for decoded_frame_result in decoder.read_bytes(&outgoing_bytes) {
         incoming_frames.push(decoded_frame_result.unwrap());
     }
 

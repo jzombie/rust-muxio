@@ -15,7 +15,7 @@ fn rpc_parallel_streams_roundtrip() {
     // RefCell for processing received bytes on a simulated server
     let process_received_bytes = RefCell::new(|bytes: &[u8]| {
         server
-            .receive_bytes(bytes, |evt| match evt {
+            .read_bytes(bytes, |evt| match evt {
                 RpcStreamEvent::Header {
                     rpc_header_id,
                     ref rpc_header,
@@ -99,12 +99,12 @@ fn rpc_parallel_streams_roundtrip() {
         let mut progressed = false;
 
         if let Some(chunk) = payload1.next() {
-            enc1.push_bytes(&chunk).expect("enc1 push bytes failed");
+            enc1.write_bytes(&chunk).expect("enc1 push bytes failed");
             progressed = true;
         }
 
         if let Some(chunk) = payload2.next() {
-            enc2.push_bytes(&chunk).expect("enc2 push bytes failed");
+            enc2.write_bytes(&chunk).expect("enc2 push bytes failed");
             progressed = true;
         }
 
@@ -192,7 +192,7 @@ fn rpc_stream_with_multiple_metadata_entries() {
         })
         .expect("enc instantiation failed");
 
-    enc.push_bytes(b"test multiple metadata")
+    enc.write_bytes(b"test multiple metadata")
         .expect("push bytes failed");
 
     enc.flush().expect("enc flush failed");
@@ -202,7 +202,7 @@ fn rpc_stream_with_multiple_metadata_entries() {
     let mut decoded: HashMap<u32, (Option<RpcHeader>, Vec<u8>)> = HashMap::new();
     for chunk in outbound.chunks(8).map(Vec::from) {
         server
-            .receive_bytes(&chunk, |evt| match evt {
+            .read_bytes(&chunk, |evt| match evt {
                 RpcStreamEvent::Header {
                     rpc_header_id,
                     ref rpc_header,
@@ -314,11 +314,11 @@ fn rpc_complex_shuffled_stream() {
         })
         .expect("enc2 instantiation failed");
 
-    enc1.push_bytes(b"Shuffled payload bytes 1 2 3 4 5")
-        .expect("enc1 push_bytes failed");
+    enc1.write_bytes(b"Shuffled payload bytes 1 2 3 4 5")
+        .expect("enc1 write_bytes failed");
 
-    enc2.push_bytes(b"Shuffled payload bytes 6 7 8 9 10")
-        .expect("enc1 push_bytes failed");
+    enc2.write_bytes(b"Shuffled payload bytes 6 7 8 9 10")
+        .expect("enc1 write_bytes failed");
 
     enc1.flush().expect("enc1 flush failed");
     enc1.end_stream().expect("enc1 end stream failed");
@@ -335,7 +335,7 @@ fn rpc_complex_shuffled_stream() {
         let mut decoded: HashMap<u32, (Option<RpcHeader>, Vec<u8>)> = HashMap::new();
         for chunk in outbound_chunks.borrow().iter() {
             server
-                .receive_bytes(&chunk, |evt| match evt {
+                .read_bytes(&chunk, |evt| match evt {
                     RpcStreamEvent::Header {
                         rpc_header_id,
                         ref rpc_header,
@@ -446,7 +446,7 @@ fn rpc_session_bidirectional_roundtrip() {
         .expect("init_request failed");
 
     for chunk in b"ping".chunks(2) {
-        enc.push_bytes(chunk).expect("push_chunk failed");
+        enc.write_bytes(chunk).expect("push_chunk failed");
     }
 
     enc.flush().expect("flush failed");
@@ -457,7 +457,7 @@ fn rpc_session_bidirectional_roundtrip() {
 
     for chunk in &outbound {
         server
-            .receive_bytes(chunk, |evt| match evt {
+            .read_bytes(chunk, |evt| match evt {
                 RpcStreamEvent::Header {
                     rpc_header_id: _,
                     rpc_header,
@@ -476,7 +476,7 @@ fn rpc_session_bidirectional_roundtrip() {
                 RpcStreamEvent::End { .. } => {}
                 _ => {}
             })
-            .expect("server.receive_bytes failed");
+            .expect("server.read_bytes failed");
     }
 
     assert_eq!(req_buf, b"ping");
@@ -499,7 +499,7 @@ fn rpc_session_bidirectional_roundtrip() {
         .expect("init_request (reply) failed");
 
     for chunk in b"pong".chunks(2) {
-        reply_enc.push_bytes(chunk).expect("push_chunk (reply)");
+        reply_enc.write_bytes(chunk).expect("push_chunk (reply)");
     }
 
     reply_enc.flush().expect("flush (reply)");
@@ -510,7 +510,7 @@ fn rpc_session_bidirectional_roundtrip() {
 
     for chunk in &reply_bytes {
         client
-            .receive_bytes(chunk, |evt| match evt {
+            .read_bytes(chunk, |evt| match evt {
                 RpcStreamEvent::Header {
                     rpc_header_id: _,
                     rpc_header,
@@ -529,7 +529,7 @@ fn rpc_session_bidirectional_roundtrip() {
                 RpcStreamEvent::End { .. } => {}
                 _ => {}
             })
-            .expect("client.receive_bytes failed");
+            .expect("client.read_bytes failed");
     }
 
     assert_eq!(reply_buf, b"pong");

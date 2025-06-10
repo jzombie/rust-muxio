@@ -61,7 +61,7 @@ impl FrameMuxStreamDecoder {
     }
 
     // Reads new bytes and attempts to decode them into frames
-    pub fn pull_bytes(&mut self, data: &[u8]) -> FrameDecoderIterator {
+    pub fn read_bytes(&mut self, data: &[u8]) -> FrameDecoderIterator {
         self.buffer.extend_from_slice(data);
         let mut queue = VecDeque::new();
 

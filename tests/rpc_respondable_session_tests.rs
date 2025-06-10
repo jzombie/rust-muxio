@@ -95,7 +95,7 @@ fn rpc_respondable_session_stream_and_reply_roundtrip() {
             )
             .expect("client init_request failed");
 
-        client_encoder.push_bytes(b"ping").unwrap();
+        client_encoder.write_bytes(b"ping").unwrap();
         client_encoder.flush().unwrap();
         client_encoder.end_stream().unwrap();
 
@@ -103,8 +103,8 @@ fn rpc_respondable_session_stream_and_reply_roundtrip() {
             server
                 .lock()
                 .unwrap()
-                .receive_bytes(chunk)
-                .expect("server receive_bytes failed");
+                .read_bytes(chunk)
+                .expect("server read_bytes failed");
         }
 
         assert_eq!(
@@ -130,7 +130,7 @@ fn rpc_respondable_session_stream_and_reply_roundtrip() {
                 })
                 .expect("server init_request failed");
 
-            server_encoder.push_bytes(&reply_bytes).unwrap();
+            server_encoder.write_bytes(&reply_bytes).unwrap();
             server_encoder.flush().unwrap();
             server_encoder.end_stream().unwrap();
         }
@@ -139,8 +139,8 @@ fn rpc_respondable_session_stream_and_reply_roundtrip() {
             client
                 .lock()
                 .unwrap()
-                .receive_bytes(chunk)
-                .expect("client receive_bytes failed");
+                .read_bytes(chunk)
+                .expect("client read_bytes failed");
         }
 
         assert_eq!(client_received_payload.lock().unwrap().as_slice(), b"pong");

@@ -3,7 +3,7 @@ use muxio::rpc::{
     RpcDispatcher, RpcRequest,
     rpc_internals::{RpcStreamEncoder, RpcStreamEvent},
 };
-use muxio_rpc_service::RpcClientInterface;
+use muxio_rpc_service::{RpcClientInterface, constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE};
 use std::sync::Arc;
 use wasm_bindgen_futures::spawn_local;
 
@@ -23,9 +23,11 @@ impl RpcWasmClient {
         }
     }
 
-    pub fn receive_inbound(&self, bytes: Vec<u8>) {
+    pub fn read_bytes(&self, bytes: Vec<u8>) {
+        // TODO: Remove
         web_sys::console::log_1(&"receive...".into());
-        if let Err(e) = self.dispatcher.lock().unwrap().receive_bytes(&bytes) {
+
+        if let Err(e) = self.dispatcher.lock().unwrap().read_bytes(&bytes) {
             web_sys::console::error_1(&format!("Dispatcher error: {:?}", e).into());
         }
     }
@@ -86,7 +88,7 @@ impl RpcClientInterface for RpcWasmClient {
                     pre_buffered_payload_bytes: None,
                     is_finalized,
                 },
-                1024, // TODO: Don't hardcode
+                DEFAULT_SERVICE_MAX_CHUNK_SIZE, // TODO: Make configurable
                 send_fn,
                 Some(recv_fn),
                 true,

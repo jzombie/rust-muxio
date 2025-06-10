@@ -130,7 +130,7 @@ fn rpc_dispatcher_call_and_echo_response() {
         let chunk_size = 4; // Define the chunk size
         for chunk in incoming_buf.borrow().chunks(chunk_size) {
             let request_header_ids = server_dispatcher
-                .receive_bytes(chunk)
+                .read_bytes(chunk)
                 .expect("Failed to receive bytes on server");
 
             for request_header_id in request_header_ids {
@@ -194,7 +194,7 @@ fn rpc_dispatcher_call_and_echo_response() {
                     if let Some(rpc_response) = rpc_response {
                         server_dispatcher
                             .respond(rpc_response, 4, |bytes: &[u8]| {
-                                client_dispatcher.receive_bytes(bytes).unwrap();
+                                client_dispatcher.read_bytes(bytes).unwrap();
                             })
                             .unwrap();
                     }

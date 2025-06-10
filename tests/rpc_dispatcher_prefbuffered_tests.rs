@@ -132,7 +132,7 @@ fn dispatch_call_and_get_prebuffered_response<T: for<'a> Decode<'a>>(
 
     for chunk in outgoing_buf.chunks(4) {
         let request_header_ids = server_dispatcher
-            .receive_bytes(chunk)
+            .read_bytes(chunk)
             .expect("Failed to receive bytes on server");
 
         for request_header_id in request_header_ids {
@@ -184,7 +184,7 @@ fn dispatch_call_and_get_prebuffered_response<T: for<'a> Decode<'a>>(
                     server_dispatcher
                         .respond(rpc_response, 4, |bytes: &[u8]| {
                             // Write the response back to the client dispatcher
-                            client_dispatcher.receive_bytes(bytes).unwrap();
+                            client_dispatcher.read_bytes(bytes).unwrap();
                         })
                         .unwrap();
                 }
