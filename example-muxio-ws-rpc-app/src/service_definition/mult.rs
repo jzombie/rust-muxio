@@ -44,13 +44,3 @@ impl RpcMethodPrebuffered for Mult {
         Ok(raw.result)
     }
 }
-
-#[async_trait::async_trait]
-impl RpcCallPrebuffered for Mult {
-    async fn call<C: RpcClientInterface + Send + Sync>(
-        rpc_client: &C,
-        input: Self::Input,
-    ) -> Result<Self::Output, io::Error> {
-        call_prebuffered_rpc::<Mult, C>(rpc_client, input).await
-    }
-}

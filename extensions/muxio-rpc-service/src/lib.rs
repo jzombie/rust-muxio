@@ -22,12 +22,13 @@ pub async fn call_prebuffered_rpc<T, C>(
 ) -> Result<T::Output, io::Error>
 where
     T: RpcMethodPrebuffered + Send + Sync + 'static,
+    T::Input: Send + 'static,
     T::Output: Send + 'static,
     C: RpcClientInterface + Send + Sync,
 {
-    let (_, rpc_result)  = rpc_client
+    let (_, rpc_result) = rpc_client
         .call_rpc(
-            <T as RpcMethodPrebuffered>::METHOD_ID,
+            T::METHOD_ID,
             T::encode_request(input),
             T::decode_response,
             true,
@@ -37,3 +38,25 @@ where
     rpc_result
 }
 
+/// Blanket implementation of the `RpcCallPrebuffered` trait for any type
+/// that also implements `RpcMethodPrebuffered`.
+///
+/// This enables `.call()` usage on any RPC method type without requiring
+/// a manual implementation for each one.
+///
+/// This reduces boilerplate and enforces consistency across your service
+/// method definitions.
+#[async_trait::async_trait]
+impl<T> RpcCallPrebuffered for T
+where
+    T: RpcMethodPrebuffered + Send + Sync + 'static,
+    T::Input: Send + 'static,
+    T::Output: Send + 'static,
+{
+    async fn call<C>(rpc_client: &C, input: Self::Input) -> Result<Self::Output, io::Error>
+    where
+        C: RpcClientInterface + Send + Sync,
+    {
+        call_prebuffered_rpc::<T, C>(rpc_client, input).await
+    }
+}

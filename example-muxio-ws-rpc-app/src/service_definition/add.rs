@@ -44,13 +44,3 @@ impl RpcMethodPrebuffered for Add {
         Ok(raw.result)
     }
 }
-
-#[async_trait::async_trait]
-impl RpcCallPrebuffered for Add {
-    async fn call<C: RpcClientInterface + Send + Sync>(
-        rpc_client: &C,
-        input: Self::Input,
-    ) -> Result<Self::Output, io::Error> {
-        call_prebuffered_rpc::<Add, C>(rpc_client, input).await
-    }
-}
