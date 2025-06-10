@@ -41,7 +41,7 @@ fn bench_roundtrip(c: &mut Criterion) {
         b.to_async(&rt).iter(|| async {
             let mut tasks = FuturesUnordered::new();
 
-            // Spawn 10 concurrent RPC calls to the Add method.
+            // Spawn n concurrent RPC calls to the Add method.
             // These futures are submitted all at once and polled concurrently.
             for _ in 0..10 {
                 tasks.push(Add::call(&client, vec![1.0, 2.0, 3.0]));
