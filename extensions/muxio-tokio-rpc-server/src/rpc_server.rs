@@ -16,9 +16,11 @@ use tokio::{
     sync::{Mutex, mpsc::unbounded_channel},
 };
 
+// TODO: Move to `muxio-rpc-service-endpoint`
 type RpcHandler = Box<dyn Fn(Vec<u8>) -> Vec<u8> + Send + Sync + 'static>;
 
 pub struct RpcServer {
+    // TODO: Move to `muxio-rpc-service-endpoint`
     handlers: Arc<Mutex<HashMap<u64, RpcHandler>>>,
 }
 

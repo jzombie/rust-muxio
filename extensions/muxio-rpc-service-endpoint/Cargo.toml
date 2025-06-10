@@ -1,5 +1,5 @@
 [package]
-name = "muxio-rpc-endpoint"
+name = "muxio-rpc-service-endpoint"
 version = "0.1.0-alpha"
 edition = "2024"
 publish = false
