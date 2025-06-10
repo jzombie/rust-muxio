@@ -140,7 +140,7 @@ impl<'a> RpcRespondableSession<'a> {
                             }
                         }
                         _ => {
-                            // TODO: Handle
+                            eprintln!("Unknown `RpcStreamEvent`");
                         }
                     }
                 } else {
