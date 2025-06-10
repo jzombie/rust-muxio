@@ -24,5 +24,6 @@ members = [
     "extensions/muxio-tokio-rpc-server",
     "extensions/muxio-rpc-service",
     "extensions/muxio-wasm-rpc-client",
+    "extensions/muxio-rpc-endpoint",
 ]
 resolver = "2"
