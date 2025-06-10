@@ -15,7 +15,7 @@ struct MultResponseParams {
 pub struct Mult;
 
 impl RpcMethodPrebuffered for Mult {
-    const METHOD_ID: u64 = rpc_method_id!("mult");
+    const METHOD_ID: u64 = rpc_method_id!("math.mult");
 
     type Input = Vec<f64>;
     type Output = f64;

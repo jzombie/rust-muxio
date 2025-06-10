@@ -15,7 +15,7 @@ struct AddResponseParams {
 pub struct Add;
 
 impl RpcMethodPrebuffered for Add {
-    const METHOD_ID: u64 = rpc_method_id!("add");
+    const METHOD_ID: u64 = rpc_method_id!("math.add");
 
     type Input = Vec<f64>;
     type Output = f64;
