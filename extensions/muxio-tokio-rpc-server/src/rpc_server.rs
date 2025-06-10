@@ -172,7 +172,7 @@ impl RpcServer {
                             request_header_id: request_id,
                             method_id: request.method_id,
                             result_status: Some(RpcResultStatus::Success.value()),
-                            pre_buffered_payload_bytes: Some(encoded),
+                            prebuffered_payload_bytes: Some(encoded),
                             is_finalized: true,
                         },
                         Err(e) => {
@@ -183,7 +183,7 @@ impl RpcServer {
                                 request_header_id: request_id,
                                 method_id: request.method_id,
                                 result_status: Some(RpcResultStatus::SystemError.value()),
-                                pre_buffered_payload_bytes: None,
+                                prebuffered_payload_bytes: None,
                                 is_finalized: true,
                             }
                         }
@@ -193,7 +193,7 @@ impl RpcServer {
                         request_header_id: request_id,
                         method_id: request.method_id,
                         result_status: Some(RpcResultStatus::SystemError.value()),
-                        pre_buffered_payload_bytes: None,
+                        prebuffered_payload_bytes: None,
                         is_finalized: true,
                     }
                 };

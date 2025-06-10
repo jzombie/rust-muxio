@@ -88,7 +88,7 @@ fn encode_request(method_id: u64, param_bytes: Vec<u8>) -> RpcRequest {
     RpcRequest {
         method_id,
         param_bytes: Some(param_bytes),
-        pre_buffered_payload_bytes: None,
+        prebuffered_payload_bytes: None,
         is_finalized: true,
     }
 }
@@ -155,7 +155,7 @@ fn dispatch_call_and_get_prebuffered_response<T: for<'a> Decode<'a>>(
                             request_header_id,
                             method_id: id,
                             result_status: Some(0),
-                            pre_buffered_payload_bytes: Some(bitcode::encode(&AddResponseParams {
+                            prebuffered_payload_bytes: Some(bitcode::encode(&AddResponseParams {
                                 result: request_params.numbers.iter().sum(),
                             })),
                             is_finalized: true,
@@ -169,11 +169,9 @@ fn dispatch_call_and_get_prebuffered_response<T: for<'a> Decode<'a>>(
                             request_header_id,
                             method_id: id,
                             result_status: Some(0),
-                            pre_buffered_payload_bytes: Some(bitcode::encode(
-                                &MultResponseParams {
-                                    result: request_params.numbers.iter().product(),
-                                },
-                            )),
+                            prebuffered_payload_bytes: Some(bitcode::encode(&MultResponseParams {
+                                result: request_params.numbers.iter().product(),
+                            })),
                             is_finalized: true,
                         })
                     }

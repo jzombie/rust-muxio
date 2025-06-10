@@ -123,7 +123,7 @@ impl<'a> RpcDispatcher<'a> {
                         let rpc_request = RpcRequest {
                             method_id: rpc_header.method_id,
                             param_bytes,
-                            pre_buffered_payload_bytes: None, // No payload yet
+                            prebuffered_payload_bytes: None, // No payload yet
                             is_finalized: false,
                         };
 
@@ -141,7 +141,7 @@ impl<'a> RpcDispatcher<'a> {
                         {
                             // Append bytes to the payload
                             let payload = rpc_request
-                                .pre_buffered_payload_bytes
+                                .prebuffered_payload_bytes
                                 .get_or_insert_with(Vec::new);
                             payload.extend_from_slice(&bytes);
                         }
@@ -186,14 +186,14 @@ impl<'a> RpcDispatcher<'a> {
     /// - `max_chunk_size`: Max frame size before splitting into multiple frames
     /// - `on_emit`: Callback to transmit the encoded frames
     /// - `on_response`: Optional response stream handler
-    /// - `pre_buffer_response`: If true, buffer all chunks into one event
+    /// - `prebuffer_response`: If true, buffer all chunks into one event
     pub fn call<E, R>(
         &mut self,
         rpc_request: RpcRequest,
         max_chunk_size: usize,
         on_emit: E,
         on_response: Option<R>,
-        pre_buffer_response: bool,
+        prebuffer_response: bool,
     ) -> Result<RpcStreamEncoder<E>, FrameEncodeError>
     where
         E: RpcEmit,
@@ -223,12 +223,12 @@ impl<'a> RpcDispatcher<'a> {
             max_chunk_size,
             on_emit,
             on_response,
-            pre_buffer_response,
+            prebuffer_response,
         )?;
 
         // If the RPC request has a buffered payload, send it here
-        if let Some(pre_buffered_payload_bytes) = rpc_request.pre_buffered_payload_bytes {
-            encoder.write_bytes(&pre_buffered_payload_bytes)?;
+        if let Some(prebuffered_payload_bytes) = rpc_request.prebuffered_payload_bytes {
+            encoder.write_bytes(&prebuffered_payload_bytes)?;
         }
 
         // If the RPC request is pre-finalized, close the stream
@@ -277,8 +277,8 @@ impl<'a> RpcDispatcher<'a> {
             on_emit,
         )?;
 
-        if let Some(pre_buffered_payload_bytes) = rpc_response.pre_buffered_payload_bytes {
-            response_encoder.write_bytes(&pre_buffered_payload_bytes)?;
+        if let Some(prebuffered_payload_bytes) = rpc_response.prebuffered_payload_bytes {
+            response_encoder.write_bytes(&prebuffered_payload_bytes)?;
         }
 
         if rpc_response.is_finalized {

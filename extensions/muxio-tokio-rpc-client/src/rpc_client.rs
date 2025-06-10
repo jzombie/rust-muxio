@@ -118,7 +118,7 @@ impl RpcClientInterface for RpcClient {
                 RpcRequest {
                     method_id,
                     param_bytes: Some(payload),
-                    pre_buffered_payload_bytes: None,
+                    prebuffered_payload_bytes: None,
                     is_finalized,
                 },
                 DEFAULT_SERVICE_MAX_CHUNK_SIZE, // TODO: Make configurable

@@ -42,7 +42,7 @@ fn rpc_dispatcher_call_and_echo_response() {
             param_bytes: Some(bitcode::encode(&AddRequestParams {
                 numbers: vec![1.0, 2.0, 3.0],
             })),
-            pre_buffered_payload_bytes: None,
+            prebuffered_payload_bytes: None,
             is_finalized: true,
         };
 
@@ -52,7 +52,7 @@ fn rpc_dispatcher_call_and_echo_response() {
             param_bytes: Some(bitcode::encode(&MultRequestParams {
                 numbers: vec![4.0, 5.0, 6.0, 3.14],
             })),
-            pre_buffered_payload_bytes: None,
+            prebuffered_payload_bytes: None,
             is_finalized: true,
         };
 
@@ -62,7 +62,7 @@ fn rpc_dispatcher_call_and_echo_response() {
             param_bytes: Some(bitcode::encode(&MultRequestParams {
                 numbers: vec![10.0, 5.0, 6.0, 3.14],
             })),
-            pre_buffered_payload_bytes: None,
+            prebuffered_payload_bytes: None,
             is_finalized: true,
         };
 
@@ -164,7 +164,7 @@ fn rpc_dispatcher_call_and_echo_response() {
                                 request_header_id,
                                 method_id: rpc_request.method_id,
                                 result_status: Some(0),
-                                pre_buffered_payload_bytes: Some(response_bytes),
+                                prebuffered_payload_bytes: Some(response_bytes),
                                 is_finalized: true,
                             })
                         }
@@ -183,7 +183,7 @@ fn rpc_dispatcher_call_and_echo_response() {
                                 request_header_id,
                                 method_id: rpc_request.method_id,
                                 result_status: Some(0),
-                                pre_buffered_payload_bytes: Some(response_bytes),
+                                prebuffered_payload_bytes: Some(response_bytes),
                                 is_finalized: true,
                             })
                         }
