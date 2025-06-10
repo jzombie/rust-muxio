@@ -66,19 +66,27 @@ impl RpcClient {
 
         RpcClient { dispatcher, tx }
     }
+}
 
-    // TODO: Use Result type
-    // TODO: Use common trait signature
-    pub async fn call_rpc<T: Send + 'static, F: Fn(Vec<u8>) -> T + Send + Sync + 'static>(
+#[async_trait::async_trait]
+impl RpcClientInterface for RpcClient {
+    async fn call_rpc<T, F>(
         &self,
         method_id: u64,
         payload: Vec<u8>,
         response_handler: F,
         is_finalized: bool,
-    ) -> (
-        RpcStreamEncoder<Box<dyn for<'a> FnMut(&'a [u8]) + Send + 'static>>,
-        T,
-    ) {
+    ) -> Result<
+        (
+            RpcStreamEncoder<Box<dyn for<'a> FnMut(&'a [u8]) + Send + 'static>>,
+            T,
+        ),
+        std::io::Error,
+    >
+    where
+        T: Send + 'static,
+        F: Fn(Vec<u8>) -> T + Send + Sync + 'static,
+    {
         let (done_tx, done_rx) = oneshot::channel::<T>();
         let done_tx = Arc::new(Mutex::new(Some(done_tx)));
         let done_tx_clone = done_tx.clone();
@@ -86,7 +94,6 @@ impl RpcClient {
         let dispatcher = self.dispatcher.clone();
         let tx = self.tx.clone();
 
-        // Force closure coercion to boxed dyn FnMut
         let send_fn: Box<dyn for<'a> FnMut(&'a [u8]) + Send + 'static> = Box::new(move |chunk| {
             let _ = tx.send(WsMessage::Binary(Bytes::copy_from_slice(chunk)));
         });
@@ -114,7 +121,7 @@ impl RpcClient {
                     pre_buffered_payload_bytes: None,
                     is_finalized,
                 },
-                1024, // TODO: Don't hardcode
+                1024,
                 send_fn,
                 Some(recv_fn),
                 true,
@@ -123,34 +130,34 @@ impl RpcClient {
 
         let result = done_rx.await.expect("oneshot receive failed");
 
-        (rpc_stream_encoder, result)
+        Ok((rpc_stream_encoder, result))
     }
 }
 
 // TODO: Can this be de-duped instead of wrapped?
-#[async_trait::async_trait]
-impl RpcClientInterface for RpcClient {
-    async fn call_rpc<T, F>(
-        &self,
-        method_id: u64,
-        payload: Vec<u8>,
-        response_handler: F,
-        is_finalized: bool,
-    ) -> Result<
-        (
-            RpcStreamEncoder<Box<dyn for<'a> FnMut(&'a [u8]) + Send + 'static>>,
-            T,
-        ),
-        io::Error,
-    >
-    where
-        T: Send + 'static,
-        F: Fn(Vec<u8>) -> T + Send + Sync + 'static,
-    {
-        let transport_result = self
-            .call_rpc(method_id, payload, response_handler, is_finalized)
-            .await;
+// #[async_trait::async_trait]
+// impl RpcClientInterface for RpcClient {
+//     async fn call_rpc<T, F>(
+//         &self,
+//         method_id: u64,
+//         payload: Vec<u8>,
+//         response_handler: F,
+//         is_finalized: bool,
+//     ) -> Result<
+//         (
+//             RpcStreamEncoder<Box<dyn for<'a> FnMut(&'a [u8]) + Send + 'static>>,
+//             T,
+//         ),
+//         io::Error,
+//     >
+//     where
+//         T: Send + 'static,
+//         F: Fn(Vec<u8>) -> T + Send + Sync + 'static,
+//     {
+//         let transport_result = self
+//             .call_rpc(method_id, payload, response_handler, is_finalized)
+//             .await;
 
-        Ok(transport_result)
-    }
-}
+//         Ok(transport_result)
+//     }
+// }

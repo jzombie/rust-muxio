@@ -30,17 +30,23 @@ impl RpcWasmClient {
             web_sys::console::error_1(&format!("Dispatcher error: {:?}", e).into());
         }
     }
+}
 
-    pub async fn call_rpc<T, F>(
+#[async_trait::async_trait]
+impl RpcClientInterface for RpcWasmClient {
+    async fn call_rpc<T, F>(
         &self,
         method_id: u64,
         payload: Vec<u8>,
         response_handler: F,
         is_finalized: bool,
-    ) -> (
-        RpcStreamEncoder<Box<dyn for<'a> FnMut(&'a [u8]) + Send + 'static>>,
-        T,
-    )
+    ) -> Result<
+        (
+            RpcStreamEncoder<Box<dyn for<'a> FnMut(&'a [u8]) + Send + 'static>>,
+            T,
+        ),
+        std::io::Error,
+    >
     where
         T: Send + 'static,
         F: Fn(Vec<u8>) -> T + Send + Sync + 'static,
@@ -90,34 +96,34 @@ impl RpcWasmClient {
 
         let result = done_rx.await.expect("oneshot receive failed");
 
-        (rpc_stream_encoder, result)
+        Ok((rpc_stream_encoder, result))
     }
 }
 
 // TODO: Can this be de-duped instead of wrapped?
-#[async_trait::async_trait]
-impl RpcClientInterface for RpcWasmClient {
-    async fn call_rpc<T, F>(
-        &self,
-        method_id: u64,
-        payload: Vec<u8>,
-        response_handler: F,
-        is_finalized: bool,
-    ) -> Result<
-        (
-            RpcStreamEncoder<Box<dyn for<'a> FnMut(&'a [u8]) + Send + 'static>>,
-            T,
-        ),
-        io::Error,
-    >
-    where
-        T: Send + 'static,
-        F: Fn(Vec<u8>) -> T + Send + Sync + 'static,
-    {
-        let transport_result = self
-            .call_rpc(method_id, payload, response_handler, is_finalized)
-            .await;
+// #[async_trait::async_trait]
+// impl RpcClientInterface for RpcWasmClient {
+//     async fn call_rpc<T, F>(
+//         &self,
+//         method_id: u64,
+//         payload: Vec<u8>,
+//         response_handler: F,
+//         is_finalized: bool,
+//     ) -> Result<
+//         (
+//             RpcStreamEncoder<Box<dyn for<'a> FnMut(&'a [u8]) + Send + 'static>>,
+//             T,
+//         ),
+//         io::Error,
+//     >
+//     where
+//         T: Send + 'static,
+//         F: Fn(Vec<u8>) -> T + Send + Sync + 'static,
+//     {
+//         let transport_result = self
+//             .call_rpc(method_id, payload, response_handler, is_finalized)
+//             .await;
 
-        Ok(transport_result)
-    }
-}
+//         Ok(transport_result)
+//     }
+// }
