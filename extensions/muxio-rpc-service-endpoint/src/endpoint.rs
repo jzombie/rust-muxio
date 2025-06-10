@@ -1,5 +1,6 @@
 use muxio::frame::FrameDecodeError;
 use muxio::rpc::{RpcDispatcher, RpcResponse, RpcResultStatus, rpc_internals::RpcEmit};
+use muxio_rpc_service::constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::pin::Pin;
@@ -135,7 +136,7 @@ impl RpcServiceEndpoint {
             rpc_dispatcher
                 .respond(
                     response,
-                    1024, // TODO Use service constant
+                    DEFAULT_SERVICE_MAX_CHUNK_SIZE, // TODO: Make configurable
                     |chunk| on_emit(chunk),
                 )
                 // TODO: Dont' unwrap

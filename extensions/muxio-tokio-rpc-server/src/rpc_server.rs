@@ -1,5 +1,3 @@
-// TODO: Separate the Muxio server handler from the WebSocket server
-
 use axum::{
     Router,
     extract::ConnectInfo,
@@ -9,13 +7,9 @@ use axum::{
 };
 use bytes::Bytes;
 use futures_util::{SinkExt, StreamExt};
-use muxio::rpc::{RpcDispatcher, RpcResponse, RpcResultStatus};
-use muxio_rpc_service_endpoint::{RpcPrebufferedHandler, RpcServiceEndpoint};
-use std::{collections::HashMap, future::Future, net::SocketAddr, sync::Arc};
-use tokio::{
-    net::TcpListener,
-    sync::{Mutex, mpsc::unbounded_channel},
-};
+use muxio_rpc_service_endpoint::RpcServiceEndpoint;
+use std::{future::Future, net::SocketAddr, sync::Arc};
+use tokio::{net::TcpListener, sync::mpsc::unbounded_channel};
 
 // TODO: Document that this is a basic server implementation and that the underlying service
 // endpoints can be used with alternative servers or transports.
