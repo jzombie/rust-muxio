@@ -23,8 +23,10 @@ impl RpcWasmClient {
         }
     }
 
-    pub fn receive_inbound(&self, bytes: Vec<u8>) {
+    pub fn read_bytes(&self, bytes: Vec<u8>) {
+        // TODO: Remove
         web_sys::console::log_1(&"receive...".into());
+
         if let Err(e) = self.dispatcher.lock().unwrap().read_bytes(&bytes) {
             web_sys::console::error_1(&format!("Dispatcher error: {:?}", e).into());
         }
