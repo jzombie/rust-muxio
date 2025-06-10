@@ -83,25 +83,3 @@ pub async fn call_muxio(
         code => Err(format!("RPC error status: {}", code)),
     }
 }
-
-// TODO: Uncomment if ever wanting to call Muxio directly from JS
-// #[wasm_bindgen]
-// pub fn call_muxio_js(method_id: u64, param_bytes: &[u8], payload_bytes: &[u8]) -> Promise {
-//     let param_vec = match param_bytes.len() {
-//         0 => None,
-//         _ => Some(param_bytes.to_vec()),
-//     };
-
-//     let payload_vec = match payload_bytes.len() {
-//         0 => None,
-//         _ => Some(payload_bytes.to_vec()),
-
-//     };
-
-//     future_to_promise(async move {
-//         match call_muxio_inner(method_id, param_vec, payload_vec).await {
-//             Ok(bytes) => Ok(js_sys::Uint8Array::from(bytes.as_slice()).into()),
-//             Err(msg) => Err(JsValue::from_str(&msg)),
-//         }
-//     })
-// }
