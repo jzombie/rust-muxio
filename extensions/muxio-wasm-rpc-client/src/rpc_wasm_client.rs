@@ -94,6 +94,7 @@ impl RpcWasmClient {
     }
 }
 
+// TODO: Can this be de-duped instead of wrapped?
 #[async_trait::async_trait]
 impl RpcClientInterface for RpcWasmClient {
     async fn call_rpc<T, F>(
