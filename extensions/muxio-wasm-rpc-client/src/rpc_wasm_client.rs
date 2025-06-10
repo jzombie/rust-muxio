@@ -1,7 +1,7 @@
 use futures::channel::oneshot;
 use muxio::rpc::{
     RpcDispatcher, RpcRequest,
-    rpc_internals::{RpcStreamEncoder, RpcStreamEvent},
+    rpc_internals::{RpcEmit, RpcStreamEncoder, RpcStreamEvent},
 };
 use muxio_rpc_service::{RpcClientInterface, constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE};
 use std::sync::Arc;
@@ -41,13 +41,7 @@ impl RpcClientInterface for RpcWasmClient {
         payload: Vec<u8>,
         response_handler: F,
         is_finalized: bool,
-    ) -> Result<
-        (
-            RpcStreamEncoder<Box<dyn for<'a> FnMut(&'a [u8]) + Send + 'static>>,
-            T,
-        ),
-        std::io::Error,
-    >
+    ) -> Result<(RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>, T), std::io::Error>
     where
         T: Send + 'static,
         F: Fn(Vec<u8>) -> T + Send + Sync + 'static,
@@ -59,7 +53,7 @@ impl RpcClientInterface for RpcWasmClient {
         let done_tx = Arc::new(std::sync::Mutex::new(Some(done_tx)));
         let done_tx_clone = done_tx.clone();
 
-        let send_fn: Box<dyn for<'a> FnMut(&'a [u8]) + Send + 'static> = Box::new(move |chunk| {
+        let send_fn: Box<dyn RpcEmit + Send + Sync> = Box::new(move |chunk: &[u8]| {
             emit(chunk.to_vec());
             web_sys::console::log_1(&"emit...".into());
         });

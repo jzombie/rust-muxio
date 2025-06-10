@@ -2,7 +2,7 @@ use bytes::Bytes;
 use futures_util::{SinkExt, StreamExt};
 use muxio::rpc::{
     RpcDispatcher, RpcRequest,
-    rpc_internals::{RpcStreamEncoder, RpcStreamEvent},
+    rpc_internals::{RpcEmit, RpcStreamEncoder, RpcStreamEvent},
 };
 use muxio_rpc_service::{RpcClientInterface, constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE};
 use std::sync::Arc;
@@ -75,13 +75,7 @@ impl RpcClientInterface for RpcClient {
         payload: Vec<u8>,
         response_handler: F,
         is_finalized: bool,
-    ) -> Result<
-        (
-            RpcStreamEncoder<Box<dyn for<'a> FnMut(&'a [u8]) + Send + 'static>>,
-            T,
-        ),
-        std::io::Error,
-    >
+    ) -> Result<(RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>, T), std::io::Error>
     where
         T: Send + 'static,
         F: Fn(Vec<u8>) -> T + Send + Sync + 'static,
@@ -92,7 +86,7 @@ impl RpcClientInterface for RpcClient {
 
         let tx = self.tx.clone();
 
-        let send_fn: Box<dyn for<'a> FnMut(&'a [u8]) + Send + 'static> = Box::new(move |chunk| {
+        let send_fn: Box<dyn RpcEmit + Send + Sync> = Box::new(move |chunk: &[u8]| {
             let _ = tx.send(WsMessage::Binary(Bytes::copy_from_slice(chunk)));
         });
 

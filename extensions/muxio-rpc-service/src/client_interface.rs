@@ -1,4 +1,4 @@
-use muxio::rpc::rpc_internals::RpcStreamEncoder;
+use muxio::rpc::rpc_internals::{RpcEmit, RpcStreamEncoder};
 
 /// A transport-agnostic RPC client interface supporting both
 /// one-shot (pre-buffered) and streaming request workflows.
@@ -20,13 +20,7 @@ pub trait RpcClientInterface {
         payload: Vec<u8>,
         response_handler: F,
         is_finalized: bool,
-    ) -> Result<
-        (
-            RpcStreamEncoder<Box<dyn for<'a> FnMut(&'a [u8]) + Send + 'static>>,
-            T,
-        ),
-        std::io::Error,
-    >
+    ) -> Result<(RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>, T), std::io::Error>
     where
         T: Send + 'static,
         F: Fn(Vec<u8>) -> T + Send + Sync + 'static;
