@@ -795,6 +795,7 @@ dependencies = [
 name = "muxio-rpc-service-endpoint"
 version = "0.1.0-alpha"
 dependencies = [
+ "muxio",
  "tokio",
 ]
 

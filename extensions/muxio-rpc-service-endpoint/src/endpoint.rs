@@ -1,3 +1,5 @@
+use muxio::frame::FrameDecodeError;
+use muxio::rpc::{RpcDispatcher, RpcResponse, RpcResultStatus};
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::pin::Pin;
@@ -19,12 +21,14 @@ pub type RpcPrebufferedHandler = Box<
 pub struct RpcServiceEndpoint {
     // TODO: Privatize
     pub prebuffered_handlers: Arc<Mutex<HashMap<u64, RpcPrebufferedHandler>>>,
+    rpc_dispatcher: Arc<Mutex<RpcDispatcher<'static>>>,
 }
 
 impl RpcServiceEndpoint {
     pub fn new() -> Self {
         Self {
             prebuffered_handlers: Arc::new(Mutex::new(HashMap::new())),
+            rpc_dispatcher: Arc::new(Mutex::new(RpcDispatcher::new())),
         }
     }
 
@@ -62,5 +66,82 @@ impl RpcServiceEndpoint {
                 Ok(())
             }
         }
+    }
+
+    pub async fn read_bytes(&self, bytes: &[u8]) -> Result<(), FrameDecodeError> {
+        let mut rpc_dispatcher = self.rpc_dispatcher.lock().await;
+
+        let request_ids = match rpc_dispatcher.read_bytes(&bytes) {
+            Ok(ids) => ids,
+            Err(e) => return Err(e),
+        };
+
+        // Handle prebuffered requests
+        for request_id in request_ids {
+            if !rpc_dispatcher
+                .is_rpc_request_finalized(request_id)
+                .unwrap_or(false)
+            {
+                continue;
+            }
+
+            let Some(request) = rpc_dispatcher.delete_rpc_request(request_id) else {
+                continue;
+            };
+            let Some(param_bytes) = &request.param_bytes else {
+                continue;
+            };
+
+            let response = if let Some(handler) = self
+                .prebuffered_handlers
+                .lock()
+                .await
+                .get(&request.method_id)
+            {
+                match handler(param_bytes.clone()).await {
+                    Ok(encoded) => RpcResponse {
+                        request_header_id: request_id,
+                        method_id: request.method_id,
+                        result_status: Some(RpcResultStatus::Success.value()),
+                        prebuffered_payload_bytes: Some(encoded),
+                        is_finalized: true,
+                    },
+                    Err(e) => {
+                        // TODO: Handle accordingly
+                        eprintln!("Handler error: {:?}", e);
+
+                        RpcResponse {
+                            request_header_id: request_id,
+                            method_id: request.method_id,
+                            result_status: Some(RpcResultStatus::SystemError.value()),
+                            prebuffered_payload_bytes: None,
+                            is_finalized: true,
+                        }
+                    }
+                }
+            } else {
+                RpcResponse {
+                    request_header_id: request_id,
+                    method_id: request.method_id,
+                    result_status: Some(RpcResultStatus::SystemError.value()),
+                    prebuffered_payload_bytes: None,
+                    is_finalized: true,
+                }
+            };
+
+            rpc_dispatcher
+                .respond(
+                    response,
+                    1024, // TODO Use service constant
+                    move |chunk| {
+                        // TODO: handle
+                        println!("EMITTING: {:?}", chunk);
+                    },
+                )
+                // TODO: Dont' unwrap
+                .unwrap();
+        }
+
+        Ok(())
     }
 }

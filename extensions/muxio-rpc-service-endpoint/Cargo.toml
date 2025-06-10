@@ -6,3 +6,4 @@ publish = false
 
 [dependencies]
 tokio = { version = "1.45.1", features = ["sync"] }
+muxio = { path = "../../" }
