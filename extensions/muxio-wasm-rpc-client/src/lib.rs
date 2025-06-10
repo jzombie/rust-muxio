@@ -12,28 +12,16 @@ pub use socket_transport::*;
 mod rpc_wasm_client;
 pub use rpc_wasm_client::*;
 
-use muxio::rpc::{
-    RpcDispatcher, RpcRequest, RpcResponse, RpcResultStatus,
-    rpc_internals::{RpcStreamEncoder, RpcStreamEvent},
-};
-use std::sync::{Arc, Mutex};
-use web_sys::console;
-
-use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender, unbounded as unbounded_channel};
+use muxio::rpc::rpc_internals::RpcStreamEncoder;
 
 use muxio_service_traits::{RpcClientInterface, RpcMethodPrebuffered};
 
 use std::io;
 
-// TODO: Uncomment
 // TODO: Implement and move into `RpcClient`
 // #[async_trait::async_trait]
 #[async_trait::async_trait]
 impl RpcClientInterface for RpcWasmClient {
-    type Client = RpcWasmClient;
-    type Sender = UnboundedSender<Vec<u8>>;
-    type Mutex<T: Send> = Mutex<T>;
-
     async fn call_rpc<T, F>(
         &self,
         method_id: u64,

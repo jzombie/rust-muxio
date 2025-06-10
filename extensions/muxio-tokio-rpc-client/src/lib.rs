@@ -3,19 +3,12 @@ use muxio::rpc::rpc_internals::RpcStreamEncoder;
 use muxio_service_traits::{RpcClientInterface, RpcMethodPrebuffered};
 pub use rpc_client::RpcClient;
 use std::io;
-use tokio::sync::Mutex;
-use tokio::sync::mpsc::UnboundedSender;
-use tokio_tungstenite::tungstenite::protocol::Message as WsMessage;
 
 // TODO: Use feature flag for tokio vs. non-tokio here?
 
 // TODO: Move into `RpcClient`
 #[async_trait::async_trait]
 impl RpcClientInterface for RpcClient {
-    type Client = RpcClient;
-    type Sender = UnboundedSender<WsMessage>;
-    type Mutex<T: Send> = Mutex<T>;
-
     async fn call_rpc<T, F>(
         &self,
         method_id: u64,
