@@ -25,10 +25,10 @@ impl RpcMethodPrebuffered for Add {
     }
 
     fn decode_request(bytes: Vec<u8>) -> Result<Self::Input, io::Error> {
-        let raw = bitcode::decode::<AddRequestParams>(&bytes)
+        let req_params = bitcode::decode::<AddRequestParams>(&bytes)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
-        Ok(raw.numbers)
+        Ok(req_params.numbers)
     }
 
     fn encode_response(result: Self::Output) -> Vec<u8> {
@@ -36,9 +36,9 @@ impl RpcMethodPrebuffered for Add {
     }
 
     fn decode_response(bytes: Vec<u8>) -> Result<Self::Output, io::Error> {
-        let raw = bitcode::decode::<AddResponseParams>(&bytes)
+        let resp_params = bitcode::decode::<AddResponseParams>(&bytes)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
-        Ok(raw.result)
+        Ok(resp_params.result)
     }
 }
