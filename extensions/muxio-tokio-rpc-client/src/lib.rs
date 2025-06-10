@@ -1,6 +1,6 @@
 mod rpc_client;
 use muxio::rpc::rpc_internals::RpcStreamEncoder;
-use muxio_rpc_service::{RpcClientInterface, RpcMethodPrebuffered};
+use muxio_rpc_service::{RpcClientInterface};
 pub use rpc_client::RpcClient;
 use std::io;
 
@@ -34,35 +34,4 @@ impl RpcClientInterface for RpcClient {
     }
 }
 
-// TODO: Refactor (and dedupe)
-/// Calls a prebuffered RPC method defined by the `RpcRequestPrebuffered` and
-/// `RpcResponsePrebuffered` traits using a generic RPC transport.
-///
-/// This layer exists to decouple call-site logic from the encoding/decoding and
-/// transport mechanics, allowing for easier composition and testability.
-pub async fn call_prebuffered_rpc<T, C>(
-    rpc_client: &C,
-    input: T::Input,
-) -> Result<T::Output, io::Error>
-where
-    T: RpcMethodPrebuffered + Send + Sync + 'static,
-    T::Output: Send + 'static,
-    C: RpcClientInterface + Send + Sync,
-    // C::Dispatcher: Send,
-{
-    // let dispatcher = rpc_client.dispatcher();
-    // let tx = rpc_client.sender();
 
-    let transport_result = rpc_client
-        .call_rpc(
-            <T as RpcMethodPrebuffered>::METHOD_ID,
-            T::encode_request(input),
-            T::decode_response,
-            true,
-        )
-        .await?;
-
-    let (_, rpc_result) = transport_result;
-
-    rpc_result
-}
