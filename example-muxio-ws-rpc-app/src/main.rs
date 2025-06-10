@@ -5,6 +5,19 @@ use muxio_tokio_rpc_server::RpcServer;
 use tokio::join;
 use tokio::net::TcpListener;
 
+// TODO: Refactor accordingly
+fn boxed_handler<F>(
+    f: F,
+) -> impl Fn(Vec<u8>) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> + Send + Sync
+where
+    F: Fn(Vec<u8>) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>>
+        + Send
+        + Sync
+        + 'static,
+{
+    f
+}
+
 #[tokio::main]
 async fn main() {
     // Bind to a random available port
@@ -17,16 +30,26 @@ async fn main() {
         // Register server method
         // Note: If not using `join!`, each `register` call must be awaited.
         join!(
-            server.register(Add::METHOD_ID, |bytes| {
-                let req = Add::decode_request(bytes).unwrap();
-                let result = req.iter().sum();
-                Add::encode_response(result)
-            }),
-            server.register(Mult::METHOD_ID, |bytes| {
-                let req = Mult::decode_request(bytes).unwrap();
-                let result = req.iter().product();
-                Mult::encode_response(result)
-            })
+            server.register(
+                Add::METHOD_ID,
+                boxed_handler(
+                    |bytes| -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
+                        let req = Add::decode_request(bytes)?;
+                        let result = req.iter().sum();
+                        Ok(Add::encode_response(result))
+                    },
+                ),
+            ),
+            server.register(
+                Mult::METHOD_ID,
+                boxed_handler(|bytes| {
+                    let req = Mult::decode_request(bytes)
+                        .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+                    let result = req.iter().product();
+
+                    Ok(Mult::encode_response(result))
+                })
+            )
         );
 
         // Spawn the server using the pre-bound listener

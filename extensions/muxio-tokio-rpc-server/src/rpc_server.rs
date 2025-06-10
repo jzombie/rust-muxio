@@ -20,7 +20,12 @@ use tokio::{
 // endpoints can be used with alternative servers or transports.
 
 // TODO: Move to `muxio-rpc-service-endpoint`
-type RpcHandler = Box<dyn Fn(Vec<u8>) -> Vec<u8> + Send + Sync + 'static>;
+type RpcHandler = Box<
+    dyn Fn(Vec<u8>) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>>
+        + Send
+        + Sync
+        + 'static,
+>;
 
 pub struct RpcServer {
     // TODO: Move to `muxio-rpc-service-endpoint`
@@ -74,7 +79,10 @@ impl RpcServer {
     /// Registers a new RPC method handler.
     pub async fn register<F>(&self, method_id: u64, handler: F)
     where
-        F: Fn(Vec<u8>) -> Vec<u8> + Send + Sync + 'static,
+        F: Fn(Vec<u8>) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>>
+            + Send
+            + Sync
+            + 'static,
     {
         self.handlers
             .lock()
@@ -147,13 +155,26 @@ impl RpcServer {
 
                 let response = if let Some(handler) = handlers.lock().await.get(&request.method_id)
                 {
-                    let encoded = handler(param_bytes.clone());
-                    RpcResponse {
-                        request_header_id: request_id,
-                        method_id: request.method_id,
-                        result_status: Some(RpcResultStatus::Success.value()),
-                        pre_buffered_payload_bytes: Some(encoded),
-                        is_finalized: true,
+                    match handler(param_bytes.clone()) {
+                        Ok(encoded) => RpcResponse {
+                            request_header_id: request_id,
+                            method_id: request.method_id,
+                            result_status: Some(RpcResultStatus::Success.value()),
+                            pre_buffered_payload_bytes: Some(encoded),
+                            is_finalized: true,
+                        },
+                        Err(e) => {
+                            // TODO: Handle accordingly
+                            eprintln!("Handler error: {:?}", e);
+
+                            RpcResponse {
+                                request_header_id: request_id,
+                                method_id: request.method_id,
+                                result_status: Some(RpcResultStatus::SystemError.value()),
+                                pre_buffered_payload_bytes: None,
+                                is_finalized: true,
+                            }
+                        }
                     }
                 } else {
                     RpcResponse {
