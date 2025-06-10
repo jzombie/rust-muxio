@@ -11,4 +11,4 @@ futures-util = "0.3.31"
 tokio = { version = "1.45.1", features = ["full"] }
 tokio-tungstenite = "0.26.2"
 muxio = { path = "../../" }
-muxio-service-traits = { path = "../muxio-service-traits" }
+muxio-rpc-service = { path = "../muxio-rpc-service" }

@@ -11,5 +11,5 @@ js-sys = "0.3.77"
 muxio = { path = "../../" }
 wasm-bindgen = "0.2.100"
 web-sys = { version = "0.3.77", features = ["console"] }
-muxio-service-traits = { path = "../muxio-service-traits" }
+muxio-rpc-service = { path = "../muxio-rpc-service" }
 wasm-bindgen-futures = "0.4.50"

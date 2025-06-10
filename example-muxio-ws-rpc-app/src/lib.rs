@@ -1,5 +1,5 @@
 pub mod service_definition;
-use muxio_service_traits::{RpcCallPrebuffered, RpcClientInterface};
+use muxio_rpc_service::{RpcCallPrebuffered, RpcClientInterface};
 use muxio_tokio_rpc_client::call_prebuffered_rpc;
 pub use service_definition::{Add, Mult};
 use std::io;

@@ -1,5 +1,5 @@
 use example_muxio_ws_rpc_app::service_definition::{Add, Mult};
-use muxio_service_traits::{RpcCallPrebuffered, RpcMethodPrebuffered};
+use muxio_rpc_service::{RpcCallPrebuffered, RpcMethodPrebuffered};
 use muxio_tokio_rpc_client::RpcClient;
 use muxio_tokio_rpc_server::RpcServer;
 use tokio::join;

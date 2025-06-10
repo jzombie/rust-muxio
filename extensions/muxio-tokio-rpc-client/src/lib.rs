@@ -1,6 +1,6 @@
 mod rpc_client;
 use muxio::rpc::rpc_internals::RpcStreamEncoder;
-use muxio_service_traits::{RpcClientInterface, RpcMethodPrebuffered};
+use muxio_rpc_service::{RpcClientInterface, RpcMethodPrebuffered};
 pub use rpc_client::RpcClient;
 use std::io;
 

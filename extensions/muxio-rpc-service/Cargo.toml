@@ -1,5 +1,5 @@
 [package]
-name = "muxio-service-traits"
+name = "muxio-rpc-service"
 version = "0.1.0-alpha"
 edition = "2024"
 publish = false
