@@ -1,6 +1,5 @@
 use xxhash_rust::const_xxh3::xxh3_64 as const_xxh3_64;
 
-// inside your crate
 pub const fn method_id_hash(name: &str) -> u64 {
     const_xxh3_64(name.as_bytes())
 }
