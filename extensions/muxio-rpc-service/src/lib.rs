@@ -3,6 +3,8 @@ pub use prebuffered::*;
 mod client_interface;
 pub use client_interface::*;
 use std::io;
+pub mod constants;
+pub use constants::*;
 
 /// Performs a one-shot (pre-buffered) RPC call using a method that conforms to
 /// the `RpcMethodPrebuffered` interface.
