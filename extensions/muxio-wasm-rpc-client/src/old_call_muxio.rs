@@ -28,7 +28,7 @@ pub async fn call_muxio(
                 RpcRequest {
                     method_id,
                     param_bytes,
-                    pre_buffered_payload_bytes: payload,
+                    prebuffered_payload_bytes: payload,
                     is_finalized: true,
                 },
                 max_chunk_size,

@@ -18,8 +18,8 @@ extern "C" {
 /// Converts the given Rust `&[u8]` into a `Uint8Array` and passes it to
 /// the JavaScript `muxio_emit_socket_frame_uint8` function.
 pub fn muxio_emit_socket_frame_bytes(bytes: &[u8]) {
-    // TODO: Remove
-    web_sys::console::log_1(&"Emit bytes...".into());
+    // TODO: Remove (or use tracing)
+    // web_sys::console::log_1(&"Emit...".into());
 
     muxio_emit_socket_frame_uint8(Uint8Array::from(bytes));
 }

@@ -2,6 +2,8 @@ TODO: Mention something about "layered transport kit"
 
 TODO: Ensure reading and writing is standardized to: `read_bytes` and `write_bytes`
 
+TODO: Use `tracing` for logging: tracing = { version = "x", default-features = false, features = ["release_max_level_info"] }
+
 # Core Design Goals
 
 - Binary, not JSON — zero assumptions about serialization (CBOR, f32, FlatBuffers, etc.)

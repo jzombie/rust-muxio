@@ -789,11 +789,17 @@ version = "0.1.0-alpha"
 dependencies = [
  "async-trait",
  "muxio",
+ "xxhash-rust",
 ]
 
 [[package]]
 name = "muxio-rpc-service-endpoint"
 version = "0.1.0-alpha"
+dependencies = [
+ "muxio",
+ "muxio-rpc-service",
+ "tokio",
+]
 
 [[package]]
 name = "muxio-tokio-rpc-client"
@@ -816,6 +822,7 @@ dependencies = [
  "bytes",
  "futures-util",
  "muxio",
+ "muxio-rpc-service-endpoint",
  "tokio",
  "tokio-tungstenite",
 ]
@@ -1632,6 +1639,12 @@ checksum = "6f42320e61fe2cfd34354ecb597f86f413484a798ba44a8ca1165c58d42da6c1"
 dependencies = [
  "bitflags",
 ]
+
+[[package]]
+name = "xxhash-rust"
+version = "0.8.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fdd20c5420375476fbd4394763288da7eb0cc0b8c11deed431a91562af7335d3"
 
 [[package]]
 name = "zerocopy"

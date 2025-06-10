@@ -1,7 +1,7 @@
 use futures::channel::oneshot;
 use muxio::rpc::{
     RpcDispatcher, RpcRequest,
-    rpc_internals::{RpcStreamEncoder, RpcStreamEvent},
+    rpc_internals::{RpcEmit, RpcStreamEncoder, RpcStreamEvent},
 };
 use muxio_rpc_service::{RpcClientInterface, constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE};
 use std::sync::Arc;
@@ -38,35 +38,32 @@ impl RpcClientInterface for RpcWasmClient {
     async fn call_rpc<T, F>(
         &self,
         method_id: u64,
-        payload: Vec<u8>,
+        payload: &[u8],
         response_handler: F,
         is_finalized: bool,
-    ) -> Result<
-        (
-            RpcStreamEncoder<Box<dyn for<'a> FnMut(&'a [u8]) + Send + 'static>>,
-            T,
-        ),
-        std::io::Error,
-    >
+    ) -> Result<(RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>, T), std::io::Error>
     where
         T: Send + 'static,
-        F: Fn(Vec<u8>) -> T + Send + Sync + 'static,
+        F: Fn(&[u8]) -> T + Send + Sync + 'static,
     {
-        web_sys::console::log_1(&"Call RPC...".into());
+        // TODO: Remove (or use tracing)
+        // web_sys::console::log_1(&"Call RPC...".into());
 
         let emit = self.emit_callback.clone();
         let (done_tx, done_rx) = oneshot::channel::<T>();
         let done_tx = Arc::new(std::sync::Mutex::new(Some(done_tx)));
         let done_tx_clone = done_tx.clone();
 
-        let send_fn: Box<dyn for<'a> FnMut(&'a [u8]) + Send + 'static> = Box::new(move |chunk| {
+        let send_fn: Box<dyn RpcEmit + Send + Sync> = Box::new(move |chunk: &[u8]| {
             emit(chunk.to_vec());
-            web_sys::console::log_1(&"emit...".into());
+
+            // TODO: Remove (or use tracing)
+            // web_sys::console::log_1(&"emit...".into());
         });
 
         let recv_fn: Box<dyn FnMut(RpcStreamEvent) + Send + 'static> = Box::new(move |evt| {
             if let RpcStreamEvent::PayloadChunk { bytes, .. } = evt {
-                let result = response_handler(bytes);
+                let result = response_handler(&bytes);
                 let done_tx_clone2 = done_tx_clone.clone();
 
                 spawn_local(async move {
@@ -84,8 +81,8 @@ impl RpcClientInterface for RpcWasmClient {
             .call(
                 RpcRequest {
                     method_id,
-                    param_bytes: Some(payload),
-                    pre_buffered_payload_bytes: None,
+                    param_bytes: Some(payload.to_vec()),
+                    prebuffered_payload_bytes: None,
                     is_finalized,
                 },
                 DEFAULT_SERVICE_MAX_CHUNK_SIZE, // TODO: Make configurable

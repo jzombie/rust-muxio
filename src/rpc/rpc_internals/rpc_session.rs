@@ -1,18 +1,10 @@
+use super::aliases::*;
 use crate::{
     frame::{FrameDecodeError, FrameEncodeError, FrameKind, FrameMuxStreamDecoder},
     rpc::rpc_internals::{RpcHeader, RpcStreamDecoder, RpcStreamEncoder, RpcStreamEvent},
     utils::increment_u32_id,
 };
 use std::collections::HashMap;
-
-pub trait RpcEmit: FnMut(&[u8]) {}
-impl<T: FnMut(&[u8])> RpcEmit for T {}
-
-pub trait RpcResponseHandler: FnMut(RpcStreamEvent) + Send {}
-impl<T: FnMut(RpcStreamEvent) + Send> RpcResponseHandler for T {}
-
-pub trait RpcStreamEventHandler: FnMut(RpcStreamEvent) {}
-impl<T: FnMut(RpcStreamEvent)> RpcStreamEventHandler for T {}
 
 /// Low-level stream multiplexing engine for RPC.
 ///

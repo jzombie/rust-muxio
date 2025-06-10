@@ -24,7 +24,7 @@ pub struct RpcRequest {
     ///
     /// This is useful for single-frame RPCs where the entire message (metadata
     /// and payload) is known up front. If provided, it is sent during `call()`.
-    pub pre_buffered_payload_bytes: Option<Vec<u8>>,
+    pub prebuffered_payload_bytes: Option<Vec<u8>>,
 
     /// Indicates whether the request is fully formed and no more payload is expected.
     ///
@@ -67,7 +67,7 @@ pub struct RpcResponse {
     /// Optional payload to return with the response.
     ///
     /// If set, this will be sent immediately as the response payload.
-    pub pre_buffered_payload_bytes: Option<Vec<u8>>,
+    pub prebuffered_payload_bytes: Option<Vec<u8>>,
 
     /// Marks whether the response stream is complete.
     ///
@@ -99,7 +99,7 @@ impl RpcResponse {
                     _ => Some(rpc_header.metadata_bytes[0]),
                 }
             },
-            pre_buffered_payload_bytes: None,
+            prebuffered_payload_bytes: None,
             is_finalized: false, // Hardcoded to false because it is currently non-determinable from the header alone
         }
     }

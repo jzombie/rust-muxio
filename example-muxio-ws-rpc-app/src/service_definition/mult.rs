@@ -1,5 +1,5 @@
 use bitcode::{Decode, Encode};
-use muxio_rpc_service::RpcMethodPrebuffered;
+use muxio_rpc_service::{RpcMethodPrebuffered, rpc_method_id};
 use std::io;
 
 #[derive(Encode, Decode, PartialEq, Debug)]
@@ -15,30 +15,30 @@ struct MultResponseParams {
 pub struct Mult;
 
 impl RpcMethodPrebuffered for Mult {
-    const METHOD_ID: u64 = 0x02;
+    const METHOD_ID: u64 = rpc_method_id!("math.mult");
 
     type Input = Vec<f64>;
     type Output = f64;
 
-    fn encode_request(numbers: Self::Input) -> Vec<u8> {
-        bitcode::encode(&MultRequestParams { numbers })
+    fn encode_request(numbers: Self::Input) -> Result<Vec<u8>, io::Error> {
+        Ok(bitcode::encode(&MultRequestParams { numbers }))
     }
 
-    fn decode_request(bytes: Vec<u8>) -> Result<Self::Input, io::Error> {
-        let raw = bitcode::decode::<MultRequestParams>(&bytes)
+    fn decode_request(bytes: &[u8]) -> Result<Self::Input, io::Error> {
+        let req_params: MultRequestParams = bitcode::decode::<MultRequestParams>(&bytes)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
-        Ok(raw.numbers)
+        Ok(req_params.numbers)
     }
 
-    fn encode_response(result: Self::Output) -> Vec<u8> {
-        bitcode::encode(&MultResponseParams { result })
+    fn encode_response(result: Self::Output) -> Result<Vec<u8>, io::Error> {
+        Ok(bitcode::encode(&MultResponseParams { result }))
     }
 
-    fn decode_response(bytes: Vec<u8>) -> Result<Self::Output, io::Error> {
-        let raw = bitcode::decode::<MultResponseParams>(&bytes)
+    fn decode_response(bytes: &[u8]) -> Result<Self::Output, io::Error> {
+        let resp_params = bitcode::decode::<MultResponseParams>(&bytes)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
-        Ok(raw.result)
+        Ok(resp_params.result)
     }
 }

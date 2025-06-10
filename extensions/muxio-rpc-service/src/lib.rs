@@ -5,6 +5,8 @@ pub use client_interface::*;
 use std::io;
 pub mod constants;
 pub use constants::*;
+mod macros;
+pub use macros::*;
 
 /// Performs a one-shot (pre-buffered) RPC call using a method that conforms to
 /// the `RpcMethodPrebuffered` interface.
@@ -31,7 +33,7 @@ where
     let (_, rpc_result) = rpc_client
         .call_rpc(
             T::METHOD_ID,
-            T::encode_request(input),
+            &T::encode_request(input)?,
             T::decode_response,
             true,
         )

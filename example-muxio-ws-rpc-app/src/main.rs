@@ -2,6 +2,7 @@ use example_muxio_ws_rpc_app::service_definition::{Add, Mult};
 use muxio_rpc_service::{RpcCallPrebuffered, RpcMethodPrebuffered};
 use muxio_tokio_rpc_client::RpcClient;
 use muxio_tokio_rpc_server::RpcServer;
+use std::sync::Arc;
 use tokio::join;
 use tokio::net::TcpListener;
 
@@ -16,16 +17,18 @@ async fn main() {
 
         // Register server method
         // Note: If not using `join!`, each `register` call must be awaited.
-        join!(
-            server.register(Add::METHOD_ID, |bytes| async move {
-                let req = Add::decode_request(bytes)?;
+        let _ = join!(
+            server.register_prebuffered(Add::METHOD_ID, |bytes| async move {
+                let req = Add::decode_request(&bytes)?;
                 let result = req.iter().sum();
-                Ok(Add::encode_response(result))
+                let resp = Add::encode_response(result)?;
+                Ok(resp)
             }),
-            server.register(Mult::METHOD_ID, |bytes| async move {
-                let req = Mult::decode_request(bytes)?;
+            server.register_prebuffered(Mult::METHOD_ID, |bytes| async move {
+                let req = Mult::decode_request(&bytes)?;
                 let result = req.iter().product();
-                Ok(Mult::encode_response(result))
+                let resp = Mult::encode_response(result)?;
+                Ok(resp)
             })
         );
 
@@ -33,7 +36,7 @@ async fn main() {
         let _server_task = tokio::spawn({
             let server = server;
             async move {
-                let _ = server.serve_with_listener(listener).await;
+                let _ = Arc::new(server).serve_with_listener(listener).await;
             }
         });
     }
