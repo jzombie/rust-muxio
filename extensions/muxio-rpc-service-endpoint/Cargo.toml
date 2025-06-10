@@ -5,3 +5,4 @@ edition = "2024"
 publish = false
 
 [dependencies]
+tokio = { version = "1.45.1", features = ["sync"] }

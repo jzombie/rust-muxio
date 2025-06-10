@@ -10,6 +10,7 @@ use axum::{
 use bytes::Bytes;
 use futures_util::{SinkExt, StreamExt};
 use muxio::rpc::{RpcDispatcher, RpcResponse, RpcResultStatus};
+use muxio_rpc_service_endpoint::{RpcPrebufferedHandler, RpcServiceEndpoint};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::{
     net::TcpListener,
@@ -23,28 +24,15 @@ use tokio::{
 use std::future::Future;
 use std::pin::Pin;
 
-type RpcHandler = Box<
-    dyn Fn(
-            Vec<u8>,
-        ) -> Pin<
-            Box<
-                dyn Future<Output = Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>>>
-                    + Send,
-            >,
-        > + Send
-        + Sync,
->;
-
 pub struct RpcServer {
-    // TODO: Move to `muxio-rpc-service-endpoint`
-    handlers: Arc<Mutex<HashMap<u64, RpcHandler>>>,
+    endpoint: RpcServiceEndpoint,
 }
 
 impl RpcServer {
     /// Creates a new `RpcServer` instance with no routes started.
     pub fn new() -> Self {
         RpcServer {
-            handlers: Arc::new(Mutex::new(HashMap::new())),
+            endpoint: RpcServiceEndpoint::new(),
         }
     }
 
@@ -66,8 +54,8 @@ impl RpcServer {
         let app = Router::new().route(
             "/ws", // TODO: Don't hardcode
             get({
-                let handlers = self.handlers.clone();
-                move |ws, conn| Self::ws_handler(ws, conn, handlers.clone())
+                let prebuffered_handlers = self.endpoint.prebuffered_handlers.clone();
+                move |ws, conn| Self::ws_handler(ws, conn, prebuffered_handlers.clone())
             }),
         );
 
@@ -85,28 +73,44 @@ impl RpcServer {
     // TODO: Enable inner method to return result type
     // TODO: Add ability to register streaming handler
     /// Registers a new RPC method handler.
-    pub async fn register<F, Fut>(&self, method_id: u64, handler: F)
+    // pub async fn register<F, Fut>(&self, method_id: u64, handler: F)
+    // where
+    //     F: Fn(Vec<u8>) -> Fut + Send + Sync + 'static,
+    //     Fut: Future<Output = Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>>>
+    //         + Send
+    //         + 'static,
+    // {
+    //     let wrapped = move |bytes: Vec<u8>| {
+    //         Box::pin(handler(bytes)) as Pin<Box<dyn Future<Output = _> + Send>>
+    //     };
+
+    //     self.endpoint
+    //         .prebuffered_handlers
+    //         .lock()
+    //         .await
+    //         .insert(method_id, Box::new(wrapped));
+    // }
+
+    // TODO: Rename to `register_prebuffered`
+    pub async fn register<F, Fut>(
+        &self,
+        method_id: u64,
+        handler: F,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
     where
         F: Fn(Vec<u8>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>>>
             + Send
             + 'static,
     {
-        let wrapped = move |bytes: Vec<u8>| {
-            Box::pin(handler(bytes)) as Pin<Box<dyn Future<Output = _> + Send>>
-        };
-
-        self.handlers
-            .lock()
-            .await
-            .insert(method_id, Box::new(wrapped));
+        self.endpoint.register(method_id, handler).await
     }
 
     /// WebSocket route handler that sets up the WebSocket connection.
     async fn ws_handler(
         ws: WebSocketUpgrade,
         ConnectInfo(addr): ConnectInfo<SocketAddr>,
-        handlers: Arc<Mutex<HashMap<u64, RpcHandler>>>,
+        handlers: Arc<Mutex<HashMap<u64, RpcPrebufferedHandler>>>,
     ) -> impl IntoResponse {
         println!("Client connected: {}", addr);
         ws.on_upgrade(move |socket| Self::handle_socket(socket, handlers))
@@ -114,7 +118,10 @@ impl RpcServer {
 
     /// Handles the actual WebSocket connection lifecycle, dispatching incoming
     /// RPC messages and sending appropriate responses using the muxio dispatcher.
-    async fn handle_socket(socket: WebSocket, handlers: Arc<Mutex<HashMap<u64, RpcHandler>>>) {
+    async fn handle_socket(
+        socket: WebSocket,
+        handlers: Arc<Mutex<HashMap<u64, RpcPrebufferedHandler>>>,
+    ) {
         let (mut sender, mut receiver) = socket.split();
         let (tx, mut rx) = unbounded_channel::<Message>();
         let (recv_tx, mut recv_rx) = unbounded_channel::<Option<Result<Message, axum::Error>>>();
