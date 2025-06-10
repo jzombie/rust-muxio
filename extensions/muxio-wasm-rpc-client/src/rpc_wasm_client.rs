@@ -1,17 +1,13 @@
-use crate::socket_transport::muxio_emit_socket_frame_bytes;
 use futures::channel::oneshot;
-use js_sys::Uint8Array;
 use muxio::rpc::{
     RpcDispatcher, RpcRequest,
     rpc_internals::{RpcStreamEncoder, RpcStreamEvent},
 };
 use std::sync::Arc;
-use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
-use web_sys::console;
 
 pub struct RpcWasmClient {
-    // TODO: Should these be made public?
+    // TODO: Should these be kept public?
     pub dispatcher: Arc<std::sync::Mutex<RpcDispatcher<'static>>>,
     pub emit_callback: Arc<dyn Fn(Vec<u8>) + Send + Sync>,
 }

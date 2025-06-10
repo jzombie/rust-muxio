@@ -14,7 +14,7 @@ use tokio_tungstenite::{connect_async, tungstenite::protocol::Message as WsMessa
 
 // TODO: Rename to RpcNativeClient?
 pub struct RpcClient {
-    // TODO: Should these be made public?
+    // TODO: Should these be kept public?
     pub dispatcher: Arc<Mutex<RpcDispatcher<'static>>>,
     pub tx: mpsc::UnboundedSender<WsMessage>,
 }
