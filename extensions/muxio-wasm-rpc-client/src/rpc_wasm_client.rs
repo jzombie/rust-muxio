@@ -46,7 +46,8 @@ impl RpcClientInterface for RpcWasmClient {
         T: Send + 'static,
         F: Fn(&[u8]) -> T + Send + Sync + 'static,
     {
-        web_sys::console::log_1(&"Call RPC...".into());
+        // TODO: Remove (or use tracing)
+        // web_sys::console::log_1(&"Call RPC...".into());
 
         let emit = self.emit_callback.clone();
         let (done_tx, done_rx) = oneshot::channel::<T>();
@@ -55,7 +56,9 @@ impl RpcClientInterface for RpcWasmClient {
 
         let send_fn: Box<dyn RpcEmit + Send + Sync> = Box::new(move |chunk: &[u8]| {
             emit(chunk.to_vec());
-            web_sys::console::log_1(&"emit...".into());
+
+            // TODO: Remove (or use tracing)
+            // web_sys::console::log_1(&"emit...".into());
         });
 
         let recv_fn: Box<dyn FnMut(RpcStreamEvent) + Send + 'static> = Box::new(move |evt| {
