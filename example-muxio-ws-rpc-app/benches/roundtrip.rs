@@ -4,7 +4,7 @@ use futures::{StreamExt, stream::FuturesUnordered};
 use muxio_rpc_service::{RpcCallPrebuffered, RpcMethodPrebuffered};
 use muxio_tokio_rpc_client::RpcClient;
 use muxio_tokio_rpc_server::RpcServer;
-use std::{hint::black_box, time::Duration};
+use std::{hint::black_box, sync::Arc, time::Duration};
 use tokio::{net::TcpListener, runtime::Runtime};
 
 fn bench_roundtrip(c: &mut Criterion) {
@@ -28,7 +28,7 @@ fn bench_roundtrip(c: &mut Criterion) {
         let server_task = tokio::spawn({
             let server = server;
             async move {
-                let _ = server.serve_with_listener(listener).await;
+                let _ = Arc::new(server).serve_with_listener(listener).await;
             }
         });
 

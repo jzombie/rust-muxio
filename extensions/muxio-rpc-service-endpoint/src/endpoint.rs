@@ -1,5 +1,5 @@
 use muxio::frame::FrameDecodeError;
-use muxio::rpc::{RpcDispatcher, RpcResponse, RpcResultStatus};
+use muxio::rpc::{RpcDispatcher, RpcResponse, RpcResultStatus, rpc_internals::RpcEmit};
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::pin::Pin;
@@ -68,7 +68,10 @@ impl RpcServiceEndpoint {
         }
     }
 
-    pub async fn read_bytes(&self, bytes: &[u8]) -> Result<(), FrameDecodeError> {
+    pub async fn read_bytes<E>(&self, bytes: &[u8], mut on_emit: E) -> Result<(), FrameDecodeError>
+    where
+        E: RpcEmit,
+    {
         let mut rpc_dispatcher = self.rpc_dispatcher.lock().await;
 
         let request_ids = match rpc_dispatcher.read_bytes(&bytes) {
@@ -133,10 +136,7 @@ impl RpcServiceEndpoint {
                 .respond(
                     response,
                     1024, // TODO Use service constant
-                    move |chunk| {
-                        // TODO: handle
-                        println!("EMITTING: {:?}", chunk);
-                    },
+                    |chunk| on_emit(chunk),
                 )
                 // TODO: Dont' unwrap
                 .unwrap();
