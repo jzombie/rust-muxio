@@ -16,6 +16,9 @@ use tokio::{
     sync::{Mutex, mpsc::unbounded_channel},
 };
 
+// TODO: Document that this is a basic server implementation and that the underlying service
+// endpoints can be used with alternative servers or transports.
+
 // TODO: Move to `muxio-rpc-service-endpoint`
 type RpcHandler = Box<dyn Fn(Vec<u8>) -> Vec<u8> + Send + Sync + 'static>;
 
