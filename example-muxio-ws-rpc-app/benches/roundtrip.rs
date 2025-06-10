@@ -5,7 +5,7 @@ use muxio_rpc_service::{RpcCallPrebuffered, RpcMethodPrebuffered};
 use muxio_tokio_rpc_client::RpcClient;
 use muxio_tokio_rpc_server::RpcServer;
 use std::{hint::black_box, time::Duration};
-use tokio::{join, net::TcpListener, runtime::Runtime};
+use tokio::{net::TcpListener, runtime::Runtime};
 
 fn bench_roundtrip(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
@@ -37,51 +37,25 @@ fn bench_roundtrip(c: &mut Criterion) {
         (client, server_task)
     });
 
-    // Benchmark only the actual call
-    c.bench_function("rpc_add_roundtrip_batch_10", |b| {
-        b.to_async(&rt).iter(|| async {
-            let fut1 = Add::call(&client, vec![1.0, 2.0, 3.0]);
-            let fut2 = Add::call(&client, vec![1.0, 2.0, 3.0]);
-            let fut3 = Add::call(&client, vec![1.0, 2.0, 3.0]);
-            let fut4 = Add::call(&client, vec![1.0, 2.0, 3.0]);
-            let fut5 = Add::call(&client, vec![1.0, 2.0, 3.0]);
-            let fut6 = Add::call(&client, vec![1.0, 2.0, 3.0]);
-            let fut7 = Add::call(&client, vec![1.0, 2.0, 3.0]);
-            let fut8 = Add::call(&client, vec![1.0, 2.0, 3.0]);
-            let fut9 = Add::call(&client, vec![1.0, 2.0, 3.0]);
-            let fut10 = Add::call(&client, vec![1.0, 2.0, 3.0]);
-
-            let (r1, r2, r3, r4, r5, r6, r7, r8, r9, r10) =
-                join!(fut1, fut2, fut3, fut4, fut5, fut6, fut7, fut8, fut9, fut10);
-
-            black_box((
-                r1.unwrap(),
-                r2.unwrap(),
-                r3.unwrap(),
-                r4.unwrap(),
-                r5.unwrap(),
-                r6.unwrap(),
-                r7.unwrap(),
-                r8.unwrap(),
-                r9.unwrap(),
-                r10.unwrap(),
-            ));
-        });
-    });
-
     c.bench_function("rpc_add_roundtrip_futures_unordered_batch_10", |b| {
         b.to_async(&rt).iter(|| async {
             let mut tasks = FuturesUnordered::new();
 
+            // Spawn 10 concurrent RPC calls to the Add method.
+            // These futures are submitted all at once and polled concurrently.
             for _ in 0..10 {
                 tasks.push(Add::call(&client, vec![1.0, 2.0, 3.0]));
             }
 
             let mut results = Vec::with_capacity(10);
+
+            // Collect results as each RPC call completes, in completion order.
+            // This loop allows early yielding of finished calls, ensuring true concurrency.
             while let Some(res) = tasks.next().await {
                 results.push(res.unwrap());
             }
 
+            // Prevent compiler from optimizing away the result
             black_box(results);
         });
     });
