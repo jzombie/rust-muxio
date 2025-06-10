@@ -115,6 +115,9 @@ impl RpcServer {
         let mut dispatcher = RpcDispatcher::new();
 
         while let Some(Some(Ok(Message::Binary(bytes)))) = recv_rx.recv().await {
+            // TODO: This aspect can be refactored aways and used on *both*
+            // client and server as there should be no distinction between
+            // the two in Muxio.
             let request_ids = match dispatcher.receive_bytes(&bytes) {
                 Ok(ids) => ids,
                 Err(e) => {
