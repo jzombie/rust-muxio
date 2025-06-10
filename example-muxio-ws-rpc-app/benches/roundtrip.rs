@@ -85,6 +85,13 @@ fn bench_roundtrip(c: &mut Criterion) {
             black_box(results);
         });
     });
+
+    c.bench_function("rpc_add_roundtrip_futures_unordered_singles", |b| {
+        b.to_async(&rt).iter(|| async {
+            let res = Add::call(&client, vec![1.0, 2.0, 3.0]).await;
+            black_box(res.unwrap());
+        });
+    });
 }
 
 criterion_group!(benches, bench_roundtrip);
