@@ -17,15 +17,15 @@ async fn main() {
         // Register server method
         // Note: If not using `join!`, each `register` call must be awaited.
         join!(
-            server.register(Add::METHOD_ID, |bytes| {
-                let req = Add::decode_request(bytes).unwrap();
+            server.register(Add::METHOD_ID, |bytes| async move {
+                let req = Add::decode_request(bytes)?;
                 let result = req.iter().sum();
-                Add::encode_response(result)
+                Ok(Add::encode_response(result))
             }),
-            server.register(Mult::METHOD_ID, |bytes| {
-                let req = Mult::decode_request(bytes).unwrap();
+            server.register(Mult::METHOD_ID, |bytes| async move {
+                let req = Mult::decode_request(bytes)?;
                 let result = req.iter().product();
-                Mult::encode_response(result)
+                Ok(Mult::encode_response(result))
             })
         );
 

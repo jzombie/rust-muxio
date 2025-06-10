@@ -20,7 +20,20 @@ use tokio::{
 // endpoints can be used with alternative servers or transports.
 
 // TODO: Move to `muxio-rpc-service-endpoint`
-type RpcHandler = Box<dyn Fn(Vec<u8>) -> Vec<u8> + Send + Sync + 'static>;
+use std::future::Future;
+use std::pin::Pin;
+
+type RpcHandler = Box<
+    dyn Fn(
+            Vec<u8>,
+        ) -> Pin<
+            Box<
+                dyn Future<Output = Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>>>
+                    + Send,
+            >,
+        > + Send
+        + Sync,
+>;
 
 pub struct RpcServer {
     // TODO: Move to `muxio-rpc-service-endpoint`
@@ -69,16 +82,24 @@ impl RpcServer {
         Ok(addr)
     }
 
+    // TODO: Enable inner method to return result type
     // TODO: Add ability to register streaming handler
     /// Registers a new RPC method handler.
-    pub async fn register<F>(&self, method_id: u64, handler: F)
+    pub async fn register<F, Fut>(&self, method_id: u64, handler: F)
     where
-        F: Fn(Vec<u8>) -> Vec<u8> + Send + Sync + 'static,
+        F: Fn(Vec<u8>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>>>
+            + Send
+            + 'static,
     {
+        let wrapped = move |bytes: Vec<u8>| {
+            Box::pin(handler(bytes)) as Pin<Box<dyn Future<Output = _> + Send>>
+        };
+
         self.handlers
             .lock()
             .await
-            .insert(method_id, Box::new(handler));
+            .insert(method_id, Box::new(wrapped));
     }
 
     /// WebSocket route handler that sets up the WebSocket connection.
@@ -146,13 +167,26 @@ impl RpcServer {
 
                 let response = if let Some(handler) = handlers.lock().await.get(&request.method_id)
                 {
-                    let encoded = handler(param_bytes.clone());
-                    RpcResponse {
-                        request_header_id: request_id,
-                        method_id: request.method_id,
-                        result_status: Some(RpcResultStatus::Success.value()),
-                        pre_buffered_payload_bytes: Some(encoded),
-                        is_finalized: true,
+                    match handler(param_bytes.clone()).await {
+                        Ok(encoded) => RpcResponse {
+                            request_header_id: request_id,
+                            method_id: request.method_id,
+                            result_status: Some(RpcResultStatus::Success.value()),
+                            pre_buffered_payload_bytes: Some(encoded),
+                            is_finalized: true,
+                        },
+                        Err(e) => {
+                            // TODO: Handle accordingly
+                            eprintln!("Handler error: {:?}", e);
+
+                            RpcResponse {
+                                request_header_id: request_id,
+                                method_id: request.method_id,
+                                result_status: Some(RpcResultStatus::SystemError.value()),
+                                pre_buffered_payload_bytes: None,
+                                is_finalized: true,
+                            }
+                        }
                     }
                 } else {
                     RpcResponse {
