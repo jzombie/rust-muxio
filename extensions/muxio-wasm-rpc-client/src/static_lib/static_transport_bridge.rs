@@ -1,6 +1,5 @@
 use js_sys::Uint8Array;
 use wasm_bindgen::prelude::*;
-use web_sys::console;
 
 use super::MUXIO_STATIC_RPC_CLIENT_REF;
 
@@ -69,7 +68,8 @@ pub fn static_muxio_read_bytes_uint8(inbound_data: Uint8Array) -> Result<(), JsV
                 .read_bytes(&inbound_bytes)
                 .unwrap();
         } else {
-            console::error_1(&"Dispatcher not initialized".into());
+            // TODO: Use tracing instead?
+            panic!("Dispatcher not initialized");
         }
     });
 

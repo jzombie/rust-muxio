@@ -22,15 +22,6 @@ impl RpcWasmClient {
             emit_callback: Arc::new(emit_callback),
         }
     }
-
-    pub fn read_bytes(&self, bytes: Vec<u8>) {
-        // TODO: Remove
-        // web_sys::console::log_1(&"receive...".into());
-
-        if let Err(e) = self.dispatcher.lock().unwrap().read_bytes(&bytes) {
-            web_sys::console::error_1(&format!("Dispatcher error: {:?}", e).into());
-        }
-    }
 }
 
 #[async_trait::async_trait]
@@ -46,9 +37,6 @@ impl RpcClientInterface for RpcWasmClient {
         T: Send + 'static,
         F: Fn(&[u8]) -> T + Send + Sync + 'static,
     {
-        // TODO: Remove (or use tracing)
-        // web_sys::console::log_1(&"Call RPC...".into());
-
         let emit = self.emit_callback.clone();
         let (done_tx, done_rx) = oneshot::channel::<T>();
         let done_tx = Arc::new(std::sync::Mutex::new(Some(done_tx)));
@@ -56,9 +44,6 @@ impl RpcClientInterface for RpcWasmClient {
 
         let send_fn: Box<dyn RpcEmit + Send + Sync> = Box::new(move |chunk: &[u8]| {
             emit(chunk.to_vec());
-
-            // TODO: Remove (or use tracing)
-            // web_sys::console::log_1(&"emit...".into());
         });
 
         let recv_fn: Box<dyn FnMut(RpcStreamEvent) + Send + 'static> = Box::new(move |evt| {
