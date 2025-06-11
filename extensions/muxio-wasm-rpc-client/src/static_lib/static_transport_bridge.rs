@@ -7,16 +7,17 @@ use super::MUXIO_STATIC_RPC_CLIENT_REF;
 #[wasm_bindgen]
 extern "C" {
     // Internally called when the RPC client has data to share over the network.
-    fn static_muxio_emit_frame_uint8(data: Uint8Array);
+    fn static_muxio_write_bytes_uint8(data: Uint8Array);
 }
 
-pub fn static_muxio_emit_frame_bytes(bytes: &[u8]) {
-    static_muxio_emit_frame_uint8(Uint8Array::from(bytes));
+// Internally called to convert bytes to `Uint8Array` for JavaScript.
+pub(crate) fn static_muxio_write_bytes(bytes: &[u8]) {
+    static_muxio_write_bytes_uint8(Uint8Array::from(bytes));
 }
 
 // Called from JS when network data is available to the client.
 #[wasm_bindgen]
-pub fn static_muxio_receive_frame_uint8(inbound_data: Uint8Array) -> Result<(), JsValue> {
+pub fn static_muxio_read_bytes_uint8(inbound_data: Uint8Array) -> Result<(), JsValue> {
     // Convert Uint8Array to Vec<u8>
     let inbound_bytes = inbound_data.to_vec();
 
