@@ -8,6 +8,8 @@ use muxio_rpc_service::{RpcClientInterface, constants::DEFAULT_SERVICE_MAX_CHUNK
 use std::io;
 use std::sync::{Arc, Mutex};
 
+const ERROR_MARKER_PREFIX: &[u8] = b"__MUXIO_ERR__";
+
 pub struct RpcWasmClient {
     dispatcher: Arc<Mutex<RpcDispatcher<'static>>>,
     emit_callback: Arc<dyn Fn(Vec<u8>) + Send + Sync>,
@@ -16,7 +18,6 @@ pub struct RpcWasmClient {
 impl RpcWasmClient {
     pub fn new(emit_callback: impl Fn(Vec<u8>) + Send + Sync + 'static) -> RpcWasmClient {
         let dispatcher = Arc::new(Mutex::new(RpcDispatcher::new()));
-
         RpcWasmClient {
             dispatcher,
             emit_callback: Arc::new(emit_callback),
@@ -64,12 +65,10 @@ impl RpcClientInterface for RpcWasmClient {
                         .unwrap_or(RpcResultStatus::Success);
 
                     if result_status != RpcResultStatus::Success {
-                        let err = io::Error::new(
-                            io::ErrorKind::Other,
-                            format!("RPC failed: {:?}", result_status),
-                        );
                         let _ = tx.lock().unwrap().take().map(|mut t| {
-                            let _ = t.try_send(err.to_string().into_bytes());
+                            let mut marker = Vec::from(ERROR_MARKER_PREFIX);
+                            marker.push(result_status as u8);
+                            let _ = t.try_send(marker);
                         });
                     }
                 }
@@ -81,7 +80,7 @@ impl RpcClientInterface for RpcWasmClient {
                 }
 
                 RpcStreamEvent::End { .. } => {
-                    let _ = tx.lock().unwrap().take(); // Close stream
+                    let _ = tx.lock().unwrap().take();
                 }
 
                 _ => {}
@@ -132,6 +131,15 @@ impl RpcClientInterface for RpcWasmClient {
 
         let mut buf = Vec::new();
         while let Some(chunk) = stream.next().await {
+            if chunk.starts_with(ERROR_MARKER_PREFIX) {
+                let status_byte = chunk[ERROR_MARKER_PREFIX.len()];
+                let err = io::Error::new(
+                    io::ErrorKind::Other,
+                    format!("RPC error status: {:?}", status_byte),
+                );
+                return Ok((encoder, Err(err)));
+            }
+
             buf.extend_from_slice(&chunk);
         }
 
