@@ -7,7 +7,9 @@ use axum::{
 };
 use bytes::Bytes;
 use futures_util::{SinkExt, StreamExt};
-use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface};
+use muxio_rpc_service_endpoint::{
+    RpcServiceEndpoint, RpcServiceEndpointInterface, error::RpcEndpointError,
+};
 use std::{future::Future, net::SocketAddr, sync::Arc};
 use tokio::{net::TcpListener, sync::mpsc::unbounded_channel};
 
@@ -124,7 +126,7 @@ impl RpcServiceEndpointInterface for RpcServer {
         &self,
         method_id: u64,
         handler: F,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
+    ) -> Result<(), RpcEndpointError>
     where
         F: Fn(Vec<u8>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>>>

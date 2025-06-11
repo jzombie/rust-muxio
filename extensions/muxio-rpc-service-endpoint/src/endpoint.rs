@@ -29,7 +29,7 @@ pub trait RpcServiceEndpointInterface {
         &self,
         method_id: u64,
         handler: F,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
+    ) -> Result<(), RpcEndpointError>
     where
         F: Fn(Vec<u8>) -> Fut + Send + Sync + 'static,
         // TODO: Use type alias
@@ -134,7 +134,7 @@ impl RpcServiceEndpointInterface for RpcServiceEndpoint {
         &self,
         method_id: u64,
         handler: F,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
+    ) -> Result<(), RpcEndpointError>
     where
         F: Fn(Vec<u8>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>>>
@@ -152,7 +152,7 @@ impl RpcServiceEndpointInterface for RpcServiceEndpoint {
                     "a handler for method ID {} is already registered",
                     method_id
                 );
-                Err(err_msg.into()) // .into() converts the String to the Box<dyn Error>
+                Err(RpcEndpointError::Handler(err_msg.into()))
             }
 
             // If the key doesn't exist, insert the handler and return Ok.
