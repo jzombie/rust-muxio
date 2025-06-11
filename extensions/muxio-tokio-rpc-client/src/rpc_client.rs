@@ -125,7 +125,8 @@ impl RpcClientInterface for RpcClient {
                 Some(recv_fn),
                 true,
             )
-            .expect("dispatcher.call failed");
+            // TODO: Don't use unwrap
+            .unwrap();
 
         let result = done_rx.await.expect("oneshot receive failed");
 
