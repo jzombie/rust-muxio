@@ -1,4 +1,3 @@
-use futures::StreamExt;
 use futures::channel::{mpsc, oneshot};
 use muxio::rpc::{
     RpcDispatcher, RpcRequest, RpcResultStatus,
@@ -22,7 +21,7 @@ pub async fn call_rpc_streaming_generic(
     ),
     io::Error,
 > {
-    let (tx, rx) = mpsc::channel::<Vec<u8>>(8);
+    let (tx, rx) = mpsc::channel::<Vec<u8>>(8); // TODO: Don't hardcode buffer size
     let tx = Arc::new(Mutex::new(Some(tx)));
 
     let (ready_tx, ready_rx) = oneshot::channel::<Result<(), io::Error>>();
