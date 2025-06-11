@@ -1,5 +1,5 @@
+use super::static_muxio_emit_socket_frame_bytes;
 use crate::RpcWasmClient;
-use crate::muxio_emit_socket_frame_bytes;
 use js_sys::Promise;
 use std::cell::RefCell;
 use std::sync::Arc;
@@ -15,7 +15,7 @@ pub fn init_static_client() {
     MUXIO_STATIC_RPC_CLIENT_REF.with(|cell| {
         if cell.borrow().is_none() {
             let rpc_wasm_client = Arc::new(RpcWasmClient::new(|bytes| {
-                muxio_emit_socket_frame_bytes(&bytes)
+                static_muxio_emit_socket_frame_bytes(&bytes)
             }));
 
             *cell.borrow_mut() = Some(rpc_wasm_client);
@@ -24,7 +24,7 @@ pub fn init_static_client() {
 }
 
 // TODO: Document
-pub fn with_rpc_client_async<F, Fut, T>(f: F) -> Promise
+pub fn with_static_client_async<F, Fut, T>(f: F) -> Promise
 where
     F: FnOnce(Arc<RpcWasmClient>) -> Fut + 'static,
     Fut: Future<Output = Result<T, String>> + 'static,
