@@ -4,6 +4,7 @@ use muxio::rpc::{
     rpc_internals::{RpcStreamEncoder, RpcStreamEvent, rpc_trait::RpcEmit},
 };
 use muxio_rpc_service::{RpcClientInterface, constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE};
+use std::io;
 use std::sync::{Arc, Mutex};
 use wasm_bindgen_futures::spawn_local;
 
@@ -37,7 +38,7 @@ impl RpcClientInterface for RpcWasmClient {
         payload: &[u8],
         response_handler: F,
         is_finalized: bool,
-    ) -> Result<(RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>, T), std::io::Error>
+    ) -> Result<(RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>, T), io::Error>
     where
         T: Send + 'static,
         F: Fn(&[u8]) -> T + Send + Sync + 'static,

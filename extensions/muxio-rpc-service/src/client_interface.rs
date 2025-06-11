@@ -2,7 +2,7 @@ use muxio::rpc::{
     RpcDispatcher,
     rpc_internals::{RpcStreamEncoder, rpc_trait::RpcEmit},
 };
-use std::sync::Arc;
+use std::{io, sync::Arc};
 
 /// A transport-agnostic RPC client interface supporting both
 /// one-shot (pre-buffered) and streaming request workflows.
@@ -29,7 +29,7 @@ pub trait RpcClientInterface {
         payload: &[u8],
         response_handler: F,
         is_finalized: bool,
-    ) -> Result<(RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>, T), std::io::Error>
+    ) -> Result<(RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>, T), io::Error>
     where
         T: Send + 'static,
         // TODO: Use type alias for `Fn(&[u8])`
