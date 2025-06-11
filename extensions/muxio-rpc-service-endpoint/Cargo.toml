@@ -5,6 +5,7 @@ edition = "2024"
 publish = false
 
 [dependencies]
+async-trait = "0.1.88"
 tokio = { version = "1.45.1", features = ["sync"] }
 muxio = { path = "../../" }
 muxio-rpc-service = { path = "../muxio-rpc-service" }

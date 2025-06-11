@@ -7,8 +7,7 @@ use axum::{
 };
 use bytes::Bytes;
 use futures_util::{SinkExt, StreamExt};
-use muxio_rpc_service::RpcServerInterface;
-use muxio_rpc_service_endpoint::RpcServiceEndpoint;
+use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface};
 use std::{future::Future, net::SocketAddr, sync::Arc};
 use tokio::{net::TcpListener, sync::mpsc::unbounded_channel};
 
@@ -120,7 +119,7 @@ impl RpcServer {
 }
 
 #[async_trait::async_trait]
-impl RpcServerInterface for RpcServer {
+impl RpcServiceEndpointInterface for RpcServer {
     async fn register_prebuffered<F, Fut>(
         &self,
         method_id: u64,

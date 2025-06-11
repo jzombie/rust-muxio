@@ -3,6 +3,7 @@ use muxio::rpc::{RpcDispatcher, RpcResponse, RpcResultStatus, rpc_internals::Rpc
 use muxio_rpc_service::constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
+use std::marker::Send;
 use std::pin::Pin;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -20,6 +21,22 @@ pub type RpcPrebufferedHandler = Box<
         + Sync,
 >;
 
+/// Used so that servers (and optionally clients) can implement endpoint registration methods.
+#[async_trait::async_trait]
+pub trait RpcServiceEndpointInterface {
+    async fn register_prebuffered<F, Fut>(
+        &self,
+        method_id: u64,
+        handler: F,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
+    where
+        F: Fn(Vec<u8>) -> Fut + Send + Sync + 'static,
+        // TODO: Use type alias
+        Fut: Future<Output = Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>>>
+            + Send
+            + 'static;
+}
+
 pub struct RpcServiceEndpoint {
     prebuffered_handlers: Arc<Mutex<HashMap<u64, RpcPrebufferedHandler>>>,
     rpc_dispatcher: Arc<Mutex<RpcDispatcher<'static>>>,
@@ -33,45 +50,9 @@ impl RpcServiceEndpoint {
         }
     }
 
-    pub async fn register_prebuffered<F, Fut>(
-        &self,
-        method_id: u64,
-        handler: F,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
-    where
-        F: Fn(Vec<u8>) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>>>
-            + Send
-            + 'static,
-    {
-        // Acquire the lock. If it's poisoned, create a descriptive error message.
-        let mut handlers = self.prebuffered_handlers.lock().await;
-
-        // Use the entry API to atomically check and insert.
-        match handlers.entry(method_id) {
-            // If the key already exists, return an error.
-            Entry::Occupied(_) => {
-                let err_msg = format!(
-                    "a handler for method ID {} is already registered",
-                    method_id
-                );
-                Err(err_msg.into()) // .into() converts the String to the Box<dyn Error>
-            }
-
-            // If the key doesn't exist, insert the handler and return Ok.
-            Entry::Vacant(entry) => {
-                let wrapped = move |bytes: Vec<u8>| {
-                    Box::pin(handler(bytes)) as Pin<Box<dyn Future<Output = _> + Send>>
-                };
-                entry.insert(Box::new(wrapped));
-                Ok(())
-            }
-        }
-    }
-
     pub async fn read_bytes<E>(&self, bytes: &[u8], mut on_emit: E) -> Result<(), FrameDecodeError>
     where
-        E: RpcEmit,
+        E: RpcEmit + Send,
     {
         let mut rpc_dispatcher = self.rpc_dispatcher.lock().await;
 
@@ -144,5 +125,44 @@ impl RpcServiceEndpoint {
         }
 
         Ok(())
+    }
+}
+
+#[async_trait::async_trait]
+impl RpcServiceEndpointInterface for RpcServiceEndpoint {
+    async fn register_prebuffered<F, Fut>(
+        &self,
+        method_id: u64,
+        handler: F,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
+    where
+        F: Fn(Vec<u8>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>>>
+            + Send
+            + 'static,
+    {
+        // Acquire the lock. If it's poisoned, create a descriptive error message.
+        let mut handlers = self.prebuffered_handlers.lock().await;
+
+        // Use the entry API to atomically check and insert.
+        match handlers.entry(method_id) {
+            // If the key already exists, return an error.
+            Entry::Occupied(_) => {
+                let err_msg = format!(
+                    "a handler for method ID {} is already registered",
+                    method_id
+                );
+                Err(err_msg.into()) // .into() converts the String to the Box<dyn Error>
+            }
+
+            // If the key doesn't exist, insert the handler and return Ok.
+            Entry::Vacant(entry) => {
+                let wrapped = move |bytes: Vec<u8>| {
+                    Box::pin(handler(bytes)) as Pin<Box<dyn Future<Output = _> + Send>>
+                };
+                entry.insert(Box::new(wrapped));
+                Ok(())
+            }
+        }
     }
 }

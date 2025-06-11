@@ -14,3 +14,4 @@ muxio = { path = "../../" }
 muxio-rpc-service = { path = "../muxio-rpc-service" }
 muxio-rpc-service-endpoint = { path = "../muxio-rpc-service-endpoint" }
 async-trait = "0.1.88"
+
