@@ -1,4 +1,4 @@
-# Muxio: Multiplexed, Schemaless, and Extensible Binary RPC for Rust
+# Muxio: An Extensible Framework for Multiplexed, Schemaless RPC
 
 Muxio is a high-performance, asynchronous RPC and stream multiplexing framework for Rust. It provides a set of foundational components for building robust, transport-agnostic, and runtime-agnostic services.
 
