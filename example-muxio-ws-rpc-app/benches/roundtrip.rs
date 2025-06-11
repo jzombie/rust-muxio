@@ -1,7 +1,7 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use example_muxio_ws_rpc_app::service_definition::Add;
 use futures::{StreamExt, stream::FuturesUnordered};
-use muxio_rpc_service::{RpcCallPrebuffered, RpcMethodPrebuffered};
+use muxio_rpc_service::prebuffered::{RpcCallPrebuffered, RpcMethodPrebuffered};
 use muxio_tokio_rpc_client::RpcClient;
 use muxio_tokio_rpc_server::RpcServer;
 use std::{hint::black_box, sync::Arc, time::Duration};

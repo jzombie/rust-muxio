@@ -1,5 +1,5 @@
 use bitcode::{Decode, Encode};
-use muxio_rpc_service::{RpcMethodPrebuffered, rpc_method_id};
+use muxio_rpc_service::{prebuffered::RpcMethodPrebuffered, rpc_method_id};
 use std::io;
 
 #[derive(Encode, Decode, PartialEq, Debug)]

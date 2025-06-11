@@ -23,5 +23,6 @@ pub trait RpcClientInterface {
     ) -> Result<(RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>, T), std::io::Error>
     where
         T: Send + 'static,
+        // TODO: Use type alias for `Fn(&[u8])`
         F: Fn(&[u8]) -> T + Send + Sync + 'static;
 }
