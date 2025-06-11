@@ -5,6 +5,7 @@ use muxio::rpc::{
     rpc_internals::{RpcStreamEncoder, RpcStreamEvent, rpc_trait::RpcEmit},
 };
 use muxio_rpc_service::{RpcClientInterface, constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE};
+use std::io;
 use std::sync::Arc;
 use tokio::sync::{
     Mutex,
@@ -80,7 +81,7 @@ impl RpcClientInterface for RpcClient {
         payload: &[u8],
         response_handler: F,
         is_finalized: bool,
-    ) -> Result<(RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>, T), std::io::Error>
+    ) -> Result<(RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>, T), io::Error>
     where
         T: Send + 'static,
         F: Fn(&[u8]) -> T + Send + Sync + 'static,
@@ -125,8 +126,7 @@ impl RpcClientInterface for RpcClient {
                 Some(recv_fn),
                 true,
             )
-            // TODO: Don't use unwrap
-            .unwrap();
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("{:?}", e)))?;
 
         let result = done_rx.await.expect("oneshot receive failed");
 
