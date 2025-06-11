@@ -20,8 +20,7 @@ pub type RpcPrebufferedHandler = Box<
 >;
 
 pub struct RpcServiceEndpoint {
-    // TODO: Privatize
-    pub prebuffered_handlers: Arc<Mutex<HashMap<u64, RpcPrebufferedHandler>>>,
+    prebuffered_handlers: Arc<Mutex<HashMap<u64, RpcPrebufferedHandler>>>,
     rpc_dispatcher: Arc<Mutex<RpcDispatcher<'static>>>,
 }
 

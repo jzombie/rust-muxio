@@ -8,9 +8,8 @@ use std::sync::Arc;
 use wasm_bindgen_futures::spawn_local;
 
 pub struct RpcWasmClient {
-    // TODO: Should these be kept public?
     pub dispatcher: Arc<std::sync::Mutex<RpcDispatcher<'static>>>,
-    pub emit_callback: Arc<dyn Fn(Vec<u8>) + Send + Sync>,
+    emit_callback: Arc<dyn Fn(Vec<u8>) + Send + Sync>,
 }
 
 impl RpcWasmClient {
