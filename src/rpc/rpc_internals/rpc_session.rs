@@ -1,4 +1,4 @@
-use super::aliases::*;
+use super::rpc_trait::*;
 use crate::{
     frame::{FrameDecodeError, FrameEncodeError, FrameKind, FrameMuxStreamDecoder},
     rpc::rpc_internals::{RpcHeader, RpcStreamDecoder, RpcStreamEncoder, RpcStreamEvent},

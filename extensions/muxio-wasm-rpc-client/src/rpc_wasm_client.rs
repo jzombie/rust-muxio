@@ -1,7 +1,7 @@
 use futures::channel::oneshot;
 use muxio::rpc::{
     RpcDispatcher, RpcRequest,
-    rpc_internals::{RpcEmit, RpcStreamEncoder, RpcStreamEvent},
+    rpc_internals::{RpcStreamEncoder, RpcStreamEvent, rpc_trait::RpcEmit},
 };
 use muxio_rpc_service::{RpcClientInterface, constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE};
 use std::sync::{Arc, Mutex};

@@ -1,6 +1,6 @@
 use muxio::rpc::{
     RpcDispatcher,
-    rpc_internals::{RpcEmit, RpcStreamEncoder},
+    rpc_internals::{RpcStreamEncoder, rpc_trait::RpcEmit},
 };
 use std::sync::Arc;
 

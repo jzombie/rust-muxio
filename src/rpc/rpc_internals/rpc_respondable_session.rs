@@ -1,6 +1,7 @@
 use crate::frame::{FrameDecodeError, FrameEncodeError};
 use crate::rpc::rpc_internals::{
-    RpcEmit, RpcHeader, RpcResponseHandler, RpcSession, RpcStreamEncoder, RpcStreamEvent,
+    RpcHeader, RpcSession, RpcStreamEncoder, RpcStreamEvent,
+    rpc_trait::{RpcEmit, RpcResponseHandler},
 };
 use std::collections::HashMap;
 

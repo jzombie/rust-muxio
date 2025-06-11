@@ -1,6 +1,6 @@
 use super::error::RpcEndpointError;
 use muxio::frame::FrameEncodeError;
-use muxio::rpc::{RpcDispatcher, RpcResponse, RpcResultStatus, rpc_internals::RpcEmit};
+use muxio::rpc::{RpcDispatcher, RpcResponse, RpcResultStatus, rpc_internals::rpc_trait::RpcEmit};
 use muxio_rpc_service::constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
