@@ -85,7 +85,7 @@ pub async fn call_rpc_streaming_generic(
                 prebuffered_payload_bytes: None,
                 is_finalized,
             },
-            DEFAULT_SERVICE_MAX_CHUNK_SIZE,
+            DEFAULT_SERVICE_MAX_CHUNK_SIZE, // TODO: Make configurable
             send_fn,
             Some(recv_fn),
             true,
