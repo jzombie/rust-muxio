@@ -1,0 +1,1 @@
+Provides a singleton-based, global RPC client (RpcWasmClient) accessible throughout the WebAssembly module. This is ideal for interop scenarios where JS bindings are exposed globally or callbacks come from multiple sources without explicit state passing.
