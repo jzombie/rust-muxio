@@ -1,4 +1,5 @@
-use futures::channel::oneshot;
+use futures::StreamExt;
+use futures::channel::mpsc;
 use muxio::rpc::{
     RpcDispatcher, RpcRequest, RpcResultStatus,
     rpc_internals::{RpcStreamEncoder, RpcStreamEvent, rpc_trait::RpcEmit},
@@ -6,7 +7,6 @@ use muxio::rpc::{
 use muxio_rpc_service::{RpcClientInterface, constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE};
 use std::io;
 use std::sync::{Arc, Mutex};
-use wasm_bindgen_futures::spawn_local;
 
 pub struct RpcWasmClient {
     dispatcher: Arc<Mutex<RpcDispatcher<'static>>>,
@@ -32,40 +32,28 @@ impl RpcClientInterface for RpcWasmClient {
         self.dispatcher.clone()
     }
 
-    async fn call_rpc<T, F>(
+    async fn call_rpc_streaming(
         &self,
         method_id: u64,
         payload: &[u8],
-        response_handler: F,
         is_finalized: bool,
     ) -> Result<
         (
             RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>,
-            Result<T, io::Error>,
+            mpsc::Receiver<Vec<u8>>,
         ),
         io::Error,
-    >
-    where
-        T: Send + 'static,
-        F: Fn(&[u8]) -> T + Send + Sync + 'static,
-    {
+    > {
         let emit = self.emit_callback.clone();
-
-        let (done_tx, done_rx) = oneshot::channel::<Result<T, io::Error>>();
-        let done_tx = Arc::new(Mutex::new(Some(done_tx)));
-        let done_tx_clone = done_tx.clone();
-
-        let response_buf = Arc::new(Mutex::new(Vec::new()));
-        let response_buf_clone = Arc::clone(&response_buf);
-
-        let response_handler = Arc::new(response_handler);
+        let (tx, rx) = mpsc::channel::<Vec<u8>>(8);
+        let tx = Arc::new(Mutex::new(Some(tx)));
 
         let send_fn: Box<dyn RpcEmit + Send + Sync> = Box::new(move |chunk: &[u8]| {
             emit(chunk.to_vec());
         });
 
         let recv_fn: Box<dyn FnMut(RpcStreamEvent) + Send + 'static> = Box::new({
-            let response_handler = Arc::clone(&response_handler);
+            let tx = Arc::clone(&tx);
             move |evt| match evt {
                 RpcStreamEvent::Header { rpc_header, .. } => {
                     let result_status = rpc_header
@@ -76,42 +64,31 @@ impl RpcClientInterface for RpcWasmClient {
                         .unwrap_or(RpcResultStatus::Success);
 
                     if result_status != RpcResultStatus::Success {
-                        let done_tx_clone2 = done_tx_clone.clone();
-                        spawn_local(async move {
-                            let err = io::Error::new(
-                                io::ErrorKind::Other,
-                                format!("RPC call failed: {:?}", result_status),
-                            );
-                            if let Some(tx) = done_tx_clone2.lock().unwrap().take() {
-                                let _ = tx.send(Err(err));
-                            }
+                        let err = io::Error::new(
+                            io::ErrorKind::Other,
+                            format!("RPC failed: {:?}", result_status),
+                        );
+                        let _ = tx.lock().unwrap().take().map(|mut t| {
+                            let _ = t.try_send(err.to_string().into_bytes());
                         });
                     }
                 }
 
                 RpcStreamEvent::PayloadChunk { bytes, .. } => {
-                    let mut buf = response_buf.lock().unwrap();
-                    buf.extend_from_slice(&bytes);
+                    let _ = tx.lock().unwrap().as_mut().map(|t| {
+                        let _ = t.try_send(bytes);
+                    });
                 }
 
                 RpcStreamEvent::End { .. } => {
-                    let done_tx_clone2 = done_tx_clone.clone();
-                    let full_response = response_buf_clone.lock().unwrap().clone();
-                    let response_handler = Arc::clone(&response_handler);
-
-                    spawn_local(async move {
-                        let result = response_handler(&full_response);
-                        if let Some(tx) = done_tx_clone2.lock().unwrap().take() {
-                            let _ = tx.send(Ok(result));
-                        }
-                    });
+                    let _ = tx.lock().unwrap().take(); // Close stream
                 }
 
                 _ => {}
             }
         });
 
-        let rpc_stream_encoder = self
+        let encoder = self
             .dispatcher
             .lock()
             .map_err(|_| io::Error::new(io::ErrorKind::Other, "Dispatcher lock poisoned"))?
@@ -129,13 +106,35 @@ impl RpcClientInterface for RpcWasmClient {
             )
             .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Encode error: {e:?}")))?;
 
-        let result = done_rx.await.map_err(|_| {
-            io::Error::new(
-                io::ErrorKind::Other,
-                "oneshot receive failed: channel dropped",
-            )
-        })?;
+        Ok((encoder, rx))
+    }
 
-        Ok((rpc_stream_encoder, result))
+    async fn call_rpc_buffered<T, F>(
+        &self,
+        method_id: u64,
+        payload: &[u8],
+        decode: F,
+        is_finalized: bool,
+    ) -> Result<
+        (
+            RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>,
+            Result<T, io::Error>,
+        ),
+        io::Error,
+    >
+    where
+        T: Send + 'static,
+        F: Fn(&[u8]) -> T + Send + Sync + 'static,
+    {
+        let (encoder, mut stream) = self
+            .call_rpc_streaming(method_id, payload, is_finalized)
+            .await?;
+
+        let mut buf = Vec::new();
+        while let Some(chunk) = stream.next().await {
+            buf.extend_from_slice(&chunk);
+        }
+
+        Ok((encoder, Ok(decode(&buf))))
     }
 }

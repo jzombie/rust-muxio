@@ -788,6 +788,7 @@ name = "muxio-rpc-service"
 version = "0.1.0-alpha"
 dependencies = [
  "async-trait",
+ "futures",
  "muxio",
  "xxhash-rust",
 ]

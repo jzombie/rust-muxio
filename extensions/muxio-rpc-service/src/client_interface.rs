@@ -1,3 +1,4 @@
+use futures::channel::mpsc::Receiver;
 use muxio::rpc::{
     RpcDispatcher,
     rpc_internals::{RpcStreamEncoder, rpc_trait::RpcEmit},
@@ -23,11 +24,25 @@ pub trait RpcClientInterface {
 
     fn get_dispatcher(&self) -> Arc<Self::DispatcherMutex<RpcDispatcher<'static>>>;
 
-    async fn call_rpc<T, F>(
+    async fn call_rpc_streaming(
         &self,
         method_id: u64,
         payload: &[u8],
-        response_handler: F,
+        is_finalized: bool,
+    ) -> Result<
+        (
+            RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>,
+            Receiver<Vec<u8>>, // streamed response chunks
+        ),
+        io::Error,
+    >;
+
+    /// Buffered interface: collects all response chunks before decoding.
+    async fn call_rpc_buffered<T, F>(
+        &self,
+        method_id: u64,
+        payload: &[u8],
+        decode: F,
         is_finalized: bool,
     ) -> Result<
         (

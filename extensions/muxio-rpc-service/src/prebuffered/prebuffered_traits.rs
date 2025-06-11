@@ -1,4 +1,3 @@
-use super::call_prebuffered_rpc;
 use crate::RpcClientInterface;
 use std::io;
 
@@ -55,27 +54,4 @@ pub trait RpcMethodPrebuffered {
     /// # Arguments
     /// * `bytes` - Serialized response payload.
     fn decode_response(bytes: &[u8]) -> Result<Self::Output, io::Error>;
-}
-
-/// Blanket implementation of the `RpcCallPrebuffered` trait for any type
-/// that also implements `RpcMethodPrebuffered`.
-///
-/// This enables `.call()` usage on any RPC method type without requiring
-/// a manual implementation for each one.
-///
-/// This reduces boilerplate and enforces consistency across your service
-/// method definitions.
-#[async_trait::async_trait]
-impl<T> RpcCallPrebuffered for T
-where
-    T: RpcMethodPrebuffered + Send + Sync + 'static,
-    T::Input: Send + 'static,
-    T::Output: Send + 'static,
-{
-    async fn call<C>(rpc_client: &C, input: Self::Input) -> Result<Self::Output, io::Error>
-    where
-        C: RpcClientInterface + Send + Sync,
-    {
-        call_prebuffered_rpc::<T, C>(rpc_client, input).await
-    }
 }
