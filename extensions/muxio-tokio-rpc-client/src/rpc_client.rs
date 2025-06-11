@@ -23,7 +23,7 @@ impl RpcClient {
     pub async fn new(websocket_address: &str) -> RpcClient {
         let (ws_stream, _) = connect_async(websocket_address)
             .await
-            // TODO: Use Result type
+            // TODO: Don't use expect or unwrap
             .expect("Failed to connect");
         let (mut sender, mut receiver) = ws_stream.split();
 
@@ -127,6 +127,7 @@ impl RpcClientInterface for RpcClient {
             )
             .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("{:?}", e)))?;
 
+        // TODO: Don't use expect or unwrap
         let result = done_rx.await.expect("oneshot receive failed");
 
         Ok((rpc_stream_encoder, result))

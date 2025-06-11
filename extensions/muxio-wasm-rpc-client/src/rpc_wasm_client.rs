@@ -85,6 +85,7 @@ impl RpcClientInterface for RpcWasmClient {
             // TODO: Don't use unwrap
             .unwrap();
 
+        // TODO: Don't use expect or unwrap
         let result = done_rx.await.expect("oneshot receive failed");
 
         Ok((rpc_stream_encoder, result))
