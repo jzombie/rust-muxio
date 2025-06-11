@@ -17,8 +17,8 @@ impl<T: FnMut(&[u8])> RpcEmit for T {}
 /// Implementors must be `Send` to allow handling in concurrent or async contexts.
 /// This is used for registering per-request response callbacks in a client session.
 ///
-/// Each event corresponds to part of an RPC response stream, such as `Header`,
-/// `PayloadChunk`, or `End`.
+/// Each event corresponds to part of an RPC response stream, such as [`RpcStreamEvent::Header`],
+/// [`RpcStreamEvent::PayloadChunk`], or [`RpcStreamEvent::End`].
 /// ```
 pub trait RpcResponseHandler: FnMut(RpcStreamEvent) + Send {}
 impl<T: FnMut(RpcStreamEvent) + Send> RpcResponseHandler for T {}
