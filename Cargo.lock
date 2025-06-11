@@ -794,6 +794,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "muxio-rpc-service-caller"
+version = "0.1.0-alpha"
+dependencies = [
+ "futures",
+ "muxio",
+ "muxio-rpc-service",
+]
+
+[[package]]
 name = "muxio-rpc-service-endpoint"
 version = "0.1.0-alpha"
 dependencies = [
@@ -840,6 +849,7 @@ dependencies = [
  "js-sys",
  "muxio",
  "muxio-rpc-service",
+ "muxio-rpc-service-caller",
  "wasm-bindgen",
  "wasm-bindgen-futures",
 ]
