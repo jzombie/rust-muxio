@@ -1,4 +1,5 @@
 use js_sys::Uint8Array;
+use muxio_rpc_service::RpcClientInterface;
 use wasm_bindgen::prelude::*;
 
 use super::MUXIO_STATIC_RPC_CLIENT_REF;
@@ -62,7 +63,7 @@ pub fn static_muxio_read_bytes_uint8(inbound_data: Uint8Array) -> Result<(), JsV
     MUXIO_STATIC_RPC_CLIENT_REF.with(|cell| {
         if let Some(rpc_wasm_client) = cell.borrow_mut().as_mut() {
             rpc_wasm_client
-                .dispatcher
+                .get_dispatcher()
                 .lock()
                 .unwrap()
                 .read_bytes(&inbound_bytes)

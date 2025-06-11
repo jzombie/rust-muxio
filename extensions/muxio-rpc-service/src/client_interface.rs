@@ -1,4 +1,8 @@
-use muxio::rpc::rpc_internals::{RpcEmit, RpcStreamEncoder};
+use muxio::rpc::{
+    RpcDispatcher,
+    rpc_internals::{RpcEmit, RpcStreamEncoder},
+};
+use std::sync::Arc;
 
 /// A transport-agnostic RPC client interface supporting both
 /// one-shot (pre-buffered) and streaming request workflows.
@@ -14,6 +18,10 @@ use muxio::rpc::rpc_internals::{RpcEmit, RpcStreamEncoder};
 ///
 #[async_trait::async_trait]
 pub trait RpcClientInterface {
+    type DispatcherMutex<T>;
+
+    fn get_dispatcher(&self) -> Arc<Self::DispatcherMutex<RpcDispatcher<'static>>>;
+
     async fn call_rpc<T, F>(
         &self,
         method_id: u64,

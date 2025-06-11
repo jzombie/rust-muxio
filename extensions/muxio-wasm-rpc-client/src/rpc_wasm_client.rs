@@ -4,11 +4,11 @@ use muxio::rpc::{
     rpc_internals::{RpcEmit, RpcStreamEncoder, RpcStreamEvent},
 };
 use muxio_rpc_service::{RpcClientInterface, constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use wasm_bindgen_futures::spawn_local;
 
 pub struct RpcWasmClient {
-    pub dispatcher: Arc<std::sync::Mutex<RpcDispatcher<'static>>>,
+    dispatcher: Arc<Mutex<RpcDispatcher<'static>>>,
     emit_callback: Arc<dyn Fn(Vec<u8>) + Send + Sync>,
 }
 
@@ -25,6 +25,12 @@ impl RpcWasmClient {
 
 #[async_trait::async_trait]
 impl RpcClientInterface for RpcWasmClient {
+    type DispatcherMutex<T> = Mutex<RpcDispatcher<'static>>;
+
+    fn get_dispatcher(&self) -> Arc<Self::DispatcherMutex<RpcDispatcher<'static>>> {
+        self.dispatcher.clone()
+    }
+
     async fn call_rpc<T, F>(
         &self,
         method_id: u64,
