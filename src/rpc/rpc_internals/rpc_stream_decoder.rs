@@ -64,12 +64,12 @@ impl RpcStreamDecoder {
                         Err(_) => return Err(FrameDecodeError::CorruptFrame), // Frame type is invalid
                     };
 
-                let id = u32::from_le_bytes(
+                let header_id = u32::from_le_bytes(
                     self.buffer[RPC_FRAME_ID_OFFSET..RPC_FRAME_METHOD_ID_OFFSET]
                         .try_into()
-                        // TODO: Don't use unwrap
-                        .unwrap(),
+                        .map_err(|_| FrameDecodeError::CorruptFrame)?,
                 );
+
                 let method_id = u64::from_le_bytes(
                     self.buffer[RPC_FRAME_METHOD_ID_OFFSET..RPC_FRAME_METADATA_LENGTH_OFFSET]
                         .try_into()
@@ -102,7 +102,7 @@ impl RpcStreamDecoder {
 
                 self.header = Some(RpcHeader {
                     msg_type,
-                    id,
+                    id: header_id,
                     method_id,
                     metadata_bytes,
                 });
