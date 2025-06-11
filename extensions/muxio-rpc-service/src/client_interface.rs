@@ -29,9 +29,14 @@ pub trait RpcClientInterface {
         payload: &[u8],
         response_handler: F,
         is_finalized: bool,
-    ) -> Result<(RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>, T), io::Error>
+    ) -> Result<
+        (
+            RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>,
+            Result<T, io::Error>,
+        ),
+        io::Error,
+    >
     where
         T: Send + 'static,
-        // TODO: Use type alias for `Fn(&[u8])` (Note: This is a wrapped variant of `RpcResponseHandler` and not directly compatible)
         F: Fn(&[u8]) -> T + Send + Sync + 'static;
 }

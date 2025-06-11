@@ -1,6 +1,6 @@
 use futures::channel::oneshot;
 use muxio::rpc::{
-    RpcDispatcher, RpcRequest,
+    RpcDispatcher, RpcRequest, RpcResultStatus,
     rpc_internals::{RpcStreamEncoder, RpcStreamEvent, rpc_trait::RpcEmit},
 };
 use muxio_rpc_service::{RpcClientInterface, constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE};
@@ -38,39 +38,69 @@ impl RpcClientInterface for RpcWasmClient {
         payload: &[u8],
         response_handler: F,
         is_finalized: bool,
-    ) -> Result<(RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>, T), io::Error>
+    ) -> Result<
+        (
+            RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>,
+            Result<T, io::Error>,
+        ),
+        io::Error,
+    >
     where
         T: Send + 'static,
         F: Fn(&[u8]) -> T + Send + Sync + 'static,
     {
         let emit = self.emit_callback.clone();
-        let (done_tx, done_rx) = oneshot::channel::<T>();
-        let done_tx = Arc::new(std::sync::Mutex::new(Some(done_tx)));
+        let (done_tx, done_rx) = oneshot::channel::<Result<T, io::Error>>();
+        let done_tx = Arc::new(Mutex::new(Some(done_tx)));
         let done_tx_clone = done_tx.clone();
 
         let send_fn: Box<dyn RpcEmit + Send + Sync> = Box::new(move |chunk: &[u8]| {
             emit(chunk.to_vec());
         });
 
-        let recv_fn: Box<dyn FnMut(RpcStreamEvent) + Send + 'static> = Box::new(move |evt| {
-            if let RpcStreamEvent::PayloadChunk { bytes, .. } = evt {
-                let result = response_handler(&bytes);
-                let done_tx_clone2 = done_tx_clone.clone();
+        let recv_fn: Box<dyn FnMut(RpcStreamEvent) + Send + 'static> =
+            Box::new(move |evt| match evt {
+                RpcStreamEvent::Header { rpc_header, .. } => {
+                    let result_status = rpc_header
+                        .metadata_bytes
+                        .first()
+                        .copied()
+                        .and_then(|b| RpcResultStatus::try_from(b).ok())
+                        .unwrap_or(RpcResultStatus::Success);
 
-                spawn_local(async move {
-                    // TODO: Don't use unwrap
-                    if let Some(tx) = done_tx_clone2.lock().unwrap().take() {
-                        let _ = tx.send(result);
+                    if result_status != RpcResultStatus::Success {
+                        let done_tx_clone2 = done_tx_clone.clone();
+
+                        spawn_local(async move {
+                            let err = io::Error::new(
+                                io::ErrorKind::Other,
+                                format!("RPC call failed: {:?}", result_status),
+                            );
+                            if let Some(tx) = done_tx_clone2.lock().unwrap().take() {
+                                let _ = tx.send(Err(err));
+                            }
+                        });
                     }
-                });
-            }
-        });
+                }
+
+                RpcStreamEvent::PayloadChunk { bytes, .. } => {
+                    let result = response_handler(&bytes);
+                    let done_tx_clone2 = done_tx_clone.clone();
+
+                    spawn_local(async move {
+                        if let Some(tx) = done_tx_clone2.lock().unwrap().take() {
+                            let _ = tx.send(Ok(result));
+                        }
+                    });
+                }
+
+                _ => {}
+            });
 
         let rpc_stream_encoder = self
             .dispatcher
             .lock()
-            // TODO: Don't use unwrap
-            .unwrap()
+            .map_err(|_| io::Error::new(io::ErrorKind::Other, "Dispatcher lock poisoned"))?
             .call(
                 RpcRequest {
                     method_id,
@@ -78,16 +108,19 @@ impl RpcClientInterface for RpcWasmClient {
                     prebuffered_payload_bytes: None,
                     is_finalized,
                 },
-                DEFAULT_SERVICE_MAX_CHUNK_SIZE, // TODO: Make configurable
+                DEFAULT_SERVICE_MAX_CHUNK_SIZE,
                 send_fn,
                 Some(recv_fn),
                 true,
             )
-            // TODO: Don't use unwrap
-            .unwrap();
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Encode error: {e:?}")))?;
 
-        // TODO: Don't use expect or unwrap
-        let result = done_rx.await.expect("oneshot receive failed");
+        let result = done_rx.await.map_err(|_| {
+            io::Error::new(
+                io::ErrorKind::Other,
+                "oneshot receive failed: channel dropped",
+            )
+        })?;
 
         Ok((rpc_stream_encoder, result))
     }

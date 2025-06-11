@@ -32,5 +32,5 @@ where
         )
         .await?;
 
-    rpc_result
+    rpc_result?
 }
