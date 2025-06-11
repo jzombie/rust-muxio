@@ -1,22 +1,21 @@
 use bytes::Bytes;
+use futures::channel::mpsc; // We use this for the stream returned by the generic fn
 use futures_util::{SinkExt, StreamExt};
 use muxio::rpc::{
-    RpcDispatcher, RpcRequest,
-    rpc_internals::{RpcStreamEncoder, RpcStreamEvent, rpc_trait::RpcEmit},
+    RpcDispatcher,
+    rpc_internals::{RpcStreamEncoder, rpc_trait::RpcEmit},
 };
 use muxio_rpc_service::{RpcClientInterface, constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE};
+// Import our robust, generic calling function
+use muxio_rpc_service_caller::call_rpc_streaming_generic;
 use std::io;
 use std::sync::Arc;
-use tokio::sync::{
-    Mutex,
-    mpsc::{self, unbounded_channel},
-    oneshot,
-};
+use tokio::sync::{Mutex, mpsc as tokio_mpsc};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message as WsMessage};
 
 pub struct RpcClient {
     dispatcher: Arc<Mutex<RpcDispatcher<'static>>>,
-    tx: mpsc::UnboundedSender<WsMessage>,
+    tx: tokio_mpsc::UnboundedSender<WsMessage>,
 }
 
 impl RpcClient {
@@ -27,9 +26,10 @@ impl RpcClient {
             .expect("Failed to connect");
         let (mut sender, mut receiver) = ws_stream.split();
 
-        let (tx, mut rx) = unbounded_channel::<WsMessage>();
-        let (recv_tx, mut recv_rx) =
-            unbounded_channel::<Option<Result<WsMessage, tokio_tungstenite::tungstenite::Error>>>();
+        let (tx, mut rx) = tokio_mpsc::unbounded_channel::<WsMessage>();
+        let (recv_tx, mut recv_rx) = tokio_mpsc::unbounded_channel::<
+            Option<Result<WsMessage, tokio_tungstenite::tungstenite::Error>>,
+        >();
 
         let dispatcher = Arc::new(Mutex::new(RpcDispatcher::new()));
 
@@ -66,70 +66,79 @@ impl RpcClient {
     }
 }
 
+// This block replaces the old implementation entirely.
 #[async_trait::async_trait]
 impl RpcClientInterface for RpcClient {
-    type DispatcherMutex<T> = Mutex<RpcDispatcher<'static>>;
+    type DispatcherMutex<T> = Mutex<T>;
 
     fn get_dispatcher(&self) -> Arc<Self::DispatcherMutex<RpcDispatcher<'static>>> {
         self.dispatcher.clone()
     }
 
-    async fn call_rpc<T, F>(
+    async fn call_rpc_streaming(
         &self,
         method_id: u64,
         payload: &[u8],
-        response_handler: F,
         is_finalized: bool,
-    ) -> Result<(RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>, T), io::Error>
+    ) -> Result<
+        (
+            RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>,
+            mpsc::Receiver<Vec<u8>>,
+        ),
+        io::Error,
+    > {
+        // Create the emit callback for the generic function.
+        // It captures the tokio MPSC sender for the websocket.
+        let emit_fn: Arc<dyn Fn(Vec<u8>) + Send + Sync> = Arc::new({
+            let tx = self.tx.clone();
+            move |chunk: Vec<u8>| {
+                // The generic handler gives us a Vec<u8>, which we wrap in a WsMessage.
+                let _ = tx.send(WsMessage::Binary(chunk.into()));
+            }
+        });
+
+        // Delegate directly to the generic function.
+        // The dispatcher (Arc<tokio::sync::Mutex<...>>) works because we implemented
+        // the WithDispatcher trait for it in the other crate.
+        call_rpc_streaming_generic(
+            self.get_dispatcher(),
+            emit_fn,
+            method_id,
+            payload,
+            is_finalized,
+        )
+        .await
+    }
+
+    async fn call_rpc_buffered<T, F>(
+        &self,
+        method_id: u64,
+        payload: &[u8],
+        decode: F,
+        is_finalized: bool,
+    ) -> Result<
+        (
+            RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>,
+            Result<T, io::Error>,
+        ),
+        io::Error,
+    >
     where
         T: Send + 'static,
         F: Fn(&[u8]) -> T + Send + Sync + 'static,
     {
-        let (done_tx, done_rx) = oneshot::channel::<T>();
-        let done_tx = Arc::new(Mutex::new(Some(done_tx)));
-        let done_tx_clone = done_tx.clone();
+        // Get the streaming response.
+        let (encoder, mut stream) = self
+            .call_rpc_streaming(method_id, payload, is_finalized)
+            .await?;
 
-        let tx = self.tx.clone();
+        // Collect all chunks from the futures::mpsc::Receiver stream.
+        let mut buf = Vec::new();
+        while let Some(chunk) = stream.next().await {
+            buf.extend_from_slice(&chunk);
+        }
 
-        let send_fn: Box<dyn RpcEmit + Send + Sync> = Box::new(move |chunk: &[u8]| {
-            let _ = tx.send(WsMessage::Binary(Bytes::copy_from_slice(chunk)));
-        });
-
-        let recv_fn: Box<dyn FnMut(RpcStreamEvent) + Send + 'static> = Box::new(move |evt| {
-            if let RpcStreamEvent::PayloadChunk { bytes, .. } = evt {
-                let result = response_handler(&bytes);
-                let done_tx_clone2 = done_tx_clone.clone();
-                tokio::spawn(async move {
-                    let mut tx_lock = done_tx_clone2.lock().await;
-                    if let Some(tx) = tx_lock.take() {
-                        let _ = tx.send(result);
-                    }
-                });
-            }
-        });
-
-        let rpc_stream_encoder = self
-            .dispatcher
-            .clone()
-            .lock()
-            .await
-            .call(
-                RpcRequest {
-                    method_id,
-                    param_bytes: Some(payload.to_vec()),
-                    prebuffered_payload_bytes: None,
-                    is_finalized,
-                },
-                DEFAULT_SERVICE_MAX_CHUNK_SIZE, // TODO: Make configurable
-                send_fn,
-                Some(recv_fn),
-                true,
-            )
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("{:?}", e)))?;
-
-        // TODO: Don't use expect or unwrap
-        let result = done_rx.await.expect("oneshot receive failed");
-
-        Ok((rpc_stream_encoder, result))
+        // Decode the fully buffered response.
+        Ok((encoder, Ok(decode(&buf))))
     }
 }

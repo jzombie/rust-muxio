@@ -797,9 +797,11 @@ dependencies = [
 name = "muxio-rpc-service-caller"
 version = "0.1.0-alpha"
 dependencies = [
+ "async-trait",
  "futures",
  "muxio",
  "muxio-rpc-service",
+ "tokio",
 ]
 
 [[package]]
@@ -818,9 +820,11 @@ version = "0.1.0-alpha"
 dependencies = [
  "async-trait",
  "bytes",
+ "futures",
  "futures-util",
  "muxio",
  "muxio-rpc-service",
+ "muxio-rpc-service-caller",
  "tokio",
  "tokio-tungstenite",
 ]
