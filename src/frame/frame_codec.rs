@@ -70,9 +70,12 @@ impl FrameCodec {
             return Err(FrameDecodeError::IncompleteHeader); // Not enough data to form a valid frame
         }
 
-        // TODO: Don't use unwrap
         // Extract the length of the payload
-        let len = u32::from_le_bytes(buf[0..FRAME_LENGTH_FIELD_SIZE].try_into().unwrap()) as usize;
+        let len = u32::from_le_bytes(
+            buf[0..FRAME_LENGTH_FIELD_SIZE]
+                .try_into()
+                .map_err(|_| FrameDecodeError::CorruptFrame)?,
+        ) as usize;
 
         // Ensure the buffer contains enough data for the frame (header + payload)
         if buf.len() < FRAME_HEADER_SIZE + len {
@@ -83,14 +86,12 @@ impl FrameCodec {
         let stream_id = u32::from_le_bytes(
             buf[FRAME_STREAM_ID_OFFSET..FRAME_SEQ_ID_OFFSET]
                 .try_into()
-                // TODO: Don't use unwrap
-                .unwrap(),
+                .map_err(|_| FrameDecodeError::CorruptFrame)?,
         );
         let seq_id = u32::from_le_bytes(
             buf[FRAME_SEQ_ID_OFFSET..FRAME_KIND_OFFSET]
                 .try_into()
-                // TODO: Don't use unwrap
-                .unwrap(),
+                .map_err(|_| FrameDecodeError::CorruptFrame)?,
         );
         let kind = FrameKind::try_from(buf[FRAME_KIND_OFFSET])
             .map_err(|_| FrameDecodeError::CorruptFrame)?; // Map error to FrameStreamError
@@ -99,8 +100,7 @@ impl FrameCodec {
         let timestamp = u64::from_le_bytes(
             buf[FRAME_TIMESTAMP_OFFSET..FRAME_HEADER_SIZE]
                 .try_into()
-                // TODO: Don't use unwrap
-                .unwrap(),
+                .map_err(|_| FrameDecodeError::CorruptFrame)?,
         );
 
         // Discard payload if canceled frame
