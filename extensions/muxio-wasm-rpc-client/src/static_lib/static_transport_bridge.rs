@@ -10,18 +10,18 @@ extern "C" {
     ///
     /// This function must be implemented in the JavaScript host environment.
     /// It is called internally by the Rust runtime to send encoded RPC frame data.
-    fn static_muxio_emit_socket_frame_uint8(data: Uint8Array);
+    fn static_muxio_emit_frame_uint8(data: Uint8Array);
 }
 
 /// Sends a raw byte slice over the socket transport using the JS-bound emitter.
 ///
 /// Converts the given Rust `&[u8]` into a `Uint8Array` and passes it to
-/// the JavaScript `muxio_emit_socket_frame_uint8` function.
-pub fn static_muxio_emit_socket_frame_bytes(bytes: &[u8]) {
+/// the JavaScript `muxio_emit_frame_uint8` function.
+pub fn static_muxio_emit_frame_bytes(bytes: &[u8]) {
     // TODO: Remove (or use tracing)
     // web_sys::console::log_1(&"Emit...".into());
 
-    static_muxio_emit_socket_frame_uint8(Uint8Array::from(bytes));
+    static_muxio_emit_frame_uint8(Uint8Array::from(bytes));
 }
 
 // TODO: Refactor accordingly
@@ -30,7 +30,7 @@ pub fn static_muxio_emit_socket_frame_bytes(bytes: &[u8]) {
 // /// This function should be called by JS whenever a new binary message is received.
 // /// It decodes the incoming `Uint8Array` and passes it to the internal RPC dispatcher.
 #[wasm_bindgen]
-pub fn static_muxio_receive_socket_frame_uint8(inbound_data: Uint8Array) -> Result<(), JsValue> {
+pub fn static_muxio_receive_frame_uint8(inbound_data: Uint8Array) -> Result<(), JsValue> {
     // Convert Uint8Array to Vec<u8>
     let inbound_bytes = inbound_data.to_vec();
 

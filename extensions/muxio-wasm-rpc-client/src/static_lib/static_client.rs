@@ -1,4 +1,4 @@
-use super::static_muxio_emit_socket_frame_bytes;
+use super::static_muxio_emit_frame_bytes;
 use crate::RpcWasmClient;
 use js_sys::Promise;
 use std::cell::RefCell;
@@ -15,7 +15,7 @@ pub fn init_static_client() {
     MUXIO_STATIC_RPC_CLIENT_REF.with(|cell| {
         if cell.borrow().is_none() {
             let rpc_wasm_client = Arc::new(RpcWasmClient::new(|bytes| {
-                static_muxio_emit_socket_frame_bytes(&bytes)
+                static_muxio_emit_frame_bytes(&bytes)
             }));
 
             *cell.borrow_mut() = Some(rpc_wasm_client);
