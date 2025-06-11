@@ -68,6 +68,7 @@ impl RpcClientInterface for RpcWasmClient {
         let rpc_stream_encoder = self
             .dispatcher
             .lock()
+            // TODO: Don't use unwrap
             .unwrap()
             .call(
                 RpcRequest {
