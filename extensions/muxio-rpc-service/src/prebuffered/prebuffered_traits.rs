@@ -55,3 +55,23 @@ pub trait RpcMethodPrebuffered {
     /// * `bytes` - Serialized response payload.
     fn decode_response(bytes: &[u8]) -> Result<Self::Output, io::Error>;
 }
+
+#[async_trait::async_trait]
+impl<T> RpcCallPrebuffered for T
+where
+    T: RpcMethodPrebuffered + Send + Sync + 'static,
+    T::Input: Send + 'static,
+    T::Output: Send + 'static,
+{
+    async fn call<C: RpcClientInterface + Send + Sync>(
+        rpc_client: &C,
+        input: Self::Input,
+    ) -> Result<Self::Output, io::Error> {
+        let encoded = Self::encode_request(input)?;
+        let (_, inner) = rpc_client
+            .call_rpc_buffered(Self::METHOD_ID, &encoded, Self::decode_response, true)
+            .await?;
+
+        inner?
+    }
+}
