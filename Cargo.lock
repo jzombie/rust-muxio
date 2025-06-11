@@ -818,10 +818,12 @@ dependencies = [
 name = "muxio-tokio-rpc-server"
 version = "0.1.0-alpha"
 dependencies = [
+ "async-trait",
  "axum",
  "bytes",
  "futures-util",
  "muxio",
+ "muxio-rpc-service",
  "muxio-rpc-service-endpoint",
  "tokio",
  "tokio-tungstenite",

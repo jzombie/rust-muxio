@@ -7,6 +7,7 @@ use axum::{
 };
 use bytes::Bytes;
 use futures_util::{SinkExt, StreamExt};
+use muxio_rpc_service::RpcServerInterface;
 use muxio_rpc_service_endpoint::RpcServiceEndpoint;
 use std::{future::Future, net::SocketAddr, sync::Arc};
 use tokio::{net::TcpListener, sync::mpsc::unbounded_channel};
@@ -63,20 +64,6 @@ impl RpcServer {
         Ok(addr)
     }
 
-    pub async fn register_prebuffered<F, Fut>(
-        &self,
-        method_id: u64,
-        handler: F,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
-    where
-        F: Fn(Vec<u8>) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>>>
-            + Send
-            + 'static,
-    {
-        self.endpoint.register_prebuffered(method_id, handler).await
-    }
-
     /// WebSocket route handler that sets up the WebSocket connection.
     /// It receives an Arc<RpcServer> to share the server's state.
     async fn ws_handler(
@@ -129,5 +116,22 @@ impl RpcServer {
                 eprintln!("Caught err: {:?}", err);
             }
         }
+    }
+}
+
+#[async_trait::async_trait]
+impl RpcServerInterface for RpcServer {
+    async fn register_prebuffered<F, Fut>(
+        &self,
+        method_id: u64,
+        handler: F,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
+    where
+        F: Fn(Vec<u8>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>>>
+            + Send
+            + 'static,
+    {
+        self.endpoint.register_prebuffered(method_id, handler).await
     }
 }

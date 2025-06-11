@@ -12,6 +12,7 @@ pub type RpcPrebufferedHandler = Box<
             Vec<u8>,
         ) -> Pin<
             Box<
+                // TODO: Make type alias
                 dyn Future<Output = Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>>>
                     + Send,
             >,
