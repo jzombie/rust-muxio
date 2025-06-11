@@ -1,4 +1,5 @@
-use muxio::frame::FrameDecodeError;
+use super::error::RpcEndpointError;
+use muxio::frame::FrameEncodeError;
 use muxio::rpc::{RpcDispatcher, RpcResponse, RpcResultStatus, rpc_internals::RpcEmit};
 use muxio_rpc_service::constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE;
 use std::collections::HashMap;
@@ -50,7 +51,7 @@ impl RpcServiceEndpoint {
         }
     }
 
-    pub async fn read_bytes<E>(&self, bytes: &[u8], mut on_emit: E) -> Result<(), FrameDecodeError>
+    pub async fn read_bytes<E>(&self, bytes: &[u8], mut on_emit: E) -> Result<(), RpcEndpointError>
     where
         E: RpcEmit + Send,
     {
@@ -58,7 +59,7 @@ impl RpcServiceEndpoint {
 
         let request_ids = match rpc_dispatcher.read_bytes(&bytes) {
             Ok(ids) => ids,
-            Err(e) => return Err(e),
+            Err(e) => return Err(RpcEndpointError::Decode(e)),
         };
 
         // Handle prebuffered requests
@@ -120,8 +121,7 @@ impl RpcServiceEndpoint {
                     DEFAULT_SERVICE_MAX_CHUNK_SIZE, // TODO: Make configurable
                     |chunk| on_emit(chunk),
                 )
-                // TODO: Dont' unwrap
-                .unwrap();
+                .map_err(|e: FrameEncodeError| RpcEndpointError::Encode(e))?;
         }
 
         Ok(())
