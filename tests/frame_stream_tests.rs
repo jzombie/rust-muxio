@@ -125,7 +125,6 @@ fn decoder_handles_interleaved_input_order() {
 
     for outgoing_bytes in interleaved_outgoing_bytes {
         for decoded_frame_result in decoder.read_bytes(&outgoing_bytes) {
-            // TODO: Don't use unwrap
             incoming_frames.push(decoded_frame_result.unwrap());
         }
     }
@@ -169,7 +168,6 @@ fn decoder_reorders_out_of_order_frames() {
 
     for outgoing_chunk in shuffled_outgoing_chunks {
         for decoded_result in decoder.read_bytes(&outgoing_chunk) {
-            // TODO: Don't use unwrap
             incoming_frames.push(decoded_result.unwrap());
         }
     }
@@ -205,7 +203,6 @@ fn encoder_emits_small_final_frame_on_end_stream() {
     let mut incoming_frames = vec![];
 
     for decoded_frame_result in decoder.read_bytes(&outgoing_bytes) {
-        // TODO: Don't use unwrap
         incoming_frames.push(decoded_frame_result.unwrap());
     }
 
