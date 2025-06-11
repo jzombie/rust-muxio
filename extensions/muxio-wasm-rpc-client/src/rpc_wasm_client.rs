@@ -15,7 +15,7 @@ pub struct RpcWasmClient {
 
 impl RpcWasmClient {
     pub fn new(emit_callback: impl Fn(Vec<u8>) + Send + Sync + 'static) -> RpcWasmClient {
-        let dispatcher = Arc::new(std::sync::Mutex::new(RpcDispatcher::new()));
+        let dispatcher = Arc::new(Mutex::new(RpcDispatcher::new()));
 
         RpcWasmClient {
             dispatcher,
@@ -50,16 +50,23 @@ impl RpcClientInterface for RpcWasmClient {
         F: Fn(&[u8]) -> T + Send + Sync + 'static,
     {
         let emit = self.emit_callback.clone();
+
         let (done_tx, done_rx) = oneshot::channel::<Result<T, io::Error>>();
         let done_tx = Arc::new(Mutex::new(Some(done_tx)));
         let done_tx_clone = done_tx.clone();
+
+        let response_buf = Arc::new(Mutex::new(Vec::new()));
+        let response_buf_clone = Arc::clone(&response_buf);
+
+        let response_handler = Arc::new(response_handler);
 
         let send_fn: Box<dyn RpcEmit + Send + Sync> = Box::new(move |chunk: &[u8]| {
             emit(chunk.to_vec());
         });
 
-        let recv_fn: Box<dyn FnMut(RpcStreamEvent) + Send + 'static> =
-            Box::new(move |evt| match evt {
+        let recv_fn: Box<dyn FnMut(RpcStreamEvent) + Send + 'static> = Box::new({
+            let response_handler = Arc::clone(&response_handler);
+            move |evt| match evt {
                 RpcStreamEvent::Header { rpc_header, .. } => {
                     let result_status = rpc_header
                         .metadata_bytes
@@ -70,7 +77,6 @@ impl RpcClientInterface for RpcWasmClient {
 
                     if result_status != RpcResultStatus::Success {
                         let done_tx_clone2 = done_tx_clone.clone();
-
                         spawn_local(async move {
                             let err = io::Error::new(
                                 io::ErrorKind::Other,
@@ -84,10 +90,17 @@ impl RpcClientInterface for RpcWasmClient {
                 }
 
                 RpcStreamEvent::PayloadChunk { bytes, .. } => {
-                    let result = response_handler(&bytes);
+                    let mut buf = response_buf.lock().unwrap();
+                    buf.extend_from_slice(&bytes);
+                }
+
+                RpcStreamEvent::End { .. } => {
                     let done_tx_clone2 = done_tx_clone.clone();
+                    let full_response = response_buf_clone.lock().unwrap().clone();
+                    let response_handler = Arc::clone(&response_handler);
 
                     spawn_local(async move {
+                        let result = response_handler(&full_response);
                         if let Some(tx) = done_tx_clone2.lock().unwrap().take() {
                             let _ = tx.send(Ok(result));
                         }
@@ -95,7 +108,8 @@ impl RpcClientInterface for RpcWasmClient {
                 }
 
                 _ => {}
-            });
+            }
+        });
 
         let rpc_stream_encoder = self
             .dispatcher
