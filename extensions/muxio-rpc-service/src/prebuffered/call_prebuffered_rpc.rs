@@ -1,6 +1,7 @@
 use crate::{RpcClientInterface, prebuffered::RpcMethodPrebuffered};
 use std::io;
 
+// TODO: Remove
 /// Performs a one-shot (pre-buffered) RPC call using a method that conforms to
 /// the `RpcMethodPrebuffered` interface.
 ///
