@@ -31,6 +31,7 @@ impl RpcServer {
     /// Starts serving the RPC server with already registered handlers
     /// on the given address. This consumes the server instance.
     pub async fn serve(self, address: &str) -> Result<SocketAddr, axum::BoxError> {
+        // TODO: Don't use unwrap
         let listener = TcpListener::bind(address).await.unwrap();
         // Wrap the server in an Arc to allow for shared, thread-safe access.
         let server = Arc::new(self);
@@ -43,6 +44,7 @@ impl RpcServer {
         self: Arc<Self>,
         listener: TcpListener,
     ) -> Result<SocketAddr, axum::BoxError> {
+        // TODO: Don't use unwrap
         let addr = listener.local_addr().unwrap();
 
         let app = Router::new().route(

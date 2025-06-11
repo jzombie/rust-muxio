@@ -67,11 +67,13 @@ impl RpcStreamDecoder {
                 let id = u32::from_le_bytes(
                     self.buffer[RPC_FRAME_ID_OFFSET..RPC_FRAME_METHOD_ID_OFFSET]
                         .try_into()
+                        // TODO: Don't use unwrap
                         .unwrap(),
                 );
                 let method_id = u64::from_le_bytes(
                     self.buffer[RPC_FRAME_METHOD_ID_OFFSET..RPC_FRAME_METADATA_LENGTH_OFFSET]
                         .try_into()
+                        // TODO: Don't use unwrap
                         .unwrap(),
                 );
                 self.rpc_method_id = Some(method_id);
@@ -81,6 +83,7 @@ impl RpcStreamDecoder {
                     self.buffer[RPC_FRAME_METADATA_LENGTH_OFFSET
                         ..RPC_FRAME_METADATA_LENGTH_OFFSET + RPC_FRAME_METADATA_LENGTH_SIZE]
                         .try_into()
+                        // TODO: Don't use unwrap
                         .unwrap(),
                 ) as usize;
 
@@ -112,11 +115,13 @@ impl RpcStreamDecoder {
                     ..RPC_FRAME_METADATA_LENGTH_OFFSET + RPC_FRAME_METADATA_LENGTH_SIZE + meta_len,
                 );
 
+                // TODO: Don't use unwrap
                 let rpc_header = self.header.clone().unwrap();
                 self.rpc_header_id = Some(rpc_header.id);
 
                 // Push the header event
                 events.push(RpcStreamEvent::Header {
+                    // TODO: Don't use unwrap
                     rpc_header_id: self.rpc_header_id.unwrap(),
                     rpc_method_id: self.rpc_method_id.unwrap(),
                     rpc_header,
@@ -125,6 +130,7 @@ impl RpcStreamDecoder {
                 // Continue processing payload if available
                 if !self.buffer.is_empty() {
                     events.push(RpcStreamEvent::PayloadChunk {
+                        // TODO: Don't use unwrap
                         rpc_header_id: self.rpc_header_id.unwrap(),
                         rpc_method_id: self.rpc_method_id.unwrap(),
                         bytes: self.buffer.split_off(0),
@@ -136,6 +142,7 @@ impl RpcStreamDecoder {
                 if frame.inner.kind == FrameKind::End {
                     self.state = RpcDecoderState::Done;
                     events.push(RpcStreamEvent::End {
+                        // TODO: Don't use unwrap
                         rpc_header_id: self.rpc_header_id.unwrap(),
                         rpc_method_id: self.rpc_method_id.unwrap(),
                     });
@@ -144,6 +151,7 @@ impl RpcStreamDecoder {
                 } else {
                     // If there's a payload chunk, append it to the events
                     events.push(RpcStreamEvent::PayloadChunk {
+                        // TODO: Don't use unwrap
                         rpc_header_id: self.rpc_header_id.unwrap(),
                         rpc_method_id: self.rpc_method_id.unwrap(),
                         bytes: frame.inner.payload.clone(),

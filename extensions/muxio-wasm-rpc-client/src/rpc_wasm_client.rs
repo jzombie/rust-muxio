@@ -57,6 +57,7 @@ impl RpcClientInterface for RpcWasmClient {
                 let done_tx_clone2 = done_tx_clone.clone();
 
                 spawn_local(async move {
+                    // TODO: Don't use unwrap
                     if let Some(tx) = done_tx_clone2.lock().unwrap().take() {
                         let _ = tx.send(result);
                     }

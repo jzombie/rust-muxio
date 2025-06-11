@@ -50,7 +50,7 @@ impl RpcSession {
         mut on_rpc_stream_event: H,
     ) -> Result<(), FrameDecodeError>
     where
-        H: RpcStreamEventHandler,
+        H: RpcStreamEventFallibleHandler,
     {
         let frames = self.frame_mux_stream_decoder.read_bytes(input);
 

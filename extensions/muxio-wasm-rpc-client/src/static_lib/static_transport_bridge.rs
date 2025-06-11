@@ -65,8 +65,10 @@ pub fn static_muxio_read_bytes_uint8(inbound_data: Uint8Array) -> Result<(), JsV
             rpc_wasm_client
                 .get_dispatcher()
                 .lock()
+                // TODO: Don't use unwrap
                 .unwrap()
                 .read_bytes(&inbound_bytes)
+                // TODO: Don't use unwrap
                 .unwrap();
         } else {
             // TODO: Use tracing instead?

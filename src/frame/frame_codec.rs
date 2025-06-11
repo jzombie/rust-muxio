@@ -70,6 +70,7 @@ impl FrameCodec {
             return Err(FrameDecodeError::IncompleteHeader); // Not enough data to form a valid frame
         }
 
+        // TODO: Don't use unwrap
         // Extract the length of the payload
         let len = u32::from_le_bytes(buf[0..FRAME_LENGTH_FIELD_SIZE].try_into().unwrap()) as usize;
 
@@ -82,11 +83,13 @@ impl FrameCodec {
         let stream_id = u32::from_le_bytes(
             buf[FRAME_STREAM_ID_OFFSET..FRAME_SEQ_ID_OFFSET]
                 .try_into()
+                // TODO: Don't use unwrap
                 .unwrap(),
         );
         let seq_id = u32::from_le_bytes(
             buf[FRAME_SEQ_ID_OFFSET..FRAME_KIND_OFFSET]
                 .try_into()
+                // TODO: Don't use unwrap
                 .unwrap(),
         );
         let kind = FrameKind::try_from(buf[FRAME_KIND_OFFSET])
@@ -96,6 +99,7 @@ impl FrameCodec {
         let timestamp = u64::from_le_bytes(
             buf[FRAME_TIMESTAMP_OFFSET..FRAME_HEADER_SIZE]
                 .try_into()
+                // TODO: Don't use unwrap
                 .unwrap(),
         );
 
