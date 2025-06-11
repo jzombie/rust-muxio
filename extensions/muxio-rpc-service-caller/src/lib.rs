@@ -1,10 +1,11 @@
+use futures::StreamExt;
 use futures::channel::{mpsc, oneshot};
 use muxio::frame::FrameEncodeError;
 use muxio::rpc::{
     RpcDispatcher, RpcRequest, RpcResultStatus,
     rpc_internals::{RpcStreamEncoder, RpcStreamEvent, rpc_trait::RpcEmit},
 };
-use muxio_rpc_service::constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE;
+use muxio_rpc_service::{RpcClientInterface, constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE};
 use std::io;
 use std::sync::Arc;
 
@@ -147,4 +148,37 @@ where
             "RPC response channel closed prematurely",
         )),
     }
+}
+
+pub async fn call_rpc_buffered_generic<C, T, F>(
+    client: &C,
+    method_id: u64,
+    payload: &[u8],
+    decode: F,
+    is_finalized: bool,
+) -> Result<
+    (
+        RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>,
+        Result<T, io::Error>,
+    ),
+    io::Error,
+>
+where
+    C: RpcClientInterface + ?Sized,
+    T: Send + 'static,
+    F: Fn(&[u8]) -> T + Send + Sync + 'static,
+{
+    // 1. Call the streaming method from the provided client.
+    let (encoder, mut stream) = client
+        .call_rpc_streaming(method_id, payload, is_finalized)
+        .await?;
+
+    // 2. Collect all chunks from the stream into a single buffer.
+    let mut buf = Vec::new();
+    while let Some(chunk) = stream.next().await {
+        buf.extend_from_slice(&chunk);
+    }
+
+    // 3. Decode the buffer and return the result.
+    Ok((encoder, Ok(decode(&buf))))
 }

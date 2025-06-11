@@ -5,7 +5,7 @@ use muxio::rpc::{
     rpc_internals::{RpcStreamEncoder, RpcStreamEvent, rpc_trait::RpcEmit},
 };
 use muxio_rpc_service::{RpcClientInterface, constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE};
-use muxio_rpc_service_caller::call_rpc_streaming_generic;
+use muxio_rpc_service_caller::{call_rpc_buffered_generic, call_rpc_streaming_generic};
 use std::io;
 use std::sync::{Arc, Mutex};
 
@@ -78,15 +78,7 @@ impl RpcClientInterface for RpcWasmClient {
         T: Send + 'static,
         F: Fn(&[u8]) -> T + Send + Sync + 'static,
     {
-        let (encoder, mut stream) = self
-            .call_rpc_streaming(method_id, payload, is_finalized)
-            .await?;
-
-        let mut buf = Vec::new();
-        while let Some(chunk) = stream.next().await {
-            buf.extend_from_slice(&chunk);
-        }
-
-        Ok((encoder, Ok(decode(&buf))))
+        // Delegate directly to the generic buffered helper
+        call_rpc_buffered_generic(self, method_id, payload, decode, is_finalized).await
     }
 }

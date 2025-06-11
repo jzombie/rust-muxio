@@ -7,7 +7,7 @@ use muxio::rpc::{
 };
 use muxio_rpc_service::{RpcClientInterface, constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE};
 // Import our robust, generic calling function
-use muxio_rpc_service_caller::call_rpc_streaming_generic;
+use muxio_rpc_service_caller::{call_rpc_buffered_generic, call_rpc_streaming_generic};
 use std::io;
 use std::sync::Arc;
 use tokio::sync::{Mutex, mpsc as tokio_mpsc};
@@ -127,18 +127,7 @@ impl RpcClientInterface for RpcClient {
         T: Send + 'static,
         F: Fn(&[u8]) -> T + Send + Sync + 'static,
     {
-        // Get the streaming response.
-        let (encoder, mut stream) = self
-            .call_rpc_streaming(method_id, payload, is_finalized)
-            .await?;
-
-        // Collect all chunks from the futures::mpsc::Receiver stream.
-        let mut buf = Vec::new();
-        while let Some(chunk) = stream.next().await {
-            buf.extend_from_slice(&chunk);
-        }
-
-        // Decode the fully buffered response.
-        Ok((encoder, Ok(decode(&buf))))
+        // Delegate directly to the generic buffered helper
+        call_rpc_buffered_generic(self, method_id, payload, decode, is_finalized).await
     }
 }
