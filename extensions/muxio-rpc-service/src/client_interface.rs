@@ -19,7 +19,7 @@ use std::{io, sync::Arc};
 #[async_trait::async_trait]
 pub trait RpcClientInterface {
     // Typically will be either `std::sync::Mutex` or `tokio::sync::Mutex`
-    type DispatcherMutex<T>;
+    type DispatcherMutex<Dispatcher>;
 
     fn get_dispatcher(&self) -> Arc<Self::DispatcherMutex<RpcDispatcher<'static>>>;
 
