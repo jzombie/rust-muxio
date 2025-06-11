@@ -10,7 +10,18 @@ thread_local! {
     pub static MUXIO_STATIC_RPC_CLIENT_REF: RefCell<Option<Arc<RpcWasmClient>>> = RefCell::new(None);
 }
 
-/// Safe to call multiple times; only the first invocation has effect.
+/// Initializes the global static RPC client if it has not been initialized.
+///
+/// This function is **idempotent**—calling it multiple times has no effect
+/// after the first successful initialization.
+///
+/// Internally, it sets a global `MUXIO_STATIC_RPC_CLIENT_REF` with an
+/// `Arc<RpcWasmClient>` instance that emits bytes via
+/// `static_muxio_write_bytes`, which is bridged to JavaScript.
+///
+/// # Usage
+/// This should be called once during WASM startup, typically from a JS
+/// `init()` or entrypoint wrapper, **before** any RPC calls are issued.
 pub fn init_static_client() {
     MUXIO_STATIC_RPC_CLIENT_REF.with(|cell| {
         if cell.borrow().is_none() {
@@ -22,7 +33,22 @@ pub fn init_static_client() {
     });
 }
 
-// TODO: Document
+/// Asynchronously executes a closure with the static `RpcWasmClient`, returning
+/// the result as a JavaScript `Promise`.
+///
+/// This is the **primary way** to interact with the static RPC client from
+/// exported async functions.
+///
+/// # Parameters
+/// - `f`: A closure that receives the `Arc<RpcWasmClient>` and returns a
+///   `Future` resolving to `Result<T, String>`, where `T: Into<JsValue>`.
+///
+/// # Returns
+/// A JS `Promise` that resolves to `T` or rejects with an error string.
+///
+/// # Errors
+/// If the static client has not been initialized via `init_static_client()`,
+/// the promise will reject with `"RPC client not initialized"`.
 pub fn with_static_client_async<F, Fut, T>(f: F) -> Promise
 where
     F: FnOnce(Arc<RpcWasmClient>) -> Fut + 'static,
