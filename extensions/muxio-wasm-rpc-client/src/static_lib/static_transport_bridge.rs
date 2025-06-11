@@ -36,28 +36,3 @@ pub fn static_muxio_read_bytes_uint8(inbound_data: Uint8Array) -> Result<(), JsV
 
     Ok(())
 }
-
-// TODO: Consider uncommenting
-// /// JS-facing hook for handling socket connection establishment.
-// ///
-// /// Can be called from JS when a connection to the backend socket is opened.
-// ///
-// /// This currently only logs to the console, but can be expanded to
-// /// set internal flags or trigger handshake logic.
-// #[wasm_bindgen]
-// pub fn handle_static_muxio_socket_connect() -> Result<(), JsValue> {
-//     console::debug_1(&"Handle socket connect...".into());
-//     Ok(())
-// }
-
-// /// JS-facing hook for handling socket disconnection events.
-// ///
-// /// Can be called from JS when the socket connection is lost or closed.
-// ///
-// /// This currently only logs to the console, but can be expanded to
-// /// support reconnection logic, exponential backoff, etc.
-// #[wasm_bindgen]
-// pub fn handle_static_muxio_socket_disconnect() -> Result<(), JsValue> {
-//     console::debug_1(&"Handle socket disconnect...".into());
-//     Ok(())
-// }
