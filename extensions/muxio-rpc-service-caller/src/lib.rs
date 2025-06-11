@@ -10,7 +10,7 @@ use std::sync::Mutex;
 
 pub async fn call_rpc_streaming_generic(
     dispatcher: Arc<Mutex<RpcDispatcher<'static>>>,
-    emit: Arc<dyn Fn(Vec<u8>) + Send + Sync>,
+    on_emit: Arc<dyn Fn(Vec<u8>) + Send + Sync>,
     method_id: u64,
     payload: &[u8],
     is_finalized: bool,
@@ -28,9 +28,9 @@ pub async fn call_rpc_streaming_generic(
     let ready_tx = Arc::new(Mutex::new(Some(ready_tx)));
 
     let send_fn: Box<dyn RpcEmit + Send + Sync> = Box::new({
-        let emit = emit.clone();
+        let on_emit = on_emit.clone();
         move |chunk: &[u8]| {
-            emit(chunk.to_vec());
+            on_emit(chunk.to_vec());
         }
     });
 
