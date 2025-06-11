@@ -1,5 +1,5 @@
 use futures::StreamExt;
-use futures::channel::mpsc;
+use futures::channel::{mpsc, oneshot};
 use muxio::rpc::{
     RpcDispatcher, RpcRequest, RpcResultStatus,
     rpc_internals::{RpcStreamEncoder, RpcStreamEvent, rpc_trait::RpcEmit},
@@ -7,8 +7,6 @@ use muxio::rpc::{
 use muxio_rpc_service::{RpcClientInterface, constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE};
 use std::io;
 use std::sync::{Arc, Mutex};
-
-const ERROR_MARKER_PREFIX: &[u8] = b"__MUXIO_ERR__";
 
 pub struct RpcWasmClient {
     dispatcher: Arc<Mutex<RpcDispatcher<'static>>>,
@@ -49,12 +47,18 @@ impl RpcClientInterface for RpcWasmClient {
         let (tx, rx) = mpsc::channel::<Vec<u8>>(8);
         let tx = Arc::new(Mutex::new(Some(tx)));
 
+        // Use oneshot to capture first error or success result
+        let (ready_tx, ready_rx) = oneshot::channel::<Result<(), io::Error>>();
+        let ready_tx = Arc::new(Mutex::new(Some(ready_tx)));
+
         let send_fn: Box<dyn RpcEmit + Send + Sync> = Box::new(move |chunk: &[u8]| {
             emit(chunk.to_vec());
         });
 
         let recv_fn: Box<dyn FnMut(RpcStreamEvent) + Send + 'static> = Box::new({
             let tx = Arc::clone(&tx);
+            let ready_tx = Arc::clone(&ready_tx);
+
             move |evt| match evt {
                 RpcStreamEvent::Header { rpc_header, .. } => {
                     let result_status = rpc_header
@@ -65,18 +69,22 @@ impl RpcClientInterface for RpcWasmClient {
                         .unwrap_or(RpcResultStatus::Success);
 
                     if result_status != RpcResultStatus::Success {
-                        let _ = tx.lock().unwrap().take().map(|mut t| {
-                            let mut marker = Vec::from(ERROR_MARKER_PREFIX);
-                            marker.push(result_status as u8);
-                            let _ = t.try_send(marker);
-                        });
+                        if let Some(tx) = ready_tx.lock().unwrap().take() {
+                            let _ = tx.send(Err(io::Error::new(
+                                io::ErrorKind::Other,
+                                format!("RPC failed: {:?}", result_status),
+                            )));
+                        }
+                        let _ = tx.lock().unwrap().take();
+                    } else {
+                        let _ = ready_tx.lock().unwrap().take().map(|t| t.send(Ok(())));
                     }
                 }
 
                 RpcStreamEvent::PayloadChunk { bytes, .. } => {
-                    let _ = tx.lock().unwrap().as_mut().map(|t| {
-                        let _ = t.try_send(bytes);
-                    });
+                    if let Some(sender) = tx.lock().unwrap().as_mut() {
+                        let _ = sender.try_send(bytes);
+                    }
                 }
 
                 RpcStreamEvent::End { .. } => {
@@ -105,7 +113,15 @@ impl RpcClientInterface for RpcWasmClient {
             )
             .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Encode error: {e:?}")))?;
 
-        Ok((encoder, rx))
+        // Wait for the header (first result) to be emitted before returning
+        match ready_rx.await {
+            Ok(Ok(())) => Ok((encoder, rx)),
+            Ok(Err(err)) => Err(err),
+            Err(_) => Err(io::Error::new(
+                io::ErrorKind::Other,
+                "RPC response channel closed prematurely",
+            )),
+        }
     }
 
     async fn call_rpc_buffered<T, F>(
@@ -131,15 +147,6 @@ impl RpcClientInterface for RpcWasmClient {
 
         let mut buf = Vec::new();
         while let Some(chunk) = stream.next().await {
-            if chunk.starts_with(ERROR_MARKER_PREFIX) {
-                let status_byte = chunk[ERROR_MARKER_PREFIX.len()];
-                let err = io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("RPC error status: {:?}", status_byte),
-                );
-                return Ok((encoder, Err(err)));
-            }
-
             buf.extend_from_slice(&chunk);
         }
 
