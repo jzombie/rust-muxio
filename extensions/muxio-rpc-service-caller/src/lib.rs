@@ -5,7 +5,10 @@ use muxio::rpc::{
     RpcDispatcher, RpcRequest, RpcResultStatus,
     rpc_internals::{RpcStreamEncoder, RpcStreamEvent, rpc_trait::RpcEmit},
 };
-use muxio_rpc_service::{RpcClientInterface, constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE};
+use muxio_rpc_service::{
+    RpcClientInterface,
+    constants::{DEFAULT_RPC_STREAM_CHANNEL_BUFFER_SIZE, DEFAULT_SERVICE_MAX_CHUNK_SIZE},
+};
 use std::io;
 use std::sync::Arc;
 
@@ -66,7 +69,7 @@ where
     // The dispatcher holder `L` must implement our new trait.
     L: WithDispatcher,
 {
-    let (tx, rx) = mpsc::channel::<Vec<u8>>(8); // TODO: Don't hardcode buffer size
+    let (tx, rx) = mpsc::channel::<Vec<u8>>(DEFAULT_RPC_STREAM_CHANNEL_BUFFER_SIZE);
     let tx = Arc::new(std::sync::Mutex::new(Some(tx)));
 
     let (ready_tx, ready_rx) = oneshot::channel::<Result<(), io::Error>>();
