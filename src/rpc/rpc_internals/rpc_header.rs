@@ -11,7 +11,7 @@ pub struct RpcHeader {
     /// For example:
     /// - For a call, this ID could represent the unique request ID.
     /// - For a response, this ID would match the request ID for which it is responding.
-    pub id: u32, // TODO: Rename... it's vague.
+    pub id: u32,
 
     /// The identifier (or hash) of the method being invoked in this RPC.
     ///
@@ -19,6 +19,6 @@ pub struct RpcHeader {
     /// It's often hashed to ensure uniqueness and prevent collisions in method names.
     pub method_id: u64, // TODO: Rename to `method_hash`?
 
-    // TODO: Document; Schema-less metadata
+    // TODO: Document; Schemaless metadata
     pub metadata_bytes: Vec<u8>,
 }

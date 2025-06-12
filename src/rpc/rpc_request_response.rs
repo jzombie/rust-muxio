@@ -42,7 +42,7 @@ pub struct RpcResponse {
     /// The request header ID this response corresponds to.
     ///
     /// This *must match* the `RpcHeader.id` from the initiating request.
-    pub request_header_id: u32,
+    pub request_id: u32,
 
     /// The method ID associated with this response.
     ///
@@ -89,7 +89,7 @@ impl RpcResponse {
     /// optionally a result status if metadata exists.
     pub fn from_rpc_header(rpc_header: &RpcHeader) -> RpcResponse {
         RpcResponse {
-            request_header_id: rpc_header.id,
+            request_id: rpc_header.id,
             method_id: rpc_header.method_id,
             result_status: {
                 match rpc_header.metadata_bytes.len() {

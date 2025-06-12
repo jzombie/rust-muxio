@@ -131,19 +131,19 @@ fn dispatch_call_and_get_prebuffered_response<T: for<'a> Decode<'a>>(
         .expect("Server call failed");
 
     for chunk in outgoing_buf.chunks(4) {
-        let request_header_ids = server_dispatcher
+        let request_ids = server_dispatcher
             .read_bytes(chunk)
             .expect("Failed to receive bytes on server");
 
-        for request_header_id in request_header_ids {
+        for request_id in request_ids {
             if !server_dispatcher
-                .is_rpc_request_finalized(request_header_id)
+                .is_rpc_request_finalized(request_id)
                 .unwrap()
             {
                 continue;
             }
 
-            let rpc_request = server_dispatcher.delete_rpc_request(request_header_id);
+            let rpc_request = server_dispatcher.delete_rpc_request(request_id);
 
             if let Some(rpc_request) = rpc_request {
                 let rpc_response = match rpc_request.method_id {
@@ -152,7 +152,7 @@ fn dispatch_call_and_get_prebuffered_response<T: for<'a> Decode<'a>>(
                             bitcode::decode(&rpc_request.param_bytes.unwrap()).unwrap();
 
                         Some(RpcResponse {
-                            request_header_id,
+                            request_id,
                             method_id: id,
                             result_status: Some(0),
                             prebuffered_payload_bytes: Some(bitcode::encode(&AddResponseParams {
@@ -166,7 +166,7 @@ fn dispatch_call_and_get_prebuffered_response<T: for<'a> Decode<'a>>(
                             bitcode::decode(&rpc_request.param_bytes.unwrap()).unwrap();
 
                         Some(RpcResponse {
-                            request_header_id,
+                            request_id,
                             method_id: id,
                             result_status: Some(0),
                             prebuffered_payload_bytes: Some(bitcode::encode(&MultResponseParams {
