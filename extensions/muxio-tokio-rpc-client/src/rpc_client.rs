@@ -4,9 +4,7 @@ use muxio::rpc::{
     RpcDispatcher,
     rpc_internals::{RpcStreamEncoder, rpc_trait::RpcEmit},
 };
-use muxio_rpc_service_caller::{
-    RpcServiceCallerInterface, call_rpc_buffered_generic, call_rpc_streaming_generic,
-};
+use muxio_rpc_service_caller::{RpcServiceCaller, RpcServiceCallerInterface};
 use std::io;
 use std::sync::Arc;
 use tokio::sync::{Mutex, mpsc as tokio_mpsc};
@@ -98,7 +96,7 @@ impl RpcServiceCallerInterface for RpcClient {
         // Delegate directly to the generic function.
         // The dispatcher (Arc<tokio::sync::Mutex<...>>) works because we implemented
         // the WithDispatcher trait for it in the other crate.
-        call_rpc_streaming_generic(
+        RpcServiceCaller::call_rpc_streaming(
             self.get_dispatcher(),
             emit_fn,
             method_id,
@@ -126,6 +124,6 @@ impl RpcServiceCallerInterface for RpcClient {
         F: Fn(&[u8]) -> T + Send + Sync + 'static,
     {
         // Delegate directly to the generic buffered helper
-        call_rpc_buffered_generic(self, method_id, payload, decode, is_finalized).await
+        RpcServiceCaller::call_rpc_buffered(self, method_id, payload, decode, is_finalized).await
     }
 }

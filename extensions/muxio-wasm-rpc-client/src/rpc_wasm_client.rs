@@ -3,8 +3,7 @@ use muxio::rpc::{
     RpcDispatcher,
     rpc_internals::{RpcStreamEncoder, rpc_trait::RpcEmit},
 };
-use muxio_rpc_service_caller::RpcServiceCallerInterface;
-use muxio_rpc_service_caller::{call_rpc_buffered_generic, call_rpc_streaming_generic};
+use muxio_rpc_service_caller::{RpcServiceCaller, RpcServiceCallerInterface};
 use std::io;
 use std::sync::{Arc, Mutex};
 
@@ -50,7 +49,7 @@ impl RpcServiceCallerInterface for RpcWasmClient {
         ),
         io::Error,
     > {
-        call_rpc_streaming_generic(
+        RpcServiceCaller::call_rpc_streaming(
             self.dispatcher(),
             self.emit(),
             method_id,
@@ -78,6 +77,6 @@ impl RpcServiceCallerInterface for RpcWasmClient {
         F: Fn(&[u8]) -> T + Send + Sync + 'static,
     {
         // Delegate directly to the generic buffered helper
-        call_rpc_buffered_generic(self, method_id, payload, decode, is_finalized).await
+        RpcServiceCaller::call_rpc_buffered(self, method_id, payload, decode, is_finalized).await
     }
 }
