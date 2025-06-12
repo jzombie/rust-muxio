@@ -1,9 +1,6 @@
-use super::{
-    endpoint::RpcPrebufferedHandler, error::RpcServiceEndpointError,
-    with_handlers_trait::WithHandlers,
-};
+use super::{error::RpcServiceEndpointError, with_handlers_trait::WithHandlers};
 use futures::future::join_all;
-use muxio::rpc::{RpcDispatcher, RpcRequest, RpcResponse, rpc_internals::rpc_trait::RpcEmit};
+use muxio::rpc::{RpcResponse, rpc_internals::rpc_trait::RpcEmit};
 // Corrected: RpcResultStatus comes from the service crate.
 use muxio_rpc_service::RpcResultStatus;
 use muxio_rpc_service::constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE;
