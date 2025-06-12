@@ -1,6 +1,6 @@
 use super::{endpoint::RpcPrebufferedHandler, error::RpcServiceEndpointError};
-use muxio::rpc::{RpcDispatcher, RpcResponse, RpcResultStatus, rpc_internals::rpc_trait::RpcEmit};
-use muxio_rpc_service::constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE;
+use muxio::rpc::{RpcDispatcher, RpcResponse, rpc_internals::rpc_trait::RpcEmit};
+use muxio_rpc_service::{RpcResultStatus, constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE};
 use std::{
     collections::{HashMap, hash_map::Entry},
     future::Future,
@@ -86,7 +86,7 @@ pub trait RpcServiceEndpointInterface: Send + Sync {
                     Ok(encoded) => RpcResponse {
                         request_header_id: request_id,
                         method_id: request.method_id,
-                        result_status: Some(RpcResultStatus::Success.value()),
+                        result_status: Some(RpcResultStatus::Success.into()),
                         prebuffered_payload_bytes: Some(encoded),
                         is_finalized: true,
                     },
@@ -95,7 +95,7 @@ pub trait RpcServiceEndpointInterface: Send + Sync {
                         RpcResponse {
                             request_header_id: request_id,
                             method_id: request.method_id,
-                            result_status: Some(RpcResultStatus::SystemError.value()),
+                            result_status: Some(RpcResultStatus::SystemError.into()),
                             prebuffered_payload_bytes: None,
                             is_finalized: true,
                         }
@@ -105,7 +105,7 @@ pub trait RpcServiceEndpointInterface: Send + Sync {
                 RpcResponse {
                     request_header_id: request_id,
                     method_id: request.method_id,
-                    result_status: Some(RpcResultStatus::MethodNotFound.value()),
+                    result_status: Some(RpcResultStatus::MethodNotFound.into()),
                     prebuffered_payload_bytes: None,
                     is_finalized: true,
                 }

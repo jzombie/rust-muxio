@@ -3,9 +3,10 @@ use futures::StreamExt;
 use futures::channel::{mpsc, oneshot};
 use muxio::frame::FrameEncodeError;
 use muxio::rpc::{
-    RpcRequest, RpcResultStatus,
+    RpcRequest,
     rpc_internals::{RpcStreamEncoder, RpcStreamEvent, rpc_trait::RpcEmit},
 };
+use muxio_rpc_service::RpcResultStatus;
 use muxio_rpc_service::constants::{
     DEFAULT_RPC_STREAM_CHANNEL_BUFFER_SIZE, DEFAULT_SERVICE_MAX_CHUNK_SIZE,
 };

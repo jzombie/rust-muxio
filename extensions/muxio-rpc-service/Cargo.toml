@@ -8,4 +8,5 @@ publish = false
 async-trait = "0.1.88"
 futures = "0.3.31"
 muxio = { path = "../../" }
+num_enum = "0.7.3"
 xxhash-rust = { version = "0.8.15", features = ["xxh3", "const_xxh3"] }

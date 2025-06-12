@@ -58,10 +58,8 @@ pub struct RpcResponse {
     /// If present, this value is embedded in the response metadata and typically
     /// represents a single-byte status code.
     ///
-    /// Note: While the `RpcResultStatus` enum can be used to interpret standard values,
-    /// this schema is not enforced — any arbitrary `u8` may be used depending on the application.
-    ///
-    /// By convention, `RpcResultStatus::Success` is `0` and `RpcResultStatus::Fail` is `1`.
+    /// Note: Muxio's core library does not enforce any meaning behind any result status,
+    /// though by convention, 0 represents success.
     pub result_status: Option<u8>,
 
     /// Optional payload to return with the response.
