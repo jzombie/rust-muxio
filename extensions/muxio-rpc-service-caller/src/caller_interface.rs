@@ -55,6 +55,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
         let (ready_tx, ready_rx) = oneshot::channel::<Result<(), io::Error>>();
         let ready_tx = Arc::new(std::sync::Mutex::new(Some(ready_tx)));
 
+        // TODO: Does this really have to wrap here?
         let send_fn: Box<dyn RpcEmit + Send + Sync> = Box::new({
             let on_emit = self.get_emit_fn(); // Get emit fn from the implementor
             move |chunk: &[u8]| {
