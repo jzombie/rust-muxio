@@ -1,5 +1,6 @@
 use example_muxio_ws_rpc_app::service_definition::{Add, Mult};
-use muxio_rpc_service::prebuffered::{RpcCallPrebuffered, RpcMethodPrebuffered};
+use muxio_rpc_service::prebuffered::RpcMethodPrebuffered;
+use muxio_rpc_service_caller::prebuffered::RpcCallPrebuffered;
 use muxio_tokio_rpc_client::RpcClient;
 use muxio_tokio_rpc_server::{RpcServer, RpcServiceEndpointInterface};
 use std::sync::Arc;

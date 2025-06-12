@@ -5,12 +5,14 @@ use muxio::rpc::{
     RpcDispatcher, RpcRequest, RpcResultStatus,
     rpc_internals::{RpcStreamEncoder, RpcStreamEvent, rpc_trait::RpcEmit},
 };
-use muxio_rpc_service::{
-    RpcClientInterface,
-    constants::{DEFAULT_RPC_STREAM_CHANNEL_BUFFER_SIZE, DEFAULT_SERVICE_MAX_CHUNK_SIZE},
+use muxio_rpc_service::constants::{
+    DEFAULT_RPC_STREAM_CHANNEL_BUFFER_SIZE, DEFAULT_SERVICE_MAX_CHUNK_SIZE,
 };
 use std::io;
 use std::sync::Arc;
+mod caller_interface;
+pub use caller_interface::*;
+pub mod prebuffered;
 
 /// A trait that provides a generic, asynchronous interface for accessing a shared
 /// `RpcDispatcher` that may be protected by different kinds of mutexes.

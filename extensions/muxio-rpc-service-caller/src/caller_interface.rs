@@ -5,6 +5,7 @@ use muxio::rpc::{
 };
 use std::{io, sync::Arc};
 
+// TODO: Rename to RpcServiceCallerInterface
 /// A transport-agnostic RPC client interface supporting both
 /// one-shot (pre-buffered) and streaming request workflows.
 ///

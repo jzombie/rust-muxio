@@ -4,8 +4,9 @@ use muxio::rpc::{
     RpcDispatcher,
     rpc_internals::{RpcStreamEncoder, rpc_trait::RpcEmit},
 };
-use muxio_rpc_service::RpcClientInterface;
-use muxio_rpc_service_caller::{call_rpc_buffered_generic, call_rpc_streaming_generic};
+use muxio_rpc_service_caller::{
+    RpcClientInterface, call_rpc_buffered_generic, call_rpc_streaming_generic,
+};
 use std::io;
 use std::sync::Arc;
 use tokio::sync::{Mutex, mpsc as tokio_mpsc};
