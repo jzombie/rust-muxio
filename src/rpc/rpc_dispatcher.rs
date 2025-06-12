@@ -242,7 +242,7 @@ impl<'a> RpcDispatcher<'a> {
 
     /// Constructs and sends a response stream for a previously received request.
     ///
-    /// The `RpcResponse` must match a valid request by `request_header_id`.
+    /// The `RpcResponse` must match a valid request by `request_id`.
     /// Optionally, it may include a result status byte or payload. If
     /// `is_finalized` is true, the stream is immediately ended.
     ///
@@ -260,7 +260,7 @@ impl<'a> RpcDispatcher<'a> {
         E: RpcEmit,
     {
         let rpc_response_header = RpcHeader {
-            id: rpc_response.request_header_id,
+            id: rpc_response.request_id,
             msg_type: RpcMessageType::Response,
             method_id: rpc_response.method_id,
             metadata_bytes: {
@@ -321,10 +321,9 @@ impl<'a> RpcDispatcher<'a> {
             .rpc_request_queue
             .lock()
             .map_err(|_| FrameDecodeError::CorruptFrame)?;
-        let active_request_header_ids: Vec<u32> =
-            queue.iter().map(|(header_id, _)| *header_id).collect();
+        let active_request_ids: Vec<u32> = queue.iter().map(|(header_id, _)| *header_id).collect();
 
-        Ok(active_request_header_ids)
+        Ok(active_request_ids)
     }
 
     /// Attempts to retrieve a lock on the request queue if the given

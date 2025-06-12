@@ -86,7 +86,7 @@ pub trait RpcServiceEndpointInterface: Send + Sync {
 
         // --- Stage 2: Concurrently process handlers WITHOUT holding locks ---
         let mut response_futures = Vec::new();
-        for (request_header_id, request) in requests_to_process {
+        for (request_id, request) in requests_to_process {
             let handlers_arc_clone = handlers_arc.clone();
             let future = async move {
                 let handler = handlers_arc_clone
@@ -96,7 +96,7 @@ pub trait RpcServiceEndpointInterface: Send + Sync {
                 if let (Some(handler), Some(params)) = (handler, &request.param_bytes) {
                     match handler(params.clone()).await {
                         Ok(encoded) => RpcResponse {
-                            request_header_id,
+                            request_id,
                             method_id: request.method_id,
                             result_status: Some(RpcResultStatus::Success.into()),
                             prebuffered_payload_bytes: Some(encoded),
@@ -105,7 +105,7 @@ pub trait RpcServiceEndpointInterface: Send + Sync {
                         Err(e) => {
                             eprintln!("Handler for method {} failed: {:?}", request.method_id, e);
                             RpcResponse {
-                                request_header_id,
+                                request_id,
                                 method_id: request.method_id,
                                 result_status: Some(RpcResultStatus::SystemError.into()),
                                 prebuffered_payload_bytes: None,
@@ -115,7 +115,7 @@ pub trait RpcServiceEndpointInterface: Send + Sync {
                     }
                 } else {
                     RpcResponse {
-                        request_header_id,
+                        request_id,
                         method_id: request.method_id,
                         result_status: Some(RpcResultStatus::MethodNotFound.into()),
                         prebuffered_payload_bytes: None,
