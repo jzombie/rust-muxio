@@ -19,7 +19,7 @@ use std::{io, sync::Arc};
 /// - **Streamed RPC calls** (multiple payload fragments, possibly long-lived)
 ///
 #[async_trait::async_trait]
-pub trait RpcClientInterface {
+pub trait RpcServiceCallerInterface {
     // Typically will be either `std::sync::Mutex` or `tokio::sync::Mutex`
     type DispatcherMutex<Dispatcher>;
 

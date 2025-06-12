@@ -1,5 +1,5 @@
 use js_sys::Uint8Array;
-use muxio_rpc_service_caller::RpcClientInterface;
+use muxio_rpc_service_caller::RpcServiceCallerInterface;
 use wasm_bindgen::prelude::*;
 
 use super::MUXIO_STATIC_RPC_CLIENT_REF;

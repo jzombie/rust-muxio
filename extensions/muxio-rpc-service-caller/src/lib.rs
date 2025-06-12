@@ -209,7 +209,7 @@ pub async fn call_rpc_buffered_generic<C, T, F>(
     io::Error,
 >
 where
-    C: RpcClientInterface + ?Sized,
+    C: RpcServiceCallerInterface + ?Sized,
     T: Send + 'static,
     F: Fn(&[u8]) -> T + Send + Sync + 'static,
 {

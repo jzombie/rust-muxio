@@ -1,4 +1,4 @@
-use crate::RpcClientInterface;
+use crate::RpcServiceCallerInterface;
 use muxio_rpc_service::prebuffered::RpcMethodPrebuffered;
 use std::io;
 
@@ -22,7 +22,7 @@ use std::io;
 /// or transport logic explicitly.
 #[async_trait::async_trait]
 pub trait RpcCallPrebuffered: RpcMethodPrebuffered + Sized + Send + Sync {
-    async fn call<C: RpcClientInterface + Send + Sync>(
+    async fn call<C: RpcServiceCallerInterface + Send + Sync>(
         rpc_client: &C,
         input: Self::Input,
     ) -> Result<Self::Output, io::Error>;
@@ -35,7 +35,7 @@ where
     T::Input: Send + 'static,
     T::Output: Send + 'static,
 {
-    async fn call<C: RpcClientInterface + Send + Sync>(
+    async fn call<C: RpcServiceCallerInterface + Send + Sync>(
         rpc_client: &C,
         input: Self::Input,
     ) -> Result<Self::Output, io::Error> {

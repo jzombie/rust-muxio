@@ -5,7 +5,7 @@ use muxio::rpc::{
     rpc_internals::{RpcStreamEncoder, rpc_trait::RpcEmit},
 };
 use muxio_rpc_service_caller::{
-    RpcClientInterface, call_rpc_buffered_generic, call_rpc_streaming_generic,
+    RpcServiceCallerInterface, call_rpc_buffered_generic, call_rpc_streaming_generic,
 };
 use std::io;
 use std::sync::Arc;
@@ -66,7 +66,7 @@ impl RpcClient {
 }
 
 #[async_trait::async_trait]
-impl RpcClientInterface for RpcClient {
+impl RpcServiceCallerInterface for RpcClient {
     type DispatcherMutex<T> = Mutex<T>;
 
     fn get_dispatcher(&self) -> Arc<Self::DispatcherMutex<RpcDispatcher<'static>>> {
