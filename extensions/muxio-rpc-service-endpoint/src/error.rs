@@ -13,7 +13,7 @@ use muxio::frame::{FrameDecodeError, FrameEncodeError};
 /// - `Handler`: Represents any error returned by a user-provided RPC handler,
 ///    typically during request processing.
 #[derive(Debug)]
-pub enum RpcEndpointError {
+pub enum RpcServiceEndpointError {
     /// Error that occurred while decoding an inbound frame.
     Decode(FrameDecodeError),
 

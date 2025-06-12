@@ -1,4 +1,4 @@
-use super::error::RpcEndpointError;
+use super::{RpcServiceEndpointInterface, error::RpcServiceEndpointError};
 use muxio::frame::FrameEncodeError;
 use muxio::rpc::{RpcDispatcher, RpcResponse, RpcResultStatus, rpc_internals::rpc_trait::RpcEmit};
 use muxio_rpc_service::constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE;
@@ -22,22 +22,6 @@ pub type RpcPrebufferedHandler = Box<
         + Sync,
 >;
 
-/// Used so that servers (and optionally clients) can implement endpoint registration methods.
-#[async_trait::async_trait]
-pub trait RpcServiceEndpointInterface {
-    async fn register_prebuffered<F, Fut>(
-        &self,
-        method_id: u64,
-        handler: F,
-    ) -> Result<(), RpcEndpointError>
-    where
-        F: Fn(Vec<u8>) -> Fut + Send + Sync + 'static,
-        // TODO: Use type alias
-        Fut: Future<Output = Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>>>
-            + Send
-            + 'static;
-}
-
 pub struct RpcServiceEndpoint {
     prebuffered_handlers: Arc<Mutex<HashMap<u64, RpcPrebufferedHandler>>>,
     rpc_dispatcher: Arc<Mutex<RpcDispatcher<'static>>>,
@@ -51,7 +35,11 @@ impl RpcServiceEndpoint {
         }
     }
 
-    pub async fn read_bytes<E>(&self, bytes: &[u8], mut on_emit: E) -> Result<(), RpcEndpointError>
+    pub async fn read_bytes<E>(
+        &self,
+        bytes: &[u8],
+        mut on_emit: E,
+    ) -> Result<(), RpcServiceEndpointError>
     where
         E: RpcEmit + Send,
     {
@@ -59,7 +47,7 @@ impl RpcServiceEndpoint {
 
         let request_ids = match rpc_dispatcher.read_bytes(&bytes) {
             Ok(ids) => ids,
-            Err(e) => return Err(RpcEndpointError::Decode(e)),
+            Err(e) => return Err(RpcServiceEndpointError::Decode(e)),
         };
 
         // Handle prebuffered requests
@@ -121,7 +109,7 @@ impl RpcServiceEndpoint {
                     DEFAULT_SERVICE_MAX_CHUNK_SIZE, // TODO: Make configurable
                     |chunk| on_emit(chunk),
                 )
-                .map_err(|e: FrameEncodeError| RpcEndpointError::Encode(e))?;
+                .map_err(|e: FrameEncodeError| RpcServiceEndpointError::Encode(e))?;
         }
 
         Ok(())
@@ -134,7 +122,7 @@ impl RpcServiceEndpointInterface for RpcServiceEndpoint {
         &self,
         method_id: u64,
         handler: F,
-    ) -> Result<(), RpcEndpointError>
+    ) -> Result<(), RpcServiceEndpointError>
     where
         F: Fn(Vec<u8>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>>>
@@ -152,7 +140,7 @@ impl RpcServiceEndpointInterface for RpcServiceEndpoint {
                     "a handler for method ID {} is already registered",
                     method_id
                 );
-                Err(RpcEndpointError::Handler(err_msg.into()))
+                Err(RpcServiceEndpointError::Handler(err_msg.into()))
             }
 
             // If the key doesn't exist, insert the handler and return Ok.
