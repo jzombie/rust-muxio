@@ -12,16 +12,46 @@ use muxio_rpc_service::{
 use std::io;
 use std::sync::Arc;
 
-// 1. REPLACE the old AsyncLock trait with this new, correct abstraction.
+/// A trait that provides a generic, asynchronous interface for accessing a shared
+/// `RpcDispatcher` that may be protected by different kinds of mutexes.
+///
+/// ## The Problem This Solves
+///
+/// This trait solves the challenge of writing a single generic function that can
+/// operate on an `RpcDispatcher` protected by either a `tokio::sync::Mutex` (for
+/// native async code) or a `std::sync::Mutex` (for single-threaded WASM).
+///
+/// These two mutex types have incompatible lock guards (`tokio`'s is `Send`,
+/// `std`'s is not), which prevents a simpler generic approach.
+///
+/// ## The Closure-Passing Pattern
+///
+/// Instead of trying to return a generic lock guard, this trait uses a
+/// closure-passing pattern. The caller provides the work to be done via a
+/// closure (`f`), and the implementation of this trait is responsible for:
+///
+/// 1. Acquiring the lock using its specific strategy (blocking or async).
+/// 2. Executing the closure with a mutable reference to the locked data.
+/// 3. Releasing the lock.
+///
+/// This encapsulates the locking logic and completely avoids the `Send` guard issue.
 #[async_trait::async_trait]
 pub trait WithDispatcher: Send + Sync {
+    /// Executes a closure against the locked `RpcDispatcher`.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `F`: A closure that takes `&mut RpcDispatcher` and is only called once.
+    ///   It must be `Send` as the work may be moved to another thread.
+    /// - `R`: The return type of the closure. It must be `Send` so the result can
+    ///   be safely returned across `.await` points.
     async fn with_dispatcher<F, R>(&self, f: F) -> R
     where
         F: FnOnce(&mut RpcDispatcher<'static>) -> R + Send,
         R: Send;
 }
 
-// 2. IMPLEMENT the new trait for tokio::sync::Mutex.
+/// The implementation for Tokio's asynchronous mutex.
 #[async_trait::async_trait]
 impl WithDispatcher for tokio::sync::Mutex<RpcDispatcher<'static>> {
     async fn with_dispatcher<F, R>(&self, f: F) -> R
@@ -29,12 +59,15 @@ impl WithDispatcher for tokio::sync::Mutex<RpcDispatcher<'static>> {
         F: FnOnce(&mut RpcDispatcher<'static>) -> R + Send,
         R: Send,
     {
+        // Asynchronously acquires the lock without blocking the thread.
         let mut guard = self.lock().await;
+
+        // Executes the provided work.
         f(&mut guard)
     }
 }
 
-// 3. IMPLEMENT the new trait for std::sync::Mutex.
+/// The implementation for the standard library's blocking mutex.
 #[async_trait::async_trait]
 impl WithDispatcher for std::sync::Mutex<RpcDispatcher<'static>> {
     async fn with_dispatcher<F, R>(&self, f: F) -> R
@@ -48,11 +81,13 @@ impl WithDispatcher for std::sync::Mutex<RpcDispatcher<'static>> {
         // is correct for its intended use cases.
         // TODO: Don't use expect or unwrap
         let mut guard = self.lock().expect("Mutex was poisoned");
+
+        // Executes the provided work.
         f(&mut guard)
     }
 }
 
-// 4. MODIFY THE GENERIC FUNCTION to use the new trait
+// Modify the generic dipatcher to use the new trait
 pub async fn call_rpc_streaming_generic<L>(
     dispatcher: Arc<L>,
     on_emit: Arc<dyn Fn(Vec<u8>) + Send + Sync>,
@@ -83,7 +118,6 @@ where
         }
     });
 
-    // The recv_fn remains unchanged from your original implementation.
     let recv_fn: Box<dyn FnMut(RpcStreamEvent) + Send + 'static> = Box::new({
         let tx = Arc::clone(&tx);
         let ready_tx = Arc::clone(&ready_tx);
@@ -126,7 +160,7 @@ where
         }
     });
 
-    // THIS IS THE KEY CHANGE: We pass a closure to the dispatcher.
+    // We pass a closure to the dispatcher.
     // The lock guard is never exposed across an .await point.
     let rpc_call_result = dispatcher
         .with_dispatcher(|d| {
