@@ -18,7 +18,7 @@ impl RpcServiceCaller {
     // Modify the generic dipatcher to use the new trait
     pub async fn call_rpc_streaming<L>(
         dispatcher: Arc<L>,
-        on_emit: Arc<dyn Fn(Vec<u8>) + Send + Sync>,
+        on_emit: Arc<dyn Fn(Vec<u8>) + Send + Sync>, // TODO: Can this use `RpcEmit` directly?
         method_id: u64,
         payload: &[u8], // TODO: Rename
         // TODO: Add `prebuffered_payload`
@@ -40,6 +40,7 @@ impl RpcServiceCaller {
         let (ready_tx, ready_rx) = oneshot::channel::<Result<(), io::Error>>();
         let ready_tx = Arc::new(std::sync::Mutex::new(Some(ready_tx)));
 
+        // TODO: Can this just call on_emit directly?
         let send_fn: Box<dyn RpcEmit + Send + Sync> = Box::new({
             let on_emit = on_emit.clone();
             move |chunk: &[u8]| {
