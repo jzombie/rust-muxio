@@ -7,7 +7,9 @@ use axum::{
 };
 use bytes::Bytes;
 use futures_util::{SinkExt, StreamExt};
-use muxio_rpc_service_endpoint::RpcServiceEndpoint;
+use muxio_rpc_service_endpoint::{
+    RpcServiceEndpoint, RpcServiceEndpointInterface, error::RpcEndpointError,
+};
 use std::{future::Future, net::SocketAddr, sync::Arc};
 use tokio::{net::TcpListener, sync::mpsc::unbounded_channel};
 
@@ -29,7 +31,7 @@ impl RpcServer {
     /// Starts serving the RPC server with already registered handlers
     /// on the given address. This consumes the server instance.
     pub async fn serve(self, address: &str) -> Result<SocketAddr, axum::BoxError> {
-        let listener = TcpListener::bind(address).await.unwrap();
+        let listener = TcpListener::bind(address).await?;
         // Wrap the server in an Arc to allow for shared, thread-safe access.
         let server = Arc::new(self);
         server.serve_with_listener(listener).await
@@ -41,7 +43,7 @@ impl RpcServer {
         self: Arc<Self>,
         listener: TcpListener,
     ) -> Result<SocketAddr, axum::BoxError> {
-        let addr = listener.local_addr().unwrap();
+        let addr = listener.local_addr()?;
 
         let app = Router::new().route(
             "/ws", // TODO: Don't hardcode
@@ -61,20 +63,6 @@ impl RpcServer {
         .await?;
 
         Ok(addr)
-    }
-
-    pub async fn register_prebuffered<F, Fut>(
-        &self,
-        method_id: u64,
-        handler: F,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
-    where
-        F: Fn(Vec<u8>) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>>>
-            + Send
-            + 'static,
-    {
-        self.endpoint.register_prebuffered(method_id, handler).await
     }
 
     /// WebSocket route handler that sets up the WebSocket connection.
@@ -129,5 +117,22 @@ impl RpcServer {
                 eprintln!("Caught err: {:?}", err);
             }
         }
+    }
+}
+
+#[async_trait::async_trait]
+impl RpcServiceEndpointInterface for RpcServer {
+    async fn register_prebuffered<F, Fut>(
+        &self,
+        method_id: u64,
+        handler: F,
+    ) -> Result<(), RpcEndpointError>
+    where
+        F: Fn(Vec<u8>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>>>
+            + Send
+            + 'static,
+    {
+        self.endpoint.register_prebuffered(method_id, handler).await
     }
 }

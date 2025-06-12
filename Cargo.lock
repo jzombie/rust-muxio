@@ -420,6 +420,7 @@ dependencies = [
  "futures",
  "muxio",
  "muxio-rpc-service",
+ "muxio-rpc-service-caller",
  "muxio-tokio-rpc-client",
  "muxio-tokio-rpc-server",
  "tokio",
@@ -788,14 +789,27 @@ name = "muxio-rpc-service"
 version = "0.1.0-alpha"
 dependencies = [
  "async-trait",
+ "futures",
  "muxio",
  "xxhash-rust",
+]
+
+[[package]]
+name = "muxio-rpc-service-caller"
+version = "0.1.0-alpha"
+dependencies = [
+ "async-trait",
+ "futures",
+ "muxio",
+ "muxio-rpc-service",
+ "tokio",
 ]
 
 [[package]]
 name = "muxio-rpc-service-endpoint"
 version = "0.1.0-alpha"
 dependencies = [
+ "async-trait",
  "muxio",
  "muxio-rpc-service",
  "tokio",
@@ -807,9 +821,11 @@ version = "0.1.0-alpha"
 dependencies = [
  "async-trait",
  "bytes",
+ "futures",
  "futures-util",
  "muxio",
  "muxio-rpc-service",
+ "muxio-rpc-service-caller",
  "tokio",
  "tokio-tungstenite",
 ]
@@ -818,10 +834,12 @@ dependencies = [
 name = "muxio-tokio-rpc-server"
 version = "0.1.0-alpha"
 dependencies = [
+ "async-trait",
  "axum",
  "bytes",
  "futures-util",
  "muxio",
+ "muxio-rpc-service",
  "muxio-rpc-service-endpoint",
  "tokio",
  "tokio-tungstenite",
@@ -836,6 +854,7 @@ dependencies = [
  "js-sys",
  "muxio",
  "muxio-rpc-service",
+ "muxio-rpc-service-caller",
  "wasm-bindgen",
  "wasm-bindgen-futures",
 ]

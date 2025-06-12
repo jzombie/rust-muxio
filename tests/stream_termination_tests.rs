@@ -72,10 +72,12 @@ fn rpc_stream_aborts_on_cancel_frame() {
 
     // RefCell for processing received bytes on a simulated server
     let process_received_bytes =
-        RefCell::new(|bytes: &[u8]| match server.read_bytes(bytes, |_evt| {}) {
-            Ok(()) => {}
-            Err(err) => *decoder_error.borrow_mut() = Some(err),
-        });
+        RefCell::new(
+            |bytes: &[u8]| match server.read_bytes(bytes, |_evt| Ok(())) {
+                Ok(()) => {}
+                Err(err) => *decoder_error.borrow_mut() = Some(err),
+            },
+        );
 
     // Start a new RPC stream
     let mut enc = client
@@ -120,10 +122,12 @@ fn rpc_stream_aborts_on_end_frame() {
 
     // RefCell for processing received bytes on a simulated server
     let process_received_bytes =
-        RefCell::new(|bytes: &[u8]| match server.read_bytes(bytes, |_evt| {}) {
-            Ok(()) => {}
-            Err(err) => *decoder_error.borrow_mut() = Some(err),
-        });
+        RefCell::new(
+            |bytes: &[u8]| match server.read_bytes(bytes, |_evt| Ok(())) {
+                Ok(()) => {}
+                Err(err) => *decoder_error.borrow_mut() = Some(err),
+            },
+        );
 
     // Start a new RPC stream
     let mut enc = client

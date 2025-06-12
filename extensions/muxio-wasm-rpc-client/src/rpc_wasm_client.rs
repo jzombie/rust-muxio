@@ -1,84 +1,83 @@
-use futures::channel::oneshot;
+use futures::channel::mpsc;
 use muxio::rpc::{
-    RpcDispatcher, RpcRequest,
-    rpc_internals::{RpcEmit, RpcStreamEncoder, RpcStreamEvent},
+    RpcDispatcher,
+    rpc_internals::{RpcStreamEncoder, rpc_trait::RpcEmit},
 };
-use muxio_rpc_service::{RpcClientInterface, constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE};
-use std::sync::Arc;
-use wasm_bindgen_futures::spawn_local;
+use muxio_rpc_service_caller::RpcServiceCallerInterface;
+use muxio_rpc_service_caller::{call_rpc_buffered_generic, call_rpc_streaming_generic};
+use std::io;
+use std::sync::{Arc, Mutex};
 
 pub struct RpcWasmClient {
-    // TODO: Should these be kept public?
-    pub dispatcher: Arc<std::sync::Mutex<RpcDispatcher<'static>>>,
-    pub emit_callback: Arc<dyn Fn(Vec<u8>) + Send + Sync>,
+    dispatcher: Arc<Mutex<RpcDispatcher<'static>>>,
+    emit_callback: Arc<dyn Fn(Vec<u8>) + Send + Sync>,
 }
 
 impl RpcWasmClient {
     pub fn new(emit_callback: impl Fn(Vec<u8>) + Send + Sync + 'static) -> RpcWasmClient {
-        let dispatcher = Arc::new(std::sync::Mutex::new(RpcDispatcher::new()));
-
         RpcWasmClient {
-            dispatcher,
+            dispatcher: Arc::new(Mutex::new(RpcDispatcher::new())),
             emit_callback: Arc::new(emit_callback),
         }
+    }
+
+    fn dispatcher(&self) -> Arc<Mutex<RpcDispatcher<'static>>> {
+        self.dispatcher.clone()
+    }
+
+    fn emit(&self) -> Arc<dyn Fn(Vec<u8>) + Send + Sync> {
+        self.emit_callback.clone()
     }
 }
 
 #[async_trait::async_trait]
-impl RpcClientInterface for RpcWasmClient {
-    async fn call_rpc<T, F>(
+impl RpcServiceCallerInterface for RpcWasmClient {
+    type DispatcherMutex<T> = Mutex<RpcDispatcher<'static>>;
+
+    fn get_dispatcher(&self) -> Arc<Self::DispatcherMutex<RpcDispatcher<'static>>> {
+        self.dispatcher()
+    }
+
+    async fn call_rpc_streaming(
         &self,
         method_id: u64,
         payload: &[u8],
-        response_handler: F,
         is_finalized: bool,
-    ) -> Result<(RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>, T), std::io::Error>
+    ) -> Result<
+        (
+            RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>,
+            mpsc::Receiver<Vec<u8>>,
+        ),
+        io::Error,
+    > {
+        call_rpc_streaming_generic(
+            self.dispatcher(),
+            self.emit(),
+            method_id,
+            payload,
+            is_finalized,
+        )
+        .await
+    }
+
+    async fn call_rpc_buffered<T, F>(
+        &self,
+        method_id: u64,
+        payload: &[u8],
+        decode: F,
+        is_finalized: bool,
+    ) -> Result<
+        (
+            RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>,
+            Result<T, io::Error>,
+        ),
+        io::Error,
+    >
     where
         T: Send + 'static,
         F: Fn(&[u8]) -> T + Send + Sync + 'static,
     {
-        let emit = self.emit_callback.clone();
-        let (done_tx, done_rx) = oneshot::channel::<T>();
-        let done_tx = Arc::new(std::sync::Mutex::new(Some(done_tx)));
-        let done_tx_clone = done_tx.clone();
-
-        let send_fn: Box<dyn RpcEmit + Send + Sync> = Box::new(move |chunk: &[u8]| {
-            emit(chunk.to_vec());
-        });
-
-        let recv_fn: Box<dyn FnMut(RpcStreamEvent) + Send + 'static> = Box::new(move |evt| {
-            if let RpcStreamEvent::PayloadChunk { bytes, .. } = evt {
-                let result = response_handler(&bytes);
-                let done_tx_clone2 = done_tx_clone.clone();
-
-                spawn_local(async move {
-                    if let Some(tx) = done_tx_clone2.lock().unwrap().take() {
-                        let _ = tx.send(result);
-                    }
-                });
-            }
-        });
-
-        let rpc_stream_encoder = self
-            .dispatcher
-            .lock()
-            .unwrap()
-            .call(
-                RpcRequest {
-                    method_id,
-                    param_bytes: Some(payload.to_vec()),
-                    prebuffered_payload_bytes: None,
-                    is_finalized,
-                },
-                DEFAULT_SERVICE_MAX_CHUNK_SIZE, // TODO: Make configurable
-                send_fn,
-                Some(recv_fn),
-                true,
-            )
-            .expect("dispatcher.call failed");
-
-        let result = done_rx.await.expect("oneshot receive failed");
-
-        Ok((rpc_stream_encoder, result))
+        // Delegate directly to the generic buffered helper
+        call_rpc_buffered_generic(self, method_id, payload, decode, is_finalized).await
     }
 }

@@ -2,8 +2,8 @@ use crate::frame::{FrameDecodeError, FrameEncodeError};
 use crate::rpc::{
     RpcRequest, RpcResponse,
     rpc_internals::{
-        RpcEmit, RpcHeader, RpcMessageType, RpcRespondableSession, RpcResponseHandler,
-        RpcStreamEncoder, RpcStreamEvent,
+        RpcHeader, RpcMessageType, RpcRespondableSession, RpcStreamEncoder, RpcStreamEvent,
+        rpc_trait::{RpcEmit, RpcResponseHandler},
     },
 };
 use crate::utils::increment_u32_id;

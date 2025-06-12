@@ -1,6 +1,7 @@
 use crate::frame::{FrameDecodeError, FrameEncodeError};
 use crate::rpc::rpc_internals::{
-    RpcEmit, RpcHeader, RpcResponseHandler, RpcSession, RpcStreamEncoder, RpcStreamEvent,
+    RpcHeader, RpcSession, RpcStreamEncoder, RpcStreamEvent,
+    rpc_trait::{RpcEmit, RpcResponseHandler},
 };
 use std::collections::HashMap;
 
@@ -127,9 +128,12 @@ impl<'a> RpcRespondableSession<'a> {
                         RpcStreamEvent::End { .. } => {
                             // When the end of the stream is reached, call the response handler
                             if let Some(cb) = self.response_handlers.get_mut(&rpc_id) {
+                                let rpc_method_id =
+                                    method_id.ok_or(FrameDecodeError::CorruptFrame)?;
+
                                 let rpc_payload_event = RpcStreamEvent::PayloadChunk {
                                     rpc_header_id: rpc_id,
-                                    rpc_method_id: method_id.unwrap(), // TODO: Don't use unwrap here
+                                    rpc_method_id,
                                     bytes: buffer.clone(),
                                 };
 
@@ -142,7 +146,7 @@ impl<'a> RpcRespondableSession<'a> {
                         _ => {
                             eprintln!("Unknown `RpcStreamEvent`");
                         }
-                    }
+                    };
                 } else {
                     if let Some(cb) = self.response_handlers.get_mut(&rpc_id) {
                         cb(evt.clone());
@@ -163,6 +167,8 @@ impl<'a> RpcRespondableSession<'a> {
                     cb(evt);
                 }
             }
+
+            Ok(())
         })?;
 
         Ok(())

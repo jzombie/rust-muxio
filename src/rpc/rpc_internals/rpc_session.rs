@@ -1,4 +1,4 @@
-use super::aliases::*;
+use super::rpc_trait::*;
 use crate::{
     frame::{FrameDecodeError, FrameEncodeError, FrameKind, FrameMuxStreamDecoder},
     rpc::rpc_internals::{RpcHeader, RpcStreamDecoder, RpcStreamEncoder, RpcStreamEvent},
@@ -50,7 +50,7 @@ impl RpcSession {
         mut on_rpc_stream_event: H,
     ) -> Result<(), FrameDecodeError>
     where
-        H: RpcStreamEventHandler,
+        H: RpcStreamEventDecoderHandler,
     {
         let frames = self.frame_mux_stream_decoder.read_bytes(input);
 

@@ -1,4 +1,5 @@
 use js_sys::Uint8Array;
+use muxio_rpc_service_caller::RpcServiceCallerInterface;
 use wasm_bindgen::prelude::*;
 
 use super::MUXIO_STATIC_RPC_CLIENT_REF;
@@ -60,18 +61,21 @@ pub fn static_muxio_read_bytes_uint8(inbound_data: Uint8Array) -> Result<(), JsV
     let inbound_bytes = inbound_data.to_vec();
 
     MUXIO_STATIC_RPC_CLIENT_REF.with(|cell| {
-        if let Some(rpc_wasm_client) = cell.borrow_mut().as_mut() {
-            rpc_wasm_client
-                .dispatcher
-                .lock()
-                .unwrap()
-                .read_bytes(&inbound_bytes)
-                .unwrap();
-        } else {
-            // TODO: Use tracing instead?
-            panic!("Dispatcher not initialized");
-        }
-    });
+        let mut opt_client = cell.borrow_mut();
+        let client = opt_client
+            .as_mut()
+            .ok_or_else(|| JsValue::from_str("Dispatcher not initialized"))?;
 
-    Ok(())
+        let dispatcher_binding = client.clone().get_dispatcher();
+
+        let mut dispatcher = dispatcher_binding
+            .lock()
+            .map_err(|_| JsValue::from_str("Failed to lock dispatcher"))?;
+
+        dispatcher
+            .read_bytes(&inbound_bytes)
+            .map_err(|e| JsValue::from_str(&format!("Read error: {:?}", e)))?;
+
+        Ok(())
+    })
 }

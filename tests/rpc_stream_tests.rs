@@ -36,6 +36,8 @@ fn rpc_parallel_streams_roundtrip() {
                     );
 
                     decoded.entry(rpc_header_id).or_default().0 = Some(rpc_header.clone());
+
+                    Ok(())
                 }
                 RpcStreamEvent::PayloadChunk {
                     rpc_header_id,
@@ -43,11 +45,15 @@ fn rpc_parallel_streams_roundtrip() {
                     ..
                 } => {
                     decoded.entry(rpc_header_id).or_default().1.extend(bytes);
+
+                    Ok(())
                 }
                 RpcStreamEvent::End { rpc_header_id, .. } => {
-                    assert!(decoded.contains_key(&rpc_header_id))
+                    assert!(decoded.contains_key(&rpc_header_id));
+
+                    Ok(())
                 }
-                _ => {}
+                _ => Ok(()),
             })
             .unwrap();
     });
@@ -209,6 +215,8 @@ fn rpc_stream_with_multiple_metadata_entries() {
                     ..
                 } => {
                     decoded.entry(rpc_header_id).or_default().0 = Some(rpc_header.clone());
+
+                    Ok(())
                 }
                 RpcStreamEvent::PayloadChunk {
                     rpc_header_id,
@@ -216,9 +224,11 @@ fn rpc_stream_with_multiple_metadata_entries() {
                     ..
                 } => {
                     decoded.entry(rpc_header_id).or_default().1.extend(bytes);
+
+                    Ok(())
                 }
-                RpcStreamEvent::End { .. } => {}
-                _ => {}
+                // RpcStreamEvent::End { .. } => Ok(()),
+                _ => Ok(()),
             })
             .unwrap();
     }
@@ -342,6 +352,8 @@ fn rpc_complex_shuffled_stream() {
                         ..
                     } => {
                         decoded.entry(rpc_header_id).or_default().0 = Some(rpc_header.clone());
+
+                        Ok(())
                     }
                     RpcStreamEvent::PayloadChunk {
                         rpc_header_id,
@@ -349,9 +361,11 @@ fn rpc_complex_shuffled_stream() {
                         ..
                     } => {
                         decoded.entry(rpc_header_id).or_default().1.extend(bytes);
+
+                        Ok(())
                     }
-                    RpcStreamEvent::End { .. } => {}
-                    _ => {}
+                    // RpcStreamEvent::End { .. } => {Ok(())}
+                    _ => Ok(()),
                 })
                 .unwrap();
         }
@@ -465,6 +479,8 @@ fn rpc_session_bidirectional_roundtrip() {
                 } => {
                     assert_eq!(rpc_header.metadata_bytes, b"foo-bar");
                     seen_hdr = Some(rpc_header);
+
+                    Ok(())
                 }
                 RpcStreamEvent::PayloadChunk {
                     rpc_header_id: _,
@@ -472,9 +488,11 @@ fn rpc_session_bidirectional_roundtrip() {
                     ..
                 } => {
                     req_buf.extend(bytes);
+
+                    Ok(())
                 }
-                RpcStreamEvent::End { .. } => {}
-                _ => {}
+                // RpcStreamEvent::End { .. } => {Ok(())}
+                _ => Ok(()),
             })
             .expect("server.read_bytes failed");
     }
@@ -518,6 +536,8 @@ fn rpc_session_bidirectional_roundtrip() {
                 } => {
                     assert_eq!(rpc_header.metadata_bytes, b"baz-qux");
                     reply_hdr_seen = Some(rpc_header);
+
+                    Ok(())
                 }
                 RpcStreamEvent::PayloadChunk {
                     rpc_header_id: _,
@@ -525,9 +545,11 @@ fn rpc_session_bidirectional_roundtrip() {
                     ..
                 } => {
                     reply_buf.extend(bytes);
+
+                    Ok(())
                 }
-                RpcStreamEvent::End { .. } => {}
-                _ => {}
+                // RpcStreamEvent::End { .. } => {Ok(())}
+                _ => Ok(()),
             })
             .expect("client.read_bytes failed");
     }

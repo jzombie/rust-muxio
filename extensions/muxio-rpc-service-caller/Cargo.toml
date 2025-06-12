@@ -1,11 +1,12 @@
 [package]
-name = "muxio-rpc-service-endpoint"
+name = "muxio-rpc-service-caller"
 version = "0.1.0-alpha"
 edition = "2024"
 publish = false
 
 [dependencies]
 async-trait = "0.1.88"
-tokio = { version = "1.45.1", features = ["sync"] }
+futures = "0.3.31"
 muxio = { path = "../../" }
 muxio-rpc-service = { path = "../muxio-rpc-service" }
+tokio = { version = "1.45.1", features = ["sync"] }

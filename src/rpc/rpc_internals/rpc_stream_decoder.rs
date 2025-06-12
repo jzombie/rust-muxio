@@ -64,15 +64,16 @@ impl RpcStreamDecoder {
                         Err(_) => return Err(FrameDecodeError::CorruptFrame), // Frame type is invalid
                     };
 
-                let id = u32::from_le_bytes(
+                let header_id = u32::from_le_bytes(
                     self.buffer[RPC_FRAME_ID_OFFSET..RPC_FRAME_METHOD_ID_OFFSET]
                         .try_into()
-                        .unwrap(),
+                        .map_err(|_| FrameDecodeError::CorruptFrame)?,
                 );
+
                 let method_id = u64::from_le_bytes(
                     self.buffer[RPC_FRAME_METHOD_ID_OFFSET..RPC_FRAME_METADATA_LENGTH_OFFSET]
                         .try_into()
-                        .unwrap(),
+                        .map_err(|_| FrameDecodeError::CorruptFrame)?,
                 );
                 self.rpc_method_id = Some(method_id);
 
@@ -81,7 +82,7 @@ impl RpcStreamDecoder {
                     self.buffer[RPC_FRAME_METADATA_LENGTH_OFFSET
                         ..RPC_FRAME_METADATA_LENGTH_OFFSET + RPC_FRAME_METADATA_LENGTH_SIZE]
                         .try_into()
-                        .unwrap(),
+                        .map_err(|_| FrameDecodeError::CorruptFrame)?,
                 ) as usize;
 
                 if self.buffer.len()
@@ -99,7 +100,7 @@ impl RpcStreamDecoder {
 
                 self.header = Some(RpcHeader {
                     msg_type,
-                    id,
+                    id: header_id,
                     method_id,
                     metadata_bytes,
                 });
@@ -112,21 +113,21 @@ impl RpcStreamDecoder {
                     ..RPC_FRAME_METADATA_LENGTH_OFFSET + RPC_FRAME_METADATA_LENGTH_SIZE + meta_len,
                 );
 
-                let rpc_header = self.header.clone().unwrap();
+                let rpc_header = self.header.clone().ok_or(FrameDecodeError::CorruptFrame)?;
                 self.rpc_header_id = Some(rpc_header.id);
 
                 // Push the header event
                 events.push(RpcStreamEvent::Header {
-                    rpc_header_id: self.rpc_header_id.unwrap(),
-                    rpc_method_id: self.rpc_method_id.unwrap(),
+                    rpc_header_id: header_id,
+                    rpc_method_id: method_id,
                     rpc_header,
                 });
 
                 // Continue processing payload if available
                 if !self.buffer.is_empty() {
                     events.push(RpcStreamEvent::PayloadChunk {
-                        rpc_header_id: self.rpc_header_id.unwrap(),
-                        rpc_method_id: self.rpc_method_id.unwrap(),
+                        rpc_header_id: header_id,
+                        rpc_method_id: method_id,
                         bytes: self.buffer.split_off(0),
                     });
                 }
@@ -136,16 +137,16 @@ impl RpcStreamDecoder {
                 if frame.inner.kind == FrameKind::End {
                     self.state = RpcDecoderState::Done;
                     events.push(RpcStreamEvent::End {
-                        rpc_header_id: self.rpc_header_id.unwrap(),
-                        rpc_method_id: self.rpc_method_id.unwrap(),
+                        rpc_header_id: self.rpc_header_id.ok_or(FrameDecodeError::CorruptFrame)?,
+                        rpc_method_id: self.rpc_method_id.ok_or(FrameDecodeError::CorruptFrame)?,
                     });
                 } else if frame.inner.kind == FrameKind::Cancel {
                     return Err(FrameDecodeError::ReadAfterCancel); // Stop processing further frames
                 } else {
                     // If there's a payload chunk, append it to the events
                     events.push(RpcStreamEvent::PayloadChunk {
-                        rpc_header_id: self.rpc_header_id.unwrap(),
-                        rpc_method_id: self.rpc_method_id.unwrap(),
+                        rpc_header_id: self.rpc_header_id.ok_or(FrameDecodeError::CorruptFrame)?,
+                        rpc_method_id: self.rpc_method_id.ok_or(FrameDecodeError::CorruptFrame)?,
                         bytes: frame.inner.payload.clone(),
                     });
                 }
