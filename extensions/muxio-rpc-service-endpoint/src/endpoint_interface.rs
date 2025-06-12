@@ -50,6 +50,8 @@ pub trait RpcServiceEndpointInterface: Send + Sync {
             .await
     }
 
+    // FIXME: Add optional user-defined context object to send to handlers (i.e. for determining `which`
+    // socket is performing some action, etc.)
     async fn read_bytes<E>(&self, bytes: &[u8], on_emit: E) -> Result<(), RpcServiceEndpointError>
     where
         E: RpcEmit + Send + Sync + Clone,
