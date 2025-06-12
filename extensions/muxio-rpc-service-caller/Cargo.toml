@@ -10,5 +10,9 @@ futures = "0.3.31"
 muxio = { path = "../../" }
 muxio-rpc-service = { path = "../muxio-rpc-service" }
 
-# TODO: Don't include if WASM
-tokio = { version = "1.45.1", features = ["sync"] }
+# Optional dependencies
+tokio = { version = "1.45.1", features = ["sync"], optional = true }
+
+[features]
+default = []
+tokio_support = ["dep:tokio"]

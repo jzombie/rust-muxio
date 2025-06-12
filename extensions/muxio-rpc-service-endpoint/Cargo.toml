@@ -11,9 +11,15 @@ muxio = { path = "../../" }
 muxio-rpc-service = { path = "../muxio-rpc-service" }
 muxio-rpc-service-caller = { path = "../muxio-rpc-service-caller" }
 
-# TODO: Don't include if WASM
-tokio = { version = "1.45.1", features = ["sync"] }
+# Optional dependencies
+tokio = { version = "1.45.1", features = ["sync"], optional = true }
+
+[features]
+default = []
+tokio_support = [
+    "dep:tokio", # Enables the optional tokio dependency in THIS crate.
+    "muxio-rpc-service-caller/tokio_support" # Enables the feature in the CALLER crate.
+]
 
 [dev-dependencies]
 doc-comment = "0.3.3"
-

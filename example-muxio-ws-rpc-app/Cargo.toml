@@ -12,7 +12,7 @@ async-trait = "0.1.88"
 muxio-tokio-rpc-server = { path = "../extensions/muxio-tokio-rpc-server" }
 muxio-tokio-rpc-client = { path = "../extensions/muxio-tokio-rpc-client" }
 muxio-rpc-service = { path = "../extensions/muxio-rpc-service" }
-muxio-rpc-service-caller = { path = "../extensions/muxio-rpc-service-caller" }
+muxio-rpc-service-caller = { path = "../extensions/muxio-rpc-service-caller", features=["tokio_support"] }
 
 [[bench]]
 name = "roundtrip"
