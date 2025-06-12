@@ -1,5 +1,5 @@
 use criterion::{Criterion, criterion_group, criterion_main};
-use example_muxio_ws_rpc_app::service_definition::Add;
+use example_muxio_ws_rpc_app::service_definition::prebuffered::Add;
 use futures::{StreamExt, stream::FuturesUnordered};
 use muxio_rpc_service::prebuffered::RpcMethodPrebuffered;
 use muxio_rpc_service_caller::prebuffered::RpcCallPrebuffered;

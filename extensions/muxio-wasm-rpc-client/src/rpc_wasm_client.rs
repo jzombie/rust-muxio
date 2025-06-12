@@ -1,10 +1,5 @@
-use futures::channel::mpsc;
-use muxio::rpc::{
-    RpcDispatcher,
-    rpc_internals::{RpcStreamEncoder, rpc_trait::RpcEmit},
-};
-use muxio_rpc_service_caller::RpcServiceCallerInterface;
-use muxio_rpc_service_caller::{call_rpc_buffered_generic, call_rpc_streaming_generic};
+use muxio::rpc::RpcDispatcher;
+use muxio_rpc_service_caller::{RpcServiceCallerInterface, WithDispatcher};
 use std::io;
 use std::sync::{Arc, Mutex};
 
@@ -21,63 +16,30 @@ impl RpcWasmClient {
         }
     }
 
+    // This helper fits the trait's requirement perfectly.
     fn dispatcher(&self) -> Arc<Mutex<RpcDispatcher<'static>>> {
         self.dispatcher.clone()
     }
 
+    // This helper also fits the trait's requirement perfectly.
     fn emit(&self) -> Arc<dyn Fn(Vec<u8>) + Send + Sync> {
         self.emit_callback.clone()
     }
 }
 
+// The new implementation block is now trivial.
 #[async_trait::async_trait]
 impl RpcServiceCallerInterface for RpcWasmClient {
-    type DispatcherMutex<T> = Mutex<RpcDispatcher<'static>>;
+    type DispatcherLock = Mutex<RpcDispatcher<'static>>;
 
-    fn get_dispatcher(&self) -> Arc<Self::DispatcherMutex<RpcDispatcher<'static>>> {
+    /// Provides the trait with access to this client's dispatcher.
+    fn get_dispatcher(&self) -> Arc<Self::DispatcherLock> {
         self.dispatcher()
     }
 
-    async fn call_rpc_streaming(
-        &self,
-        method_id: u64,
-        payload: &[u8],
-        is_finalized: bool,
-    ) -> Result<
-        (
-            RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>,
-            mpsc::Receiver<Vec<u8>>,
-        ),
-        io::Error,
-    > {
-        call_rpc_streaming_generic(
-            self.dispatcher(),
-            self.emit(),
-            method_id,
-            payload,
-            is_finalized,
-        )
-        .await
-    }
-
-    async fn call_rpc_buffered<T, F>(
-        &self,
-        method_id: u64,
-        payload: &[u8],
-        decode: F,
-        is_finalized: bool,
-    ) -> Result<
-        (
-            RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>,
-            Result<T, io::Error>,
-        ),
-        io::Error,
-    >
-    where
-        T: Send + 'static,
-        F: Fn(&[u8]) -> T + Send + Sync + 'static,
-    {
-        // Delegate directly to the generic buffered helper
-        call_rpc_buffered_generic(self, method_id, payload, decode, is_finalized).await
+    /// Provides the trait with this client's specific callback for sending
+    /// bytes to the JavaScript host.
+    fn get_emit_fn(&self) -> Arc<dyn Fn(Vec<u8>) + Send + Sync> {
+        self.emit()
     }
 }

@@ -6,6 +6,14 @@ publish = false
 
 [dependencies]
 async-trait = "0.1.88"
-tokio = { version = "1.45.1", features = ["sync"] }
+futures = "0.3.31"
 muxio = { path = "../../" }
 muxio-rpc-service = { path = "../muxio-rpc-service" }
+muxio-rpc-service-caller = { path = "../muxio-rpc-service-caller" }
+
+# TODO: Don't include if WASM
+tokio = { version = "1.45.1", features = ["sync"] }
+
+[dev-dependencies]
+doc-comment = "0.3.3"
+
