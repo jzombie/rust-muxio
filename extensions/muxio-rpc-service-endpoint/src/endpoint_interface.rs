@@ -1,6 +1,8 @@
 use super::error::RpcServiceEndpointError;
 use std::marker::Send;
 
+// TODO: Refactor just like `client_interface`
+
 /// Used so that servers (and optionally clients) can implement endpoint registration methods.
 #[async_trait::async_trait]
 pub trait RpcServiceEndpointInterface {

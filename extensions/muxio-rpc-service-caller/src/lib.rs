@@ -3,6 +3,3 @@ pub use caller_interface::*;
 pub mod prebuffered;
 mod with_dispatcher_trait;
 pub use with_dispatcher_trait::*;
-
-mod caller;
-pub use caller::*;
