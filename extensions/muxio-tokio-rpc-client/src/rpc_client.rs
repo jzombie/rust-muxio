@@ -1,12 +1,10 @@
-use bytes::Bytes;
-use futures::channel::mpsc; // We use this for the stream returned by the generic fn
+use futures::channel::mpsc;
 use futures_util::{SinkExt, StreamExt};
 use muxio::rpc::{
     RpcDispatcher,
     rpc_internals::{RpcStreamEncoder, rpc_trait::RpcEmit},
 };
-use muxio_rpc_service::{RpcClientInterface, constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE};
-// Import our robust, generic calling function
+use muxio_rpc_service::RpcClientInterface;
 use muxio_rpc_service_caller::{call_rpc_buffered_generic, call_rpc_streaming_generic};
 use std::io;
 use std::sync::Arc;
@@ -66,7 +64,6 @@ impl RpcClient {
     }
 }
 
-// This block replaces the old implementation entirely.
 #[async_trait::async_trait]
 impl RpcClientInterface for RpcClient {
     type DispatcherMutex<T> = Mutex<T>;

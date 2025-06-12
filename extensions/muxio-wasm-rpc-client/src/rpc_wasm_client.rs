@@ -1,10 +1,9 @@
-use futures::StreamExt;
-use futures::channel::{mpsc, oneshot};
+use futures::channel::mpsc;
 use muxio::rpc::{
-    RpcDispatcher, RpcRequest, RpcResultStatus,
-    rpc_internals::{RpcStreamEncoder, RpcStreamEvent, rpc_trait::RpcEmit},
+    RpcDispatcher,
+    rpc_internals::{RpcStreamEncoder, rpc_trait::RpcEmit},
 };
-use muxio_rpc_service::{RpcClientInterface, constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE};
+use muxio_rpc_service::RpcClientInterface;
 use muxio_rpc_service_caller::{call_rpc_buffered_generic, call_rpc_streaming_generic};
 use std::io;
 use std::sync::{Arc, Mutex};
