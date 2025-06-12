@@ -1,11 +1,13 @@
 // TODO: Move this out of the main `Muxio` crate, as this crate should be considered lower-level
 
+// TODO: Use an enumerable type
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum RpcResultStatus {
     Success = 0,
     Fail = 1,
     SystemError = 2,
+    MethodNotFound = 3,
 }
 
 impl RpcResultStatus {
@@ -24,6 +26,7 @@ impl TryFrom<u8> for RpcResultStatus {
             x if x == RpcResultStatus::Success as u8 => Ok(RpcResultStatus::Success),
             x if x == RpcResultStatus::Fail as u8 => Ok(RpcResultStatus::Fail),
             x if x == RpcResultStatus::SystemError as u8 => Ok(RpcResultStatus::SystemError),
+            x if x == RpcResultStatus::MethodNotFound as u8 => Ok(RpcResultStatus::MethodNotFound),
             _ => Err(()),
         }
     }

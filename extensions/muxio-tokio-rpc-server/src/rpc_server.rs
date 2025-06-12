@@ -7,11 +7,15 @@ use axum::{
 };
 use bytes::Bytes;
 use futures_util::{SinkExt, StreamExt};
+use muxio::rpc::RpcDispatcher;
 use muxio_rpc_service_endpoint::{
-    RpcServiceEndpoint, RpcServiceEndpointInterface, error::RpcServiceEndpointError,
+    RpcPrebufferedHandler, RpcServiceEndpoint, RpcServiceEndpointInterface,
 };
-use std::{future::Future, net::SocketAddr, sync::Arc};
-use tokio::{net::TcpListener, sync::mpsc::unbounded_channel};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use tokio::{
+    net::TcpListener,
+    sync::{Mutex, mpsc::unbounded_channel},
+};
 
 // TODO: Document that this is a basic server implementation and that the underlying service
 // endpoints can be used with alternative servers or transports.
@@ -107,8 +111,8 @@ impl RpcServer {
         while let Some(Some(Ok(Message::Binary(bytes)))) = recv_rx.recv().await {
             let tx_clone = tx.clone();
 
+            // Because RpcServer now implements the trait, we call read_bytes on `self`.
             if let Err(err) = self
-                .endpoint
                 .read_bytes(&bytes, |chunk| {
                     let _ = tx_clone.send(Message::Binary(Bytes::copy_from_slice(chunk)));
                 })
@@ -122,17 +126,13 @@ impl RpcServer {
 
 #[async_trait::async_trait]
 impl RpcServiceEndpointInterface for RpcServer {
-    async fn register_prebuffered<F, Fut>(
-        &self,
-        method_id: u64,
-        handler: F,
-    ) -> Result<(), RpcServiceEndpointError>
-    where
-        F: Fn(Vec<u8>) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>>>
-            + Send
-            + 'static,
-    {
-        self.endpoint.register_prebuffered(method_id, handler).await
+    /// Provides access to the dispatcher by delegating to the inner endpoint.
+    fn get_dispatcher(&self) -> Arc<Mutex<RpcDispatcher<'static>>> {
+        self.endpoint.get_dispatcher()
+    }
+
+    /// Provides access to the handler map by delegating to the inner endpoint.
+    fn get_prebuffered_handlers(&self) -> Arc<Mutex<HashMap<u64, RpcPrebufferedHandler>>> {
+        self.endpoint.get_prebuffered_handlers()
     }
 }
