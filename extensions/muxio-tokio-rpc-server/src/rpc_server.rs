@@ -126,13 +126,18 @@ impl RpcServer {
 
 #[async_trait::async_trait]
 impl RpcServiceEndpointInterface for RpcServer {
+    // FIX: Define the associated types required by the trait.
+    // Since RpcServer uses the default `RpcServiceEndpoint`, we use Tokio's Mutex.
+    type DispatcherLock = Mutex<RpcDispatcher<'static>>;
+    type HandlersLock = Mutex<HashMap<u64, RpcPrebufferedHandler>>;
+
     /// Provides access to the dispatcher by delegating to the inner endpoint.
-    fn get_dispatcher(&self) -> Arc<Mutex<RpcDispatcher<'static>>> {
+    fn get_dispatcher(&self) -> Arc<Self::DispatcherLock> {
         self.endpoint.get_dispatcher()
     }
 
     /// Provides access to the handler map by delegating to the inner endpoint.
-    fn get_prebuffered_handlers(&self) -> Arc<Mutex<HashMap<u64, RpcPrebufferedHandler>>> {
+    fn get_prebuffered_handlers(&self) -> Arc<Self::HandlersLock> {
         self.endpoint.get_prebuffered_handlers()
     }
 }

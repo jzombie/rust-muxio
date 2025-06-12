@@ -1,18 +1,22 @@
-use super::{endpoint::RpcPrebufferedHandler, error::RpcServiceEndpointError};
-use muxio::rpc::{RpcDispatcher, RpcResponse, rpc_internals::rpc_trait::RpcEmit};
-use muxio_rpc_service::{RpcResultStatus, constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE};
-use std::{
-    collections::{HashMap, hash_map::Entry},
-    future::Future,
-    marker::Send,
-    sync::Arc,
+use super::{
+    endpoint::RpcPrebufferedHandler, error::RpcServiceEndpointError,
+    with_handlers_trait::WithHandlers,
 };
-use tokio::sync::Mutex;
+use futures::future::join_all;
+use muxio::rpc::{RpcDispatcher, RpcRequest, RpcResponse, rpc_internals::rpc_trait::RpcEmit};
+// Corrected: RpcResultStatus comes from the service crate.
+use muxio_rpc_service::RpcResultStatus;
+use muxio_rpc_service::constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE;
+use muxio_rpc_service_caller::WithDispatcher;
+use std::{collections::hash_map::Entry, future::Future, marker::Send, sync::Arc};
 
 #[async_trait::async_trait]
 pub trait RpcServiceEndpointInterface: Send + Sync {
-    fn get_dispatcher(&self) -> Arc<Mutex<RpcDispatcher<'static>>>;
-    fn get_prebuffered_handlers(&self) -> Arc<Mutex<HashMap<u64, RpcPrebufferedHandler>>>;
+    type DispatcherLock: WithDispatcher;
+    type HandlersLock: WithHandlers;
+
+    fn get_dispatcher(&self) -> Arc<Self::DispatcherLock>;
+    fn get_prebuffered_handlers(&self) -> Arc<Self::HandlersLock>;
 
     async fn register_prebuffered<F, Fut>(
         &self,
@@ -25,96 +29,117 @@ pub trait RpcServiceEndpointInterface: Send + Sync {
             + Send
             + 'static,
     {
-        let handlers_arc = self.get_prebuffered_handlers();
-        let mut handlers = handlers_arc.lock().await;
-
-        match handlers.entry(method_id) {
-            Entry::Occupied(_) => {
-                let err_msg = format!(
-                    "a handler for method ID {} is already registered",
-                    method_id
-                );
-                Err(RpcServiceEndpointError::Handler(err_msg.into()))
-            }
-            Entry::Vacant(entry) => {
-                let wrapped = move |bytes: Vec<u8>| {
-                    Box::pin(handler(bytes)) as std::pin::Pin<Box<dyn Future<Output = _> + Send>>
-                };
-                // FIX: This now compiles because the HashMap's value type is Arc<...>.
-                entry.insert(Arc::new(wrapped));
-                Ok(())
-            }
-        }
+        self.get_prebuffered_handlers()
+            .with_handlers(|handlers| {
+                // FIX: Correct usage of the entry API.
+                match handlers.entry(method_id) {
+                    Entry::Occupied(_) => {
+                        let err_msg = format!(
+                            "a handler for method ID {} is already registered",
+                            method_id
+                        );
+                        Err(RpcServiceEndpointError::Handler(err_msg.into()))
+                    }
+                    Entry::Vacant(entry) => {
+                        let wrapped = move |bytes: Vec<u8>| {
+                            Box::pin(handler(bytes))
+                                as std::pin::Pin<Box<dyn Future<Output = _> + Send>>
+                        };
+                        entry.insert(Arc::new(wrapped));
+                        Ok(())
+                    }
+                }
+            })
+            .await
     }
 
     async fn read_bytes<E>(&self, bytes: &[u8], on_emit: E) -> Result<(), RpcServiceEndpointError>
     where
-        E: RpcEmit + Send + Clone,
+        E: RpcEmit + Send + Sync + Clone,
     {
-        let dispatcher_arc = self.get_dispatcher();
-        let mut rpc_dispatcher = dispatcher_arc.lock().await;
+        // --- Stage 1: Decode incoming requests ---
+        let (requests_to_process, handlers_arc) = {
+            let dispatcher_arc = self.get_dispatcher();
+            let handlers_arc = self.get_prebuffered_handlers();
 
-        let request_ids = rpc_dispatcher
-            .read_bytes(bytes)
-            .map_err(RpcServiceEndpointError::Decode)?;
+            dispatcher_arc
+                .with_dispatcher(move |dispatcher| {
+                    let request_ids = dispatcher.read_bytes(bytes)?;
+                    let mut requests_found = Vec::new();
 
-        let handlers_arc = self.get_prebuffered_handlers();
-
-        for request_id in request_ids {
-            if !rpc_dispatcher
-                .is_rpc_request_finalized(request_id)
-                .unwrap_or(false)
-            {
-                continue;
-            }
-
-            let Some(request) = rpc_dispatcher.delete_rpc_request(request_id) else {
-                continue;
-            };
-            let Some(param_bytes) = &request.param_bytes else {
-                continue;
-            };
-
-            let handler_to_call = {
-                let handlers = handlers_arc.lock().await;
-                // FIX: This now compiles because the HashMap's value type is Arc, which is Clone.
-                handlers.get(&request.method_id).cloned()
-            };
-
-            let response = if let Some(handler) = handler_to_call {
-                match handler(param_bytes.clone()).await {
-                    Ok(encoded) => RpcResponse {
-                        request_header_id: request_id,
-                        method_id: request.method_id,
-                        result_status: Some(RpcResultStatus::Success.into()),
-                        prebuffered_payload_bytes: Some(encoded),
-                        is_finalized: true,
-                    },
-                    Err(e) => {
-                        eprintln!("Handler error: {:?}", e);
-                        RpcResponse {
-                            request_header_id: request_id,
-                            method_id: request.method_id,
-                            result_status: Some(RpcResultStatus::SystemError.into()),
-                            prebuffered_payload_bytes: None,
-                            is_finalized: true,
+                    for id in request_ids {
+                        if dispatcher.is_rpc_request_finalized(id).unwrap_or(false) {
+                            if let Some(req) = dispatcher.delete_rpc_request(id) {
+                                requests_found.push((id, req));
+                            }
                         }
                     }
-                }
-            } else {
-                RpcResponse {
-                    request_header_id: request_id,
-                    method_id: request.method_id,
-                    result_status: Some(RpcResultStatus::MethodNotFound.into()),
-                    prebuffered_payload_bytes: None,
-                    is_finalized: true,
+                    // FIX: Explicitly define the Ok variant's type to resolve ambiguity.
+                    Ok::<_, RpcServiceEndpointError>((requests_found, handlers_arc))
+                })
+                .await?
+        };
+
+        if requests_to_process.is_empty() {
+            return Ok(());
+        }
+
+        // --- Stage 2: Concurrently process handlers WITHOUT holding locks ---
+        let mut response_futures = Vec::new();
+        for (request_id, request) in requests_to_process {
+            let handlers_arc_clone = handlers_arc.clone();
+            let future = async move {
+                let handler = handlers_arc_clone
+                    .with_handlers(|handlers| handlers.get(&request.method_id).cloned())
+                    .await;
+
+                if let (Some(handler), Some(params)) = (handler, &request.param_bytes) {
+                    match handler(params.clone()).await {
+                        Ok(encoded) => RpcResponse {
+                            request_header_id: request_id,
+                            method_id: request.method_id,
+                            result_status: Some(RpcResultStatus::Success.into()),
+                            prebuffered_payload_bytes: Some(encoded),
+                            is_finalized: true,
+                        },
+                        Err(e) => {
+                            eprintln!("Handler for method {} failed: {:?}", request.method_id, e);
+                            RpcResponse {
+                                request_header_id: request_id,
+                                method_id: request.method_id,
+                                result_status: Some(RpcResultStatus::SystemError.into()),
+                                prebuffered_payload_bytes: None,
+                                is_finalized: true,
+                            }
+                        }
+                    }
+                } else {
+                    RpcResponse {
+                        request_header_id: request_id,
+                        method_id: request.method_id,
+                        result_status: Some(RpcResultStatus::MethodNotFound.into()),
+                        prebuffered_payload_bytes: None,
+                        is_finalized: true,
+                    }
                 }
             };
-
-            rpc_dispatcher
-                .respond(response, DEFAULT_SERVICE_MAX_CHUNK_SIZE, on_emit.clone())
-                .map_err(|e| RpcServiceEndpointError::Encode(e))?;
+            response_futures.push(future);
         }
-        Ok(())
+
+        let responses = join_all(response_futures).await;
+
+        // --- Stage 3: Lock the dispatcher again to send all responses ---
+        self.get_dispatcher()
+            .with_dispatcher(|dispatcher| {
+                for response in responses {
+                    dispatcher.respond(
+                        response,
+                        DEFAULT_SERVICE_MAX_CHUNK_SIZE,
+                        on_emit.clone(),
+                    )?;
+                }
+                Ok(())
+            })
+            .await
     }
 }

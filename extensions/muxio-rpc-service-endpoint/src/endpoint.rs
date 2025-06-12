@@ -1,10 +1,10 @@
-use super::endpoint_interface::RpcServiceEndpointInterface;
+use super::{RpcServiceEndpointInterface, with_handlers_trait::WithHandlers};
 use muxio::rpc::RpcDispatcher;
+use muxio_rpc_service_caller::WithDispatcher;
 use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc};
 use tokio::sync::Mutex;
 
-// FIX: The handler type alias now uses Arc instead of Box.
-// This makes the handler's ownership shared and its pointer cloneable.
+/// The concrete handler type, wrapped in an Arc for shared ownership.
 pub type RpcPrebufferedHandler = Arc<
     dyn Fn(
             Vec<u8>,
@@ -17,7 +17,7 @@ pub type RpcPrebufferedHandler = Arc<
         + Sync,
 >;
 
-/// A concrete implementation of an RPC service endpoint.
+/// A concrete RPC service endpoint that uses Tokio's asynchronous mutex.
 /// It holds the state required by the `RpcServiceEndpointInterface`.
 pub struct RpcServiceEndpoint {
     prebuffered_handlers: Arc<Mutex<HashMap<u64, RpcPrebufferedHandler>>>,
@@ -33,14 +33,18 @@ impl RpcServiceEndpoint {
     }
 }
 
-// The implementation is now trivial. It just provides access to its state.
+/// The implementation simply provides the required getters. All complex logic
+/// is inherited from the trait's default methods.
 #[async_trait::async_trait]
 impl RpcServiceEndpointInterface for RpcServiceEndpoint {
-    fn get_dispatcher(&self) -> Arc<Mutex<RpcDispatcher<'static>>> {
+    type DispatcherLock = Mutex<RpcDispatcher<'static>>;
+    type HandlersLock = Mutex<HashMap<u64, RpcPrebufferedHandler>>;
+
+    fn get_dispatcher(&self) -> Arc<Self::DispatcherLock> {
         self.rpc_dispatcher.clone()
     }
 
-    fn get_prebuffered_handlers(&self) -> Arc<Mutex<HashMap<u64, RpcPrebufferedHandler>>> {
+    fn get_prebuffered_handlers(&self) -> Arc<Self::HandlersLock> {
         self.prebuffered_handlers.clone()
     }
 }
