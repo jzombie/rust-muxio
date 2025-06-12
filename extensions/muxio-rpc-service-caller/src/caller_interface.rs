@@ -5,7 +5,6 @@ use muxio::rpc::{
 };
 use std::{io, sync::Arc};
 
-// TODO: Rename to RpcServiceCallerInterface
 /// A transport-agnostic RPC client interface supporting both
 /// one-shot (pre-buffered) and streaming request workflows.
 ///
@@ -28,7 +27,7 @@ pub trait RpcServiceCallerInterface {
     async fn call_rpc_streaming(
         &self,
         method_id: u64,
-        payload: &[u8],
+        param_bytes: &[u8], // TODO: Make `Option` type
         is_finalized: bool,
     ) -> Result<
         (
@@ -42,7 +41,7 @@ pub trait RpcServiceCallerInterface {
     async fn call_rpc_buffered<T, F>(
         &self,
         method_id: u64,
-        payload: &[u8],
+        param_bytes: &[u8], // TODO: Make `Option` type
         decode: F,
         is_finalized: bool,
     ) -> Result<

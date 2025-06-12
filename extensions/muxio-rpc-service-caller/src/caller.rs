@@ -20,7 +20,7 @@ impl RpcServiceCaller {
         dispatcher: Arc<L>,
         on_emit: Arc<dyn Fn(Vec<u8>) + Send + Sync>, // TODO: Can this use `RpcEmit` directly?
         method_id: u64,
-        payload: &[u8], // TODO: Rename
+        param_bytes: &[u8], // TODO: Use `Option` type
         // TODO: Add `prebuffered_payload`
         is_finalized: bool,
     ) -> Result<
@@ -97,7 +97,7 @@ impl RpcServiceCaller {
                 d.call(
                     RpcRequest {
                         method_id,
-                        param_bytes: Some(payload.to_vec()),
+                        param_bytes: Some(param_bytes.to_vec()),
                         prebuffered_payload_bytes: None,
                         is_finalized,
                     },
@@ -126,7 +126,7 @@ impl RpcServiceCaller {
     pub async fn call_rpc_buffered<C, T, F>(
         client: &C,
         method_id: u64,
-        payload: &[u8], // TODO: Rename
+        param_bytes: &[u8], // TODO: Use `Option` type
         // TODO: Add `prebuffered_payload`
         decode: F,
         is_finalized: bool,
@@ -144,7 +144,7 @@ impl RpcServiceCaller {
     {
         // 1. Call the streaming method from the provided client.
         let (encoder, mut stream) = client
-            .call_rpc_streaming(method_id, payload, is_finalized)
+            .call_rpc_streaming(method_id, param_bytes, is_finalized)
             .await?;
 
         // 2. Collect all chunks from the stream into a single buffer.
