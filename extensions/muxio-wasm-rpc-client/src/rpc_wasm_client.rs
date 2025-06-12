@@ -1,6 +1,5 @@
 use muxio::rpc::RpcDispatcher;
-use muxio_rpc_service_caller::{RpcServiceCallerInterface, WithDispatcher};
-use std::io;
+use muxio_rpc_service_caller::RpcServiceCallerInterface;
 use std::sync::{Arc, Mutex};
 
 pub struct RpcWasmClient {

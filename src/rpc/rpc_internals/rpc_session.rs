@@ -71,8 +71,7 @@ impl RpcSession {
                                     self.rpc_stream_decoders.remove(&stream_id);
                                 }
 
-                                // TODO: Add Result error handling
-                                on_rpc_stream_event(event);
+                                on_rpc_stream_event(event)?;
                             }
                         }
                         Err(e) => {
@@ -85,8 +84,7 @@ impl RpcSession {
                                 frame_decode_error: e.clone(),
                             };
 
-                            // TODO: Add Result error handling
-                            on_rpc_stream_event(error_event);
+                            on_rpc_stream_event(error_event)?;
 
                             return Err(e);
                         }
@@ -104,8 +102,7 @@ impl RpcSession {
                         frame_decode_error: e.clone(),
                     };
 
-                    // TODO: Add Result error handling
-                    on_rpc_stream_event(error_event);
+                    on_rpc_stream_event(error_event)?;
                 }
             }
         }
