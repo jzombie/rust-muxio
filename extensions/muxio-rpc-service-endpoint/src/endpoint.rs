@@ -1,6 +1,6 @@
 use super::endpoint_interface::RpcServiceEndpointInterface;
 use muxio::rpc::RpcDispatcher;
-use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc}; // <-- Ensure Arc is in use
+use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc};
 use tokio::sync::Mutex;
 
 // FIX: The handler type alias now uses Arc instead of Box.

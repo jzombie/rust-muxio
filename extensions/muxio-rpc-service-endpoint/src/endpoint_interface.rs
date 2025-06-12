@@ -12,7 +12,6 @@ use tokio::sync::Mutex;
 #[async_trait::async_trait]
 pub trait RpcServiceEndpointInterface: Send + Sync {
     fn get_dispatcher(&self) -> Arc<Mutex<RpcDispatcher<'static>>>;
-    // The HashMap now correctly contains `Arc`-wrapped handlers.
     fn get_prebuffered_handlers(&self) -> Arc<Mutex<HashMap<u64, RpcPrebufferedHandler>>>;
 
     async fn register_prebuffered<F, Fut>(
