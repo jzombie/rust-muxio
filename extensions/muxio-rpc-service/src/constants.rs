@@ -9,5 +9,5 @@ pub const DEFAULT_SERVICE_MAX_CHUNK_SIZE: usize = 1024 * 64;
 /// while a larger buffer can increase throughput by absorbing network jitter
 /// at the cost of higher potential memory consumption.
 ///
-/// See `muxio_rpc_service_caller::call_rpc_streaming_generic` for usage.
+/// See [`muxio_rpc_service_caller::call_rpc_streaming_generic`] for usage.
 pub const DEFAULT_RPC_STREAM_CHANNEL_BUFFER_SIZE: usize = 8;
