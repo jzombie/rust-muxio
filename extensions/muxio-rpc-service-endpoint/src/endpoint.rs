@@ -45,6 +45,8 @@ pub struct RpcServiceEndpoint {
 }
 
 impl RpcServiceEndpoint {
+    // TODO: Enable the ability to instantiate from a pre-existing dispatcher
+
     /// Creates a new RPC service endpoint.
     ///
     /// The underlying mutex will be chosen automatically based on whether the
