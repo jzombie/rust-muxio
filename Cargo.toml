@@ -3,7 +3,7 @@ name = "muxio"
 authors = ["Jeremy Harris <jeremy.harris@zenosmosis.com>"]
 version = "0.3.0-alpha"
 edition = "2024"
-description = "Toolkit for layered stream multiplexing and schema-less RPC communication"
+description = "Toolkit for layered stream multiplexing and schemaless RPC communication"
 repository = "https://github.com/jzombie/rust-muxio"
 license = "Apache-2.0"
 

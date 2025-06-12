@@ -19,6 +19,6 @@ pub struct RpcHeader {
     /// It's often hashed to ensure uniqueness and prevent collisions in method names.
     pub method_id: u64, // TODO: Rename to `method_hash`?
 
-    // TODO: Document; Schema-less metadata
+    // TODO: Document; Schemaless metadata
     pub metadata_bytes: Vec<u8>,
 }
