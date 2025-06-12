@@ -102,6 +102,8 @@ pub trait RpcServiceEndpointInterface: Send + Sync {
                         },
                         Err(e) => {
                             eprintln!("Handler for method {} failed: {:?}", request.method_id, e);
+
+                            // TODO: Implement the ability to send optional error message back to client (as a prebuffered byte chunk).
                             RpcResponse {
                                 request_id,
                                 method_id: request.method_id,
