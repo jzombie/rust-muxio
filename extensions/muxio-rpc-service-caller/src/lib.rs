@@ -46,6 +46,7 @@ impl WithDispatcher for std::sync::Mutex<RpcDispatcher<'static>> {
         // In a Tokio context, this would ideally use `spawn_blocking`, but that would
         // bind this generic library to a specific runtime. This simple implementation
         // is correct for its intended use cases.
+        // TODO: Don't use expect or unwrap
         let mut guard = self.lock().expect("Mutex was poisoned");
         f(&mut guard)
     }
@@ -97,23 +98,28 @@ where
                     .unwrap_or(RpcResultStatus::Success);
 
                 if result_status != RpcResultStatus::Success {
+                    // TODO: Don't use unwrap
                     if let Some(tx) = ready_tx.lock().unwrap().take() {
                         let _ = tx.send(Err(io::Error::new(
                             io::ErrorKind::Other,
                             format!("RPC failed: {:?}", result_status),
                         )));
                     }
+                    // TODO: Don't use unwrap
                     let _ = tx.lock().unwrap().take();
                 } else {
+                    // TODO: Don't use unwrap
                     let _ = ready_tx.lock().unwrap().take().map(|t| t.send(Ok(())));
                 }
             }
             RpcStreamEvent::PayloadChunk { bytes, .. } => {
+                // TODO: Don't use unwrap
                 if let Some(sender) = tx.lock().unwrap().as_mut() {
                     let _ = sender.try_send(bytes);
                 }
             }
             RpcStreamEvent::End { .. } => {
+                // TODO: Don't use unwrap
                 let _ = tx.lock().unwrap().take();
             }
             _ => {}
