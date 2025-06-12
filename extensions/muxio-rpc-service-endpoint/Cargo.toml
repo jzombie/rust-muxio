@@ -16,9 +16,6 @@ tokio = { version = "1.45.1", features = ["sync"], optional = true }
 
 [features]
 default = []
-# tokio_support = ["dep:tokio"]
-
-# This feature block correctly propagates the feature down the dependency tree.
 tokio_support = [
     "dep:tokio", # Enables the optional tokio dependency in THIS crate.
     "muxio-rpc-service-caller/tokio_support" # Enables the feature in the CALLER crate.
