@@ -39,7 +39,8 @@ pub trait WithDispatcher: Send + Sync {
         R: Send;
 }
 
-/// The implementation for Tokio's asynchronous mutex.
+// This block is now only compiled when the `tokio_support` feature is enabled.
+#[cfg(feature = "tokio_support")]
 #[async_trait::async_trait]
 impl WithDispatcher for tokio::sync::Mutex<RpcDispatcher<'static>> {
     async fn with_dispatcher<F, R>(&self, f: F) -> R
@@ -55,7 +56,8 @@ impl WithDispatcher for tokio::sync::Mutex<RpcDispatcher<'static>> {
     }
 }
 
-/// The implementation for the standard library's blocking mutex.
+// This implementation for std::sync::Mutex does not depend on tokio
+// and is always available.
 #[async_trait::async_trait]
 impl WithDispatcher for std::sync::Mutex<RpcDispatcher<'static>> {
     async fn with_dispatcher<F, R>(&self, f: F) -> R

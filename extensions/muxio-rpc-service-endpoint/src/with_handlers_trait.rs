@@ -16,7 +16,8 @@ pub trait WithHandlers: Send + Sync {
         R: Send;
 }
 
-/// The implementation for Tokio's asynchronous mutex.
+// Only compile this block if the "tokio_support" feature is active.
+#[cfg(feature = "tokio_support")]
 #[async_trait::async_trait]
 impl WithHandlers for tokio::sync::Mutex<HashMap<u64, RpcPrebufferedHandler>> {
     async fn with_handlers<F, R>(&self, f: F) -> R
@@ -28,7 +29,6 @@ impl WithHandlers for tokio::sync::Mutex<HashMap<u64, RpcPrebufferedHandler>> {
         f(&mut guard)
     }
 }
-
 /// The implementation for the standard library's blocking mutex.
 /// This is suitable for single-threaded environments like WASM.
 #[async_trait::async_trait]
