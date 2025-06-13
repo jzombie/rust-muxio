@@ -25,7 +25,7 @@ pub type RpcPrebufferedHandler<C> = Arc<
         + Sync,
 >;
 
-// --- Unified Struct Definition (Now Generic) ---
+// --- Unified Struct Definition ---
 
 /// A concrete RPC service endpoint, generic over a context type `C`.
 pub struct RpcServiceEndpoint<C>
