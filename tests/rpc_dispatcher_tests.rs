@@ -38,39 +38,37 @@ fn rpc_dispatcher_call_and_echo_response() {
     {
         // Prepare a mock RPC request
         let rpc_request_1 = RpcRequest {
-            method_id: ADD_METHOD_ID,
-            param_bytes: Some(bitcode::encode(&AddRequestParams {
+            rpc_method_id: ADD_METHOD_ID,
+            rpc_param_bytes: Some(bitcode::encode(&AddRequestParams {
                 numbers: vec![1.0, 2.0, 3.0],
             })),
-            prebuffered_payload_bytes: None,
+            rpc_prebuffered_payload_bytes: None,
             is_finalized: true,
         };
 
         // Prepare a mock RPC request
         let rpc_request_2 = RpcRequest {
-            method_id: MULT_METHOD_ID,
-            param_bytes: Some(bitcode::encode(&MultRequestParams {
+            rpc_method_id: MULT_METHOD_ID,
+            rpc_param_bytes: Some(bitcode::encode(&MultRequestParams {
                 numbers: vec![4.0, 5.0, 6.0, 3.14],
             })),
-            prebuffered_payload_bytes: None,
+            rpc_prebuffered_payload_bytes: None,
             is_finalized: true,
         };
 
         // Prepare a mock RPC request
         let rpc_request_3 = RpcRequest {
-            method_id: MULT_METHOD_ID,
-            param_bytes: Some(bitcode::encode(&MultRequestParams {
+            rpc_method_id: MULT_METHOD_ID,
+            rpc_param_bytes: Some(bitcode::encode(&MultRequestParams {
                 numbers: vec![10.0, 5.0, 6.0, 3.14],
             })),
-            prebuffered_payload_bytes: None,
+            rpc_prebuffered_payload_bytes: None,
             is_finalized: true,
         };
 
         let rpc_requests = vec![rpc_request_1, rpc_request_2, rpc_request_3];
 
         for rpc_request in rpc_requests {
-            let method_id = rpc_request.method_id;
-
             client_dispatcher
                 .call(
                     rpc_request,
@@ -84,15 +82,14 @@ fn rpc_dispatcher_call_and_echo_response() {
                     Some({
                         move |rpc_stream_event: RpcStreamEvent| match rpc_stream_event {
                             RpcStreamEvent::Header {
-                                rpc_header_id,
+                                rpc_request_id,
                                 rpc_header,
                                 rpc_method_id,
                             } => {
-                                assert_eq!(rpc_header.method_id, method_id);
-                                assert_eq!(rpc_method_id, method_id);
+                                assert_eq!(rpc_header.rpc_method_id, rpc_method_id);
                                 println!(
                                     "Client received header: ID = {}, Header = {:?}",
-                                    rpc_header_id, rpc_header
+                                    rpc_request_id, rpc_header
                                 );
                             }
                             RpcStreamEvent::PayloadChunk {
@@ -129,13 +126,13 @@ fn rpc_dispatcher_call_and_echo_response() {
         let incoming_buf = outgoing_buf.clone();
         let chunk_size = 4; // Define the chunk size
         for chunk in incoming_buf.borrow().chunks(chunk_size) {
-            let request_ids = server_dispatcher
+            let rpc_request_ids = server_dispatcher
                 .read_bytes(chunk)
                 .expect("Failed to receive bytes on server");
 
-            for request_id in request_ids {
+            for rpc_request_id in rpc_request_ids {
                 let is_request_finalized = server_dispatcher
-                    .is_rpc_request_finalized(request_id)
+                    .is_rpc_request_finalized(rpc_request_id)
                     .unwrap();
 
                 // Pre-buffer entire request
@@ -143,16 +140,16 @@ fn rpc_dispatcher_call_and_echo_response() {
                     continue;
                 }
 
-                let rpc_request = server_dispatcher.delete_rpc_request(request_id);
+                let rpc_request = server_dispatcher.delete_rpc_request(rpc_request_id);
 
                 if let Some(rpc_request) = rpc_request {
-                    println!("Server received request header ID: {:?}", request_id);
-                    println!("\t{:?}: {:?}", request_id, rpc_request);
+                    println!("Server received request header ID: {:?}", rpc_request_id);
+                    println!("\t{:?}: {:?}", rpc_request_id, rpc_request);
 
-                    let rpc_response = match rpc_request.method_id {
-                        id if id == ADD_METHOD_ID => {
+                    let rpc_response = match rpc_request.rpc_method_id {
+                        rpc_method_id if rpc_method_id == ADD_METHOD_ID => {
                             let request_params: AddRequestParams =
-                                bitcode::decode(&rpc_request.param_bytes.unwrap()).unwrap();
+                                bitcode::decode(&rpc_request.rpc_param_bytes.unwrap()).unwrap();
 
                             println!("Server received request params: {:?}", request_params);
 
@@ -161,17 +158,17 @@ fn rpc_dispatcher_call_and_echo_response() {
                             });
 
                             Some(RpcResponse {
-                                request_id,
-                                method_id: rpc_request.method_id,
-                                result_status: Some(0),
-                                prebuffered_payload_bytes: Some(response_bytes),
+                                rpc_request_id,
+                                rpc_method_id: rpc_request.rpc_method_id,
+                                rpc_result_status: Some(0),
+                                rpc_prebuffered_payload_bytes: Some(response_bytes),
                                 is_finalized: true,
                             })
                         }
 
-                        id if id == MULT_METHOD_ID => {
+                        rpc_method_id if rpc_method_id == MULT_METHOD_ID => {
                             let request_params: MultRequestParams =
-                                bitcode::decode(&rpc_request.param_bytes.unwrap()).unwrap();
+                                bitcode::decode(&rpc_request.rpc_param_bytes.unwrap()).unwrap();
 
                             println!("Server received request params: {:?}", request_params);
 
@@ -180,10 +177,10 @@ fn rpc_dispatcher_call_and_echo_response() {
                             });
 
                             Some(RpcResponse {
-                                request_id,
-                                method_id: rpc_request.method_id,
-                                result_status: Some(0),
-                                prebuffered_payload_bytes: Some(response_bytes),
+                                rpc_request_id,
+                                rpc_method_id: rpc_request.rpc_method_id,
+                                rpc_result_status: Some(0),
+                                rpc_prebuffered_payload_bytes: Some(response_bytes),
                                 is_finalized: true,
                             })
                         }

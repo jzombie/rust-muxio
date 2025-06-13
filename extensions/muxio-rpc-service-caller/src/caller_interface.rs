@@ -38,8 +38,8 @@ pub trait RpcServiceCallerInterface: Send + Sync {
     /// This default method uses the required getters to orchestrate the call.
     async fn call_rpc_streaming(
         &self,
-        method_id: u64,
-        param_bytes: &[u8], // TODO: Make this `Option` type
+        rpc_method_id: u64,
+        rpc_param_bytes: &[u8], // TODO: Make this `Option` type
         // TODO: Add `prebuffered_payload_bytes` (match `RpcDispatcher` in design)
         is_finalized: bool,
     ) -> Result<
@@ -67,7 +67,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
             match evt {
                 RpcStreamEvent::Header { rpc_header, .. } => {
                     let result_status = rpc_header
-                        .metadata_bytes
+                        .rpc_metadata_bytes
                         .first()
                         .copied()
                         .and_then(|b| RpcResultStatus::try_from(b).ok())
@@ -109,9 +109,9 @@ pub trait RpcServiceCallerInterface: Send + Sync {
             .with_dispatcher(|d| {
                 d.call(
                     RpcRequest {
-                        method_id,
-                        param_bytes: Some(param_bytes.to_vec()),
-                        prebuffered_payload_bytes: None,
+                        rpc_method_id,
+                        rpc_param_bytes: Some(rpc_param_bytes.to_vec()),
+                        rpc_prebuffered_payload_bytes: None, // TODO: Send, if attached
                         is_finalized,
                     },
                     DEFAULT_SERVICE_MAX_CHUNK_SIZE,

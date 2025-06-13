@@ -62,10 +62,10 @@ fn rpc_stream_aborts_on_cancel_frame() {
     let mut server = RpcSession::new();
 
     let hdr = RpcHeader {
-        msg_type: RpcMessageType::Call,
-        id: 42,
-        method_id: 0x1234,
-        metadata_bytes: b"test metadata bytes".into(),
+        rpc_msg_type: RpcMessageType::Call,
+        rpc_request_id: 42,
+        rpc_method_id: 0x1234,
+        rpc_metadata_bytes: b"test metadata bytes".into(),
     };
 
     let decoder_error: RefCell<Option<FrameDecodeError>> = RefCell::new(None);
@@ -112,10 +112,10 @@ fn rpc_stream_aborts_on_end_frame() {
     let mut server = RpcSession::new();
 
     let hdr = RpcHeader {
-        msg_type: RpcMessageType::Call,
-        id: 42,
-        method_id: 0x1234,
-        metadata_bytes: b"test metadata bytes".into(),
+        rpc_msg_type: RpcMessageType::Call,
+        rpc_request_id: 42,
+        rpc_method_id: 0x1234,
+        rpc_metadata_bytes: b"test metadata bytes".into(),
     };
 
     let decoder_error: RefCell<Option<FrameDecodeError>> = RefCell::new(None);

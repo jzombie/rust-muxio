@@ -17,39 +17,39 @@ fn rpc_parallel_streams_roundtrip() {
         server
             .read_bytes(bytes, |evt| match evt {
                 RpcStreamEvent::Header {
-                    rpc_header_id,
+                    rpc_request_id,
                     ref rpc_header,
                     ..
                 } => {
                     // Validate headers and store the header with its msg ID
-                    match rpc_header.id {
+                    match rpc_header.rpc_request_id {
                         // 1 => assert_eq!(rpc_header.metadata["x"], "1".into()),
                         // 2 => assert_eq!(rpc_header.metadata["y"], "2".into()),
-                        1 => assert_eq!(rpc_header.metadata_bytes, b"message 1 metadata"),
-                        2 => assert_eq!(rpc_header.metadata_bytes, b"message 2 metadata"),
+                        1 => assert_eq!(rpc_header.rpc_metadata_bytes, b"message 1 metadata"),
+                        2 => assert_eq!(rpc_header.rpc_metadata_bytes, b"message 2 metadata"),
                         _ => panic!("unexpected header ID"),
                     }
 
                     assert!(
-                        rpc_header_id == rpc_header.id,
-                        "rpc_header_id should be rpc_header.id"
+                        rpc_request_id == rpc_header.rpc_request_id,
+                        "rpc_request_id should be rpc_header.id"
                     );
 
-                    decoded.entry(rpc_header_id).or_default().0 = Some(rpc_header.clone());
+                    decoded.entry(rpc_request_id).or_default().0 = Some(rpc_header.clone());
 
                     Ok(())
                 }
                 RpcStreamEvent::PayloadChunk {
-                    rpc_header_id,
+                    rpc_request_id,
                     bytes,
                     ..
                 } => {
-                    decoded.entry(rpc_header_id).or_default().1.extend(bytes);
+                    decoded.entry(rpc_request_id).or_default().1.extend(bytes);
 
                     Ok(())
                 }
-                RpcStreamEvent::End { rpc_header_id, .. } => {
-                    assert!(decoded.contains_key(&rpc_header_id));
+                RpcStreamEvent::End { rpc_request_id, .. } => {
+                    assert!(decoded.contains_key(&rpc_request_id));
 
                     Ok(())
                 }
@@ -60,18 +60,18 @@ fn rpc_parallel_streams_roundtrip() {
 
     // Setup headers for both streams
     let hdr1 = RpcHeader {
-        msg_type: RpcMessageType::Call,
-        id: 1,
-        method_id: 0xaaaabbbbccccdddd,
+        rpc_msg_type: RpcMessageType::Call,
+        rpc_request_id: 1,
+        rpc_method_id: 0xaaaabbbbccccdddd,
         // metadata: [("x".into(), "1".into())].into(),
-        metadata_bytes: b"message 1 metadata".into(),
+        rpc_metadata_bytes: b"message 1 metadata".into(),
     };
     let hdr2 = RpcHeader {
-        msg_type: RpcMessageType::Call,
-        id: 2,
-        method_id: 0x1111222233334444,
+        rpc_msg_type: RpcMessageType::Call,
+        rpc_request_id: 2,
+        rpc_method_id: 0x1111222233334444,
         // metadata: [("y".into(), "2".into())].into(),
-        metadata_bytes: b"message 2 metadata".into(),
+        rpc_metadata_bytes: b"message 2 metadata".into(),
     };
 
     // Prepare the payloads for both streams
@@ -126,23 +126,35 @@ fn rpc_parallel_streams_roundtrip() {
     enc2.flush().expect("enc2 flush failed");
     enc2.end_stream().expect("enc2 end stream failed");
 
-    // Validate `metadata`` integrity
+    // Validate `metadata` integrity
     assert_eq!(
-        decoded.get(&1).unwrap().0.as_ref().unwrap().metadata_bytes,
+        decoded
+            .get(&1)
+            .unwrap()
+            .0
+            .as_ref()
+            .unwrap()
+            .rpc_metadata_bytes,
         b"message 1 metadata"
     );
     assert_eq!(
-        decoded.get(&2).unwrap().0.as_ref().unwrap().metadata_bytes,
+        decoded
+            .get(&2)
+            .unwrap()
+            .0
+            .as_ref()
+            .unwrap()
+            .rpc_metadata_bytes,
         b"message 2 metadata"
     );
 
     // Validate `method_id` integrity
     assert_eq!(
-        decoded.get(&1).unwrap().0.as_ref().unwrap().method_id,
+        decoded.get(&1).unwrap().0.as_ref().unwrap().rpc_method_id,
         0xaaaabbbbccccdddd
     );
     assert_eq!(
-        decoded.get(&2).unwrap().0.as_ref().unwrap().method_id,
+        decoded.get(&2).unwrap().0.as_ref().unwrap().rpc_method_id,
         0x1111222233334444
     );
 
@@ -171,7 +183,7 @@ fn rpc_stream_with_multiple_metadata_entries() {
         some_bool_vec: Vec<bool>,
     }
 
-    let metadata_bytes = bitcode::encode(&Metadata {
+    let rpc_metadata_bytes = bitcode::encode(&Metadata {
         foo: "bar".into(),
         baz: "qux".into(),
         alpha: "beta".into(),
@@ -185,10 +197,10 @@ fn rpc_stream_with_multiple_metadata_entries() {
 
     // Create a header with multiple metadata entries
     let hdr = RpcHeader {
-        msg_type: RpcMessageType::Call,
-        id: 1,
-        method_id: 0x1234,
-        metadata_bytes,
+        rpc_msg_type: RpcMessageType::Call,
+        rpc_request_id: 1,
+        rpc_method_id: 0x1234,
+        rpc_metadata_bytes,
     };
 
     // Start RPC stream with the header containing multiple metadata entries
@@ -210,20 +222,20 @@ fn rpc_stream_with_multiple_metadata_entries() {
         server
             .read_bytes(&chunk, |evt| match evt {
                 RpcStreamEvent::Header {
-                    rpc_header_id,
+                    rpc_request_id,
                     ref rpc_header,
                     ..
                 } => {
-                    decoded.entry(rpc_header_id).or_default().0 = Some(rpc_header.clone());
+                    decoded.entry(rpc_request_id).or_default().0 = Some(rpc_header.clone());
 
                     Ok(())
                 }
                 RpcStreamEvent::PayloadChunk {
-                    rpc_header_id,
+                    rpc_request_id,
                     bytes,
                     ..
                 } => {
-                    decoded.entry(rpc_header_id).or_default().1.extend(bytes);
+                    decoded.entry(rpc_request_id).or_default().1.extend(bytes);
 
                     Ok(())
                 }
@@ -233,9 +245,16 @@ fn rpc_stream_with_multiple_metadata_entries() {
             .unwrap();
     }
 
-    let decoded_metadata =
-        bitcode::decode::<Metadata>(&decoded.get(&1).unwrap().0.as_ref().unwrap().metadata_bytes)
-            .expect("metadata deserilization failed");
+    let decoded_metadata = bitcode::decode::<Metadata>(
+        &decoded
+            .get(&1)
+            .unwrap()
+            .0
+            .as_ref()
+            .unwrap()
+            .rpc_metadata_bytes,
+    )
+    .expect("metadata deserilization failed");
 
     // Verify payload correctness and metadata integrity
     assert_eq!(decoded.get(&1).unwrap().1, b"test multiple metadata");
@@ -286,10 +305,10 @@ fn rpc_complex_shuffled_stream() {
 
     // Create a header with multiple metadata entries
     let hdr_1 = RpcHeader {
-        msg_type: RpcMessageType::Call,
-        id: 1,
-        method_id: 0x1234,
-        metadata_bytes: metadata_bytes_1,
+        rpc_msg_type: RpcMessageType::Call,
+        rpc_request_id: 1,
+        rpc_method_id: 0x1234,
+        rpc_metadata_bytes: metadata_bytes_1,
     };
 
     let metadata_bytes_2 = bitcode::encode(&Metadata {
@@ -305,10 +324,10 @@ fn rpc_complex_shuffled_stream() {
     });
 
     let hdr_2 = RpcHeader {
-        msg_type: RpcMessageType::Event,
-        id: 2,
-        method_id: 0x5678,
-        metadata_bytes: metadata_bytes_2,
+        rpc_msg_type: RpcMessageType::Event,
+        rpc_request_id: 2,
+        rpc_method_id: 0x5678,
+        rpc_metadata_bytes: metadata_bytes_2,
     };
 
     // Start RPC stream with the header containing multiple metadata entries
@@ -347,20 +366,20 @@ fn rpc_complex_shuffled_stream() {
             server
                 .read_bytes(&chunk, |evt| match evt {
                     RpcStreamEvent::Header {
-                        rpc_header_id,
+                        rpc_request_id,
                         ref rpc_header,
                         ..
                     } => {
-                        decoded.entry(rpc_header_id).or_default().0 = Some(rpc_header.clone());
+                        decoded.entry(rpc_request_id).or_default().0 = Some(rpc_header.clone());
 
                         Ok(())
                     }
                     RpcStreamEvent::PayloadChunk {
-                        rpc_header_id,
+                        rpc_request_id,
                         bytes,
                         ..
                     } => {
-                        decoded.entry(rpc_header_id).or_default().1.extend(bytes);
+                        decoded.entry(rpc_request_id).or_default().1.extend(bytes);
 
                         Ok(())
                     }
@@ -371,33 +390,51 @@ fn rpc_complex_shuffled_stream() {
         }
 
         let decoded_metadata_1 = bitcode::decode::<Metadata>(
-            &decoded.get(&1).unwrap().0.as_ref().unwrap().metadata_bytes,
+            &decoded
+                .get(&1)
+                .unwrap()
+                .0
+                .as_ref()
+                .unwrap()
+                .rpc_metadata_bytes,
         )
         .expect("metadata_1 deserilization failed");
         let decoded_metadata_2 = bitcode::decode::<Metadata>(
-            &decoded.get(&2).unwrap().0.as_ref().unwrap().metadata_bytes,
+            &decoded
+                .get(&2)
+                .unwrap()
+                .0
+                .as_ref()
+                .unwrap()
+                .rpc_metadata_bytes,
         )
         .expect("metadata_2 deserilization failed");
 
         // Verify payload correctness and metadata integrity
-        assert_eq!(decoded.get(&1).unwrap().0.as_ref().unwrap().id, 1);
-        assert_eq!(decoded.get(&2).unwrap().0.as_ref().unwrap().id, 2);
+        assert_eq!(
+            decoded.get(&1).unwrap().0.as_ref().unwrap().rpc_request_id,
+            1
+        );
+        assert_eq!(
+            decoded.get(&2).unwrap().0.as_ref().unwrap().rpc_request_id,
+            2
+        );
 
         assert_eq!(
-            decoded.get(&1).unwrap().0.as_ref().unwrap().msg_type,
+            decoded.get(&1).unwrap().0.as_ref().unwrap().rpc_msg_type,
             RpcMessageType::Call
         );
         assert_eq!(
-            decoded.get(&2).unwrap().0.as_ref().unwrap().msg_type,
+            decoded.get(&2).unwrap().0.as_ref().unwrap().rpc_msg_type,
             RpcMessageType::Event
         );
 
         assert_eq!(
-            decoded.get(&1).unwrap().0.as_ref().unwrap().method_id,
+            decoded.get(&1).unwrap().0.as_ref().unwrap().rpc_method_id,
             0x1234
         );
         assert_eq!(
-            decoded.get(&2).unwrap().0.as_ref().unwrap().method_id,
+            decoded.get(&2).unwrap().0.as_ref().unwrap().rpc_method_id,
             0x5678
         );
 
@@ -445,10 +482,10 @@ fn rpc_session_bidirectional_roundtrip() {
     let mut server = RpcSession::new();
 
     let hdr = RpcHeader {
-        msg_type: RpcMessageType::Call,
-        id: 42,
-        method_id: 0x123,
-        metadata_bytes: b"foo-bar".to_vec(),
+        rpc_msg_type: RpcMessageType::Call,
+        rpc_request_id: 42,
+        rpc_method_id: 0x123,
+        rpc_metadata_bytes: b"foo-bar".to_vec(),
     };
 
     let mut outbound = Vec::new();
@@ -473,17 +510,17 @@ fn rpc_session_bidirectional_roundtrip() {
         server
             .read_bytes(chunk, |evt| match evt {
                 RpcStreamEvent::Header {
-                    rpc_header_id: _,
+                    rpc_request_id: _,
                     rpc_header,
                     ..
                 } => {
-                    assert_eq!(rpc_header.metadata_bytes, b"foo-bar");
+                    assert_eq!(rpc_header.rpc_metadata_bytes, b"foo-bar");
                     seen_hdr = Some(rpc_header);
 
                     Ok(())
                 }
                 RpcStreamEvent::PayloadChunk {
-                    rpc_header_id: _,
+                    rpc_request_id: _,
                     bytes,
                     ..
                 } => {
@@ -502,10 +539,10 @@ fn rpc_session_bidirectional_roundtrip() {
 
     // Send a reply back
     let reply_hdr = RpcHeader {
-        msg_type: RpcMessageType::Response,
-        id: hdr.id,
-        method_id: hdr.method_id,
-        metadata_bytes: b"baz-qux".to_vec(),
+        rpc_msg_type: RpcMessageType::Response,
+        rpc_request_id: hdr.rpc_request_id,
+        rpc_method_id: hdr.rpc_method_id,
+        rpc_metadata_bytes: b"baz-qux".to_vec(),
     };
 
     let mut reply_bytes = Vec::new();
@@ -530,17 +567,17 @@ fn rpc_session_bidirectional_roundtrip() {
         client
             .read_bytes(chunk, |evt| match evt {
                 RpcStreamEvent::Header {
-                    rpc_header_id: _,
+                    rpc_request_id: _,
                     rpc_header,
                     ..
                 } => {
-                    assert_eq!(rpc_header.metadata_bytes, b"baz-qux");
+                    assert_eq!(rpc_header.rpc_metadata_bytes, b"baz-qux");
                     reply_hdr_seen = Some(rpc_header);
 
                     Ok(())
                 }
                 RpcStreamEvent::PayloadChunk {
-                    rpc_header_id: _,
+                    rpc_request_id: _,
                     bytes,
                     ..
                 } => {

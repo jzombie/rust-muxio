@@ -45,15 +45,15 @@ impl<'a> RpcRespondableSession<'a> {
         E: RpcEmit,
         R: RpcResponseHandler + 'a,
     {
-        let rpc_header_id = hdr.id;
+        let rpc_request_id = hdr.rpc_request_id;
 
         // Set pre-buffering flag for this specific request
         self.prebuffering_flags
-            .insert(rpc_header_id, prebuffer_response);
+            .insert(rpc_request_id, prebuffer_response);
 
         if let Some(on_response) = on_response {
             self.response_handlers
-                .insert(rpc_header_id, Box::new(on_response));
+                .insert(rpc_request_id, Box::new(on_response));
         }
 
         self.rpc_session
@@ -87,10 +87,10 @@ impl<'a> RpcRespondableSession<'a> {
     pub fn read_bytes(&mut self, bytes: &[u8]) -> Result<(), FrameDecodeError> {
         self.rpc_session.read_bytes(bytes, |evt| {
             let id = match &evt {
-                RpcStreamEvent::Header { rpc_header_id, .. } => Some(*rpc_header_id),
-                RpcStreamEvent::PayloadChunk { rpc_header_id, .. } => Some(*rpc_header_id),
-                RpcStreamEvent::End { rpc_header_id, .. } => Some(*rpc_header_id),
-                RpcStreamEvent::Error { rpc_header_id, .. } => *rpc_header_id,
+                RpcStreamEvent::Header { rpc_request_id, .. } => Some(*rpc_request_id),
+                RpcStreamEvent::PayloadChunk { rpc_request_id, .. } => Some(*rpc_request_id),
+                RpcStreamEvent::End { rpc_request_id, .. } => Some(*rpc_request_id),
+                RpcStreamEvent::Error { rpc_request_id, .. } => *rpc_request_id,
             };
 
             let method_id = match &evt {
@@ -132,7 +132,7 @@ impl<'a> RpcRespondableSession<'a> {
                                     method_id.ok_or(FrameDecodeError::CorruptFrame)?;
 
                                 let rpc_payload_event = RpcStreamEvent::PayloadChunk {
-                                    rpc_header_id: rpc_id,
+                                    rpc_request_id: rpc_id,
                                     rpc_method_id,
                                     bytes: buffer.clone(),
                                 };

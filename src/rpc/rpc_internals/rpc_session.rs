@@ -79,7 +79,7 @@ impl RpcSession {
                             self.rpc_stream_decoders.remove(&stream_id);
 
                             let error_event = RpcStreamEvent::Error {
-                                rpc_header_id: None,
+                                rpc_request_id: None,
                                 rpc_method_id: None,
                                 frame_decode_error: e.clone(),
                             };
@@ -97,7 +97,7 @@ impl RpcSession {
                 }
                 Err(e) => {
                     let error_event = RpcStreamEvent::Error {
-                        rpc_header_id: None,
+                        rpc_request_id: None,
                         rpc_method_id: None,
                         frame_decode_error: e.clone(),
                     };

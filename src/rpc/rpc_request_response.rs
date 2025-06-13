@@ -12,19 +12,19 @@ pub struct RpcRequest {
     ///
     /// This can be a sequential or a hashed ID (e.g., XXH3 or FNV) that maps
     /// to a known method on the remote server.
-    pub method_id: u64,
+    pub rpc_method_id: u64,
 
     /// Optional encoded metadata (typically parameters).
     ///
     /// These are serialized function arguments and are transmitted in the
     /// `RpcHeader.metadata_bytes` field. If `None`, the metadata section is empty.
-    pub param_bytes: Option<Vec<u8>>,
+    pub rpc_param_bytes: Option<Vec<u8>>,
 
     /// Optional payload that should be sent immediately after the header.
     ///
     /// This is useful for single-frame RPCs where the entire message (metadata
     /// and payload) is known up front. If provided, it is sent during `call()`.
-    pub prebuffered_payload_bytes: Option<Vec<u8>>,
+    pub rpc_prebuffered_payload_bytes: Option<Vec<u8>>,
 
     /// Indicates whether the request is fully formed and no more payload is expected.
     ///
@@ -41,8 +41,8 @@ pub struct RpcRequest {
 pub struct RpcResponse {
     /// The request header ID this response corresponds to.
     ///
-    /// This *must match* the `RpcHeader.id` from the initiating request.
-    pub request_id: u32,
+    /// This *must match* the `RpcHeader.rpc_request_id` from the initiating request.
+    pub rpc_request_id: u32,
 
     /// The method ID associated with this response.
     ///
@@ -51,7 +51,7 @@ pub struct RpcResponse {
     /// Note: While the internal routing mechanism relies on the header ID to correlate
     /// responses, user-defined services may still benefit from retaining the method ID to
     /// dispatch or verify responses against known handlers.
-    pub method_id: u64,
+    pub rpc_method_id: u64,
 
     /// Optional result status byte (e.g., success/fail/system error).
     ///
@@ -60,12 +60,12 @@ pub struct RpcResponse {
     ///
     /// Note: Muxio's core library does not enforce any meaning behind any result status,
     /// though by convention, 0 represents success.
-    pub result_status: Option<u8>,
+    pub rpc_result_status: Option<u8>,
 
     /// Optional payload to return with the response.
     ///
     /// If set, this will be sent immediately as the response payload.
-    pub prebuffered_payload_bytes: Option<Vec<u8>>,
+    pub rpc_prebuffered_payload_bytes: Option<Vec<u8>>,
 
     /// Marks whether the response stream is complete.
     ///
@@ -89,15 +89,15 @@ impl RpcResponse {
     /// optionally a result status if metadata exists.
     pub fn from_rpc_header(rpc_header: &RpcHeader) -> RpcResponse {
         RpcResponse {
-            request_id: rpc_header.id,
-            method_id: rpc_header.method_id,
-            result_status: {
-                match rpc_header.metadata_bytes.len() {
+            rpc_request_id: rpc_header.rpc_request_id,
+            rpc_method_id: rpc_header.rpc_method_id,
+            rpc_result_status: {
+                match rpc_header.rpc_metadata_bytes.len() {
                     0 => None,
-                    _ => Some(rpc_header.metadata_bytes[0]),
+                    _ => Some(rpc_header.rpc_metadata_bytes[0]),
                 }
             },
-            prebuffered_payload_bytes: None,
+            rpc_prebuffered_payload_bytes: None,
             is_finalized: false, // Hardcoded to false because it is currently non-determinable from the header alone
         }
     }

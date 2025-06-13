@@ -18,10 +18,10 @@ fn rpc_respondable_session_stream_and_reply_roundtrip() {
         let pending = Arc::new(Mutex::new(VecDeque::new()));
 
         let call_header = RpcHeader {
-            msg_type: RpcMessageType::Call,
-            id: 1,
-            method_id: 0xABCDABCDABCDABCD,
-            metadata_bytes: b"req-meta".to_vec(),
+            rpc_msg_type: RpcMessageType::Call,
+            rpc_request_id: 1,
+            rpc_method_id: 0xABCDABCDABCDABCD,
+            rpc_metadata_bytes: b"req-meta".to_vec(),
         };
 
         {
@@ -34,22 +34,22 @@ fn rpc_respondable_session_stream_and_reply_roundtrip() {
                 .unwrap()
                 .set_catch_all_response_handler(move |evt| match evt {
                     RpcStreamEvent::Header { rpc_header, .. } => {
-                        assert_eq!(rpc_header.metadata_bytes, b"req-meta");
+                        assert_eq!(rpc_header.rpc_metadata_bytes, b"req-meta");
                     }
                     RpcStreamEvent::PayloadChunk { bytes, .. } => {
                         recv_buf.lock().unwrap().extend(bytes);
                     }
-                    RpcStreamEvent::End { rpc_header_id, .. } => {
+                    RpcStreamEvent::End { rpc_request_id, .. } => {
                         let reply_bytes = match recv_buf.lock().unwrap().as_slice() {
                             b"ping" => b"pong".as_ref(),
                             _ => b"fail".as_ref(),
                         };
 
                         let reply_header = RpcHeader {
-                            msg_type: RpcMessageType::Response,
-                            id: rpc_header_id,
-                            method_id: 0xABCDABCDABCDABCD,
-                            metadata_bytes: b"resp-meta".to_vec(),
+                            rpc_msg_type: RpcMessageType::Response,
+                            rpc_request_id,
+                            rpc_method_id: 0xABCDABCDABCDABCD,
+                            rpc_metadata_bytes: b"resp-meta".to_vec(),
                         };
 
                         pending_reply.lock().unwrap().push_back((
@@ -74,16 +74,16 @@ fn rpc_respondable_session_stream_and_reply_roundtrip() {
                 |bytes| server_inbox.push(bytes.to_vec()),
                 Some(move |event| match event {
                     RpcStreamEvent::Header {
-                        rpc_header_id,
+                        rpc_request_id,
                         rpc_header,
                         ..
                     } => {
-                        assert_eq!(rpc_header_id, call_header.id);
-                        assert_eq!(rpc_header.msg_type, RpcMessageType::Response);
+                        assert_eq!(rpc_request_id, call_header.rpc_request_id);
+                        assert_eq!(rpc_header.rpc_msg_type, RpcMessageType::Response);
                         metadata_clone
                             .lock()
                             .unwrap()
-                            .insert(rpc_header_id, rpc_header.metadata_bytes);
+                            .insert(rpc_request_id, rpc_header.rpc_metadata_bytes);
                     }
                     RpcStreamEvent::PayloadChunk { bytes, .. } => {
                         payload_clone.lock().unwrap().extend(bytes);

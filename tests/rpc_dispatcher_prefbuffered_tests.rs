@@ -84,11 +84,11 @@ struct MultResponseParams {
     result: f64,
 }
 
-fn encode_request(method_id: u64, param_bytes: Vec<u8>) -> RpcRequest {
+fn encode_request(rpc_method_id: u64, rpc_param_bytes: Vec<u8>) -> RpcRequest {
     RpcRequest {
-        method_id,
-        param_bytes: Some(param_bytes),
-        prebuffered_payload_bytes: None,
+        rpc_method_id,
+        rpc_param_bytes: Some(rpc_param_bytes),
+        rpc_prebuffered_payload_bytes: None,
         is_finalized: true,
     }
 }
@@ -103,12 +103,12 @@ fn dispatch_call_and_get_prebuffered_response<T: for<'a> Decode<'a>>(
     client_dispatcher: &mut RpcDispatcher,
     server_dispatcher: &mut RpcDispatcher,
     method_id: u64,
-    param_bytes: Vec<u8>,
+    rpc_param_bytes: Vec<u8>,
 ) -> T {
     let mut outgoing_buf = Vec::new();
     let result_buf = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
 
-    let rpc_request = encode_request(method_id, param_bytes);
+    let rpc_request = encode_request(method_id, rpc_param_bytes);
     let result_buf_clone = result_buf.clone();
 
     client_dispatcher
@@ -135,43 +135,47 @@ fn dispatch_call_and_get_prebuffered_response<T: for<'a> Decode<'a>>(
             .read_bytes(chunk)
             .expect("Failed to receive bytes on server");
 
-        for request_id in request_ids {
+        for rpc_request_id in request_ids {
             if !server_dispatcher
-                .is_rpc_request_finalized(request_id)
+                .is_rpc_request_finalized(rpc_request_id)
                 .unwrap()
             {
                 continue;
             }
 
-            let rpc_request = server_dispatcher.delete_rpc_request(request_id);
+            let rpc_request = server_dispatcher.delete_rpc_request(rpc_request_id);
 
             if let Some(rpc_request) = rpc_request {
-                let rpc_response = match rpc_request.method_id {
-                    id if id == ADD_METHOD_ID => {
+                let rpc_response = match rpc_request.rpc_method_id {
+                    rpc_method_id if rpc_method_id == ADD_METHOD_ID => {
                         let request_params: AddRequestParams =
-                            bitcode::decode(&rpc_request.param_bytes.unwrap()).unwrap();
+                            bitcode::decode(&rpc_request.rpc_param_bytes.unwrap()).unwrap();
 
                         Some(RpcResponse {
-                            request_id,
-                            method_id: id,
-                            result_status: Some(0),
-                            prebuffered_payload_bytes: Some(bitcode::encode(&AddResponseParams {
-                                result: request_params.numbers.iter().sum(),
-                            })),
+                            rpc_request_id,
+                            rpc_method_id,
+                            rpc_result_status: Some(0),
+                            rpc_prebuffered_payload_bytes: Some(bitcode::encode(
+                                &AddResponseParams {
+                                    result: request_params.numbers.iter().sum(),
+                                },
+                            )),
                             is_finalized: true,
                         })
                     }
-                    id if id == MULT_METHOD_ID => {
+                    rpc_method_id if rpc_method_id == MULT_METHOD_ID => {
                         let request_params: MultRequestParams =
-                            bitcode::decode(&rpc_request.param_bytes.unwrap()).unwrap();
+                            bitcode::decode(&rpc_request.rpc_param_bytes.unwrap()).unwrap();
 
                         Some(RpcResponse {
-                            request_id,
-                            method_id: id,
-                            result_status: Some(0),
-                            prebuffered_payload_bytes: Some(bitcode::encode(&MultResponseParams {
-                                result: request_params.numbers.iter().product(),
-                            })),
+                            rpc_request_id,
+                            rpc_method_id,
+                            rpc_result_status: Some(0),
+                            rpc_prebuffered_payload_bytes: Some(bitcode::encode(
+                                &MultResponseParams {
+                                    result: request_params.numbers.iter().product(),
+                                },
+                            )),
                             is_finalized: true,
                         })
                     }
