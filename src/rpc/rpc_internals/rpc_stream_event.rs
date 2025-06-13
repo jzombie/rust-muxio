@@ -1,5 +1,6 @@
 use crate::{frame::FrameDecodeError, rpc::rpc_internals::RpcHeader};
 
+// TODO: Document
 #[derive(Debug, Clone)]
 pub enum RpcStreamEvent {
     Header {
