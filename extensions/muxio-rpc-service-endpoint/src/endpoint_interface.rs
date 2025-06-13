@@ -7,51 +7,56 @@ use muxio_rpc_service_caller::WithDispatcher;
 use std::{collections::hash_map::Entry, future::Future, marker::Send, sync::Arc};
 
 #[async_trait::async_trait]
-pub trait RpcServiceEndpointInterface: Send + Sync {
+pub trait RpcServiceEndpointInterface<C>: Send + Sync
+where
+    C: Send + Sync + Clone + 'static,
+{
     type DispatcherLock: WithDispatcher;
-    type HandlersLock: WithHandlers;
+    type HandlersLock: WithHandlers<C>;
 
     fn get_dispatcher(&self) -> Arc<Self::DispatcherLock>;
     fn get_prebuffered_handlers(&self) -> Arc<Self::HandlersLock>;
 
+    /// Registers a handler that accepts a context object.
     async fn register_prebuffered<F, Fut>(
         &self,
         method_id: u64,
         handler: F,
     ) -> Result<(), RpcServiceEndpointError>
     where
-        F: Fn(Vec<u8>) -> Fut + Send + Sync + 'static,
+        F: Fn(C, Vec<u8>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>>>
             + Send
             + 'static,
     {
         self.get_prebuffered_handlers()
-            .with_handlers(|handlers| {
-                // FIX: Correct usage of the entry API.
-                match handlers.entry(method_id) {
-                    Entry::Occupied(_) => {
-                        let err_msg = format!(
-                            "a handler for method ID {} is already registered",
-                            method_id
-                        );
-                        Err(RpcServiceEndpointError::Handler(err_msg.into()))
-                    }
-                    Entry::Vacant(entry) => {
-                        let wrapped = move |bytes: Vec<u8>| {
-                            Box::pin(handler(bytes))
-                                as std::pin::Pin<Box<dyn Future<Output = _> + Send>>
-                        };
-                        entry.insert(Arc::new(wrapped));
-                        Ok(())
-                    }
+            .with_handlers(|handlers| match handlers.entry(method_id) {
+                Entry::Occupied(_) => {
+                    let err_msg = format!(
+                        "a handler for method ID {} is already registered",
+                        method_id
+                    );
+                    Err(RpcServiceEndpointError::Handler(err_msg.into()))
+                }
+                Entry::Vacant(entry) => {
+                    let wrapped = move |ctx: C, bytes: Vec<u8>| {
+                        Box::pin(handler(ctx, bytes))
+                            as std::pin::Pin<Box<dyn Future<Output = _> + Send>>
+                    };
+                    entry.insert(Arc::new(wrapped));
+                    Ok(())
                 }
             })
             .await
     }
 
-    // FIXME: Add optional user-defined context object to send to handlers (i.e. for determining `which`
-    // socket is performing some action, etc.)
-    async fn read_bytes<E>(&self, bytes: &[u8], on_emit: E) -> Result<(), RpcServiceEndpointError>
+    /// Reads raw bytes and passes the provided context to the invoked handler.
+    async fn read_bytes<E>(
+        &self,
+        context: C,
+        bytes: &[u8],
+        on_emit: E,
+    ) -> Result<(), RpcServiceEndpointError>
     where
         E: RpcEmit + Send + Sync + Clone,
     {
@@ -72,7 +77,6 @@ pub trait RpcServiceEndpointInterface: Send + Sync {
                             }
                         }
                     }
-                    // FIX: Explicitly define the Ok variant's type to resolve ambiguity.
                     Ok::<_, RpcServiceEndpointError>((requests_found, handlers_arc))
                 })
                 .await?
@@ -86,13 +90,15 @@ pub trait RpcServiceEndpointInterface: Send + Sync {
         let mut response_futures = Vec::new();
         for (request_id, request) in requests_to_process {
             let handlers_arc_clone = handlers_arc.clone();
+            let context_clone = context.clone();
+
             let future = async move {
                 let handler = handlers_arc_clone
                     .with_handlers(|handlers| handlers.get(&request.method_id).cloned())
                     .await;
 
                 if let (Some(handler), Some(params)) = (handler, &request.param_bytes) {
-                    match handler(params.clone()).await {
+                    match handler(context_clone, params.clone()).await {
                         Ok(encoded) => RpcResponse {
                             request_id,
                             method_id: request.method_id,
@@ -102,8 +108,6 @@ pub trait RpcServiceEndpointInterface: Send + Sync {
                         },
                         Err(e) => {
                             eprintln!("Handler for method {} failed: {:?}", request.method_id, e);
-
-                            // TODO: Implement the ability to send optional error message back to client (as a prebuffered byte chunk).
                             RpcResponse {
                                 request_id,
                                 method_id: request.method_id,

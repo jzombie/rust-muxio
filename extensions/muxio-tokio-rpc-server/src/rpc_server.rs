@@ -6,7 +6,7 @@ use axum::{
     routing::get,
 };
 use bytes::Bytes;
-use futures_util::{SinkExt, StreamExt};
+use futures_util::{SinkExt, StreamExt, stream::SplitSink};
 use muxio::rpc::RpcDispatcher;
 use muxio_rpc_service_endpoint::{
     RpcPrebufferedHandler, RpcServiceEndpoint, RpcServiceEndpointInterface,
@@ -17,11 +17,16 @@ use tokio::{
     sync::{Mutex, mpsc::unbounded_channel},
 };
 
+/// A type alias for the shareable WebSocket sender, used as the RPC context.
+type WsSenderContext = Arc<Mutex<SplitSink<WebSocket, Message>>>;
+
 // TODO: Document that this is a basic server implementation and that the underlying service
 // endpoints can be used with alternative servers or transports.
 
+/// An RpcServer specialized for WebSocket connections.
+/// It uses the WebSocket's sender as the context for RPC handlers.
 pub struct RpcServer {
-    endpoint: Arc<RpcServiceEndpoint>,
+    endpoint: Arc<RpcServiceEndpoint<WsSenderContext>>,
 }
 
 impl RpcServer {
@@ -42,7 +47,6 @@ impl RpcServer {
     }
 
     /// Starts serving the RPC server using a pre-bound TcpListener.
-    /// Useful for dynamic ports or external socket management.
     pub async fn serve_with_listener(
         self: Arc<Self>,
         listener: TcpListener,
@@ -85,51 +89,63 @@ impl RpcServer {
     /// Handles the actual WebSocket connection lifecycle.
     /// This is now a method on RpcServer, allowing access to `self`.
     async fn handle_socket(self: Arc<Self>, socket: WebSocket) {
-        let (mut sender, mut receiver) = socket.split();
+        let (sender, mut receiver) = socket.split();
+
+        // Wrap the sender in an Arc<Mutex> to make it a shareable context.
+        let context = Arc::new(Mutex::new(sender));
+
+        // The write loop now uses the shared context to send messages.
         let (tx, mut rx) = unbounded_channel::<Message>();
-        let (recv_tx, mut recv_rx) = unbounded_channel::<Option<Result<Message, axum::Error>>>();
-
-        tokio::spawn(async move {
-            while let Some(msg) = receiver.next().await {
-                let done = msg.is_err();
-                let _ = recv_tx.send(Some(msg));
-                if done {
-                    break;
-                }
-            }
-            let _ = recv_tx.send(None);
-        });
-
-        tokio::spawn(async move {
-            while let Some(msg) = rx.recv().await {
-                if sender.send(msg).await.is_err() {
-                    break;
+        tokio::spawn({
+            let context = context.clone();
+            async move {
+                while let Some(msg) = rx.recv().await {
+                    if context.lock().await.send(msg).await.is_err() {
+                        break;
+                    }
                 }
             }
         });
 
-        while let Some(Some(Ok(Message::Binary(bytes)))) = recv_rx.recv().await {
-            let tx_clone = tx.clone();
+        // The read loop forwards received messages for processing.
+        tokio::spawn(async move {
+            let (recv_tx, mut recv_rx) =
+                unbounded_channel::<Option<Result<Message, axum::Error>>>();
+            tokio::spawn(async move {
+                while let Some(msg) = receiver.next().await {
+                    let done = msg.is_err();
+                    if recv_tx.send(Some(msg)).is_err() {
+                        break;
+                    }
+                    if done {
+                        break;
+                    }
+                }
+                let _ = recv_tx.send(None);
+            });
 
-            // Because RpcServer now implements the trait, we call read_bytes on `self`.
-            if let Err(err) = self
-                .read_bytes(&bytes, |chunk| {
+            while let Some(Some(Ok(Message::Binary(bytes)))) = recv_rx.recv().await {
+                let tx_clone = tx.clone();
+
+                // The `on_emit` closure sends RPC responses back via the WebSocket.
+                let on_emit = |chunk: &[u8]| {
                     let _ = tx_clone.send(Message::Binary(Bytes::copy_from_slice(chunk)));
-                })
-                .await
-            {
-                eprintln!("Caught err: {:?}", err);
+                };
+
+                // The context (the shareable WebSocket sender) is passed to `read_bytes`.
+                if let Err(err) = self.read_bytes(context.clone(), &bytes, on_emit).await {
+                    eprintln!("Caught err: {:?}", err);
+                }
             }
-        }
+        });
     }
 }
 
+// FIX: The trait implementation now specifies the concrete context type.
 #[async_trait::async_trait]
-impl RpcServiceEndpointInterface for RpcServer {
-    // FIX: Define the associated types required by the trait.
-    // Since RpcServer uses the default `RpcServiceEndpoint`, we use Tokio's Mutex.
+impl RpcServiceEndpointInterface<WsSenderContext> for RpcServer {
     type DispatcherLock = Mutex<RpcDispatcher<'static>>;
-    type HandlersLock = Mutex<HashMap<u64, RpcPrebufferedHandler>>;
+    type HandlersLock = Mutex<HashMap<u64, RpcPrebufferedHandler<WsSenderContext>>>;
 
     /// Provides access to the dispatcher by delegating to the inner endpoint.
     fn get_dispatcher(&self) -> Arc<Self::DispatcherLock> {
