@@ -19,7 +19,7 @@ fn rpc_respondable_session_stream_and_reply_roundtrip() {
 
         let call_header = RpcHeader {
             msg_type: RpcMessageType::Call,
-            request_id: 1,
+            rpc_request_id: 1,
             method_id: 0xABCDABCDABCDABCD,
             metadata_bytes: b"req-meta".to_vec(),
         };
@@ -47,7 +47,7 @@ fn rpc_respondable_session_stream_and_reply_roundtrip() {
 
                         let reply_header = RpcHeader {
                             msg_type: RpcMessageType::Response,
-                            request_id: rpc_request_id,
+                            rpc_request_id,
                             method_id: 0xABCDABCDABCDABCD,
                             metadata_bytes: b"resp-meta".to_vec(),
                         };
@@ -78,7 +78,7 @@ fn rpc_respondable_session_stream_and_reply_roundtrip() {
                         rpc_header,
                         ..
                     } => {
-                        assert_eq!(rpc_request_id, call_header.request_id);
+                        assert_eq!(rpc_request_id, call_header.rpc_request_id);
                         assert_eq!(rpc_header.msg_type, RpcMessageType::Response);
                         metadata_clone
                             .lock()

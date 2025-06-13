@@ -1,5 +1,6 @@
 use crate::rpc::rpc_internals::RpcHeader;
 
+// TODO: Prefix all with `rpc`
 /// Represents an outbound RPC call request.
 ///
 /// An `RpcRequest` is initiated by a client and contains the encoded
@@ -41,8 +42,8 @@ pub struct RpcRequest {
 pub struct RpcResponse {
     /// The request header ID this response corresponds to.
     ///
-    /// This *must match* the `RpcHeader.id` from the initiating request.
-    pub request_id: u32,
+    /// This *must match* the `RpcHeader.rpc_request_id` from the initiating request.
+    pub rpc_request_id: u32,
 
     /// The method ID associated with this response.
     ///
@@ -89,7 +90,7 @@ impl RpcResponse {
     /// optionally a result status if metadata exists.
     pub fn from_rpc_header(rpc_header: &RpcHeader) -> RpcResponse {
         RpcResponse {
-            request_id: rpc_header.request_id,
+            rpc_request_id: rpc_header.rpc_request_id,
             method_id: rpc_header.method_id,
             result_status: {
                 match rpc_header.metadata_bytes.len() {

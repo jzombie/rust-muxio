@@ -64,7 +64,7 @@ impl RpcStreamDecoder {
                         Err(_) => return Err(FrameDecodeError::CorruptFrame), // Frame type is invalid
                     };
 
-                let request_id = u32::from_le_bytes(
+                let rpc_request_id = u32::from_le_bytes(
                     self.buffer[RPC_FRAME_ID_OFFSET..RPC_FRAME_METHOD_ID_OFFSET]
                         .try_into()
                         .map_err(|_| FrameDecodeError::CorruptFrame)?,
@@ -100,7 +100,7 @@ impl RpcStreamDecoder {
 
                 self.header = Some(RpcHeader {
                     msg_type,
-                    request_id,
+                    rpc_request_id,
                     method_id,
                     metadata_bytes,
                 });
@@ -114,11 +114,11 @@ impl RpcStreamDecoder {
                 );
 
                 let rpc_header = self.header.clone().ok_or(FrameDecodeError::CorruptFrame)?;
-                self.rpc_request_id = Some(rpc_header.request_id);
+                self.rpc_request_id = Some(rpc_header.rpc_request_id);
 
                 // Push the header event
                 events.push(RpcStreamEvent::Header {
-                    rpc_request_id: request_id,
+                    rpc_request_id,
                     rpc_method_id: method_id,
                     rpc_header,
                 });
@@ -126,7 +126,7 @@ impl RpcStreamDecoder {
                 // Continue processing payload if available
                 if !self.buffer.is_empty() {
                     events.push(RpcStreamEvent::PayloadChunk {
-                        rpc_request_id: request_id,
+                        rpc_request_id,
                         rpc_method_id: method_id,
                         bytes: self.buffer.split_off(0),
                     });

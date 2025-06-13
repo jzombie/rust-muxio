@@ -129,13 +129,13 @@ fn rpc_dispatcher_call_and_echo_response() {
         let incoming_buf = outgoing_buf.clone();
         let chunk_size = 4; // Define the chunk size
         for chunk in incoming_buf.borrow().chunks(chunk_size) {
-            let request_ids = server_dispatcher
+            let rpc_request_ids = server_dispatcher
                 .read_bytes(chunk)
                 .expect("Failed to receive bytes on server");
 
-            for request_id in request_ids {
+            for rpc_request_id in rpc_request_ids {
                 let is_request_finalized = server_dispatcher
-                    .is_rpc_request_finalized(request_id)
+                    .is_rpc_request_finalized(rpc_request_id)
                     .unwrap();
 
                 // Pre-buffer entire request
@@ -143,11 +143,11 @@ fn rpc_dispatcher_call_and_echo_response() {
                     continue;
                 }
 
-                let rpc_request = server_dispatcher.delete_rpc_request(request_id);
+                let rpc_request = server_dispatcher.delete_rpc_request(rpc_request_id);
 
                 if let Some(rpc_request) = rpc_request {
-                    println!("Server received request header ID: {:?}", request_id);
-                    println!("\t{:?}: {:?}", request_id, rpc_request);
+                    println!("Server received request header ID: {:?}", rpc_request_id);
+                    println!("\t{:?}: {:?}", rpc_request_id, rpc_request);
 
                     let rpc_response = match rpc_request.method_id {
                         id if id == ADD_METHOD_ID => {
@@ -161,7 +161,7 @@ fn rpc_dispatcher_call_and_echo_response() {
                             });
 
                             Some(RpcResponse {
-                                request_id,
+                                rpc_request_id,
                                 method_id: rpc_request.method_id,
                                 result_status: Some(0),
                                 prebuffered_payload_bytes: Some(response_bytes),
@@ -180,7 +180,7 @@ fn rpc_dispatcher_call_and_echo_response() {
                             });
 
                             Some(RpcResponse {
-                                request_id,
+                                rpc_request_id,
                                 method_id: rpc_request.method_id,
                                 result_status: Some(0),
                                 prebuffered_payload_bytes: Some(response_bytes),

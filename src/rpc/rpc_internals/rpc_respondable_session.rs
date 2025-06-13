@@ -45,7 +45,7 @@ impl<'a> RpcRespondableSession<'a> {
         E: RpcEmit,
         R: RpcResponseHandler + 'a,
     {
-        let rpc_request_id = hdr.request_id;
+        let rpc_request_id = hdr.rpc_request_id;
 
         // Set pre-buffering flag for this specific request
         self.prebuffering_flags

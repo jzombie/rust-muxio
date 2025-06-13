@@ -1,5 +1,6 @@
 use crate::rpc::rpc_internals::RpcMessageType;
 
+// TODO: Prefix all with `rpc`
 /// Represents the header of an RPC (Remote Procedure Call) message.
 #[derive(Debug, Clone)]
 pub struct RpcHeader {
@@ -11,7 +12,7 @@ pub struct RpcHeader {
     /// For example:
     /// - For a call, this ID could represent the unique request ID.
     /// - For a response, this ID would match the request ID for which it is responding.
-    pub request_id: u32,
+    pub rpc_request_id: u32,
 
     /// The identifier (or hash) of the method being invoked in this RPC.
     ///

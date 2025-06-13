@@ -88,29 +88,32 @@ where
 
         // --- Stage 2: Concurrently process handlers WITHOUT holding locks ---
         let mut response_futures = Vec::new();
-        for (request_id, request) in requests_to_process {
+        for (rpc_request_id, rpc_request) in requests_to_process {
             let handlers_arc_clone = handlers_arc.clone();
             let context_clone = context.clone();
 
             let future = async move {
                 let handler = handlers_arc_clone
-                    .with_handlers(|handlers| handlers.get(&request.method_id).cloned())
+                    .with_handlers(|handlers| handlers.get(&rpc_request.method_id).cloned())
                     .await;
 
-                if let (Some(handler), Some(params)) = (handler, &request.param_bytes) {
+                if let (Some(handler), Some(params)) = (handler, &rpc_request.param_bytes) {
                     match handler(context_clone, params.clone()).await {
                         Ok(encoded) => RpcResponse {
-                            request_id,
-                            method_id: request.method_id,
+                            rpc_request_id,
+                            method_id: rpc_request.method_id,
                             result_status: Some(RpcResultStatus::Success.into()),
                             prebuffered_payload_bytes: Some(encoded),
                             is_finalized: true,
                         },
                         Err(e) => {
-                            eprintln!("Handler for method {} failed: {:?}", request.method_id, e);
+                            eprintln!(
+                                "Handler for method {} failed: {:?}",
+                                rpc_request.method_id, e
+                            );
                             RpcResponse {
-                                request_id,
-                                method_id: request.method_id,
+                                rpc_request_id,
+                                method_id: rpc_request.method_id,
                                 result_status: Some(RpcResultStatus::SystemError.into()),
                                 prebuffered_payload_bytes: Some(e.to_string().into_bytes()),
                                 is_finalized: true,
@@ -119,8 +122,8 @@ where
                     }
                 } else {
                     RpcResponse {
-                        request_id,
-                        method_id: request.method_id,
+                        rpc_request_id,
+                        method_id: rpc_request.method_id,
                         result_status: Some(RpcResultStatus::MethodNotFound.into()),
                         prebuffered_payload_bytes: None,
                         is_finalized: true,
