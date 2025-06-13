@@ -38,7 +38,7 @@ fn rpc_dispatcher_call_and_echo_response() {
     {
         // Prepare a mock RPC request
         let rpc_request_1 = RpcRequest {
-            method_id: ADD_METHOD_ID,
+            rpc_method_id: ADD_METHOD_ID,
             param_bytes: Some(bitcode::encode(&AddRequestParams {
                 numbers: vec![1.0, 2.0, 3.0],
             })),
@@ -48,7 +48,7 @@ fn rpc_dispatcher_call_and_echo_response() {
 
         // Prepare a mock RPC request
         let rpc_request_2 = RpcRequest {
-            method_id: MULT_METHOD_ID,
+            rpc_method_id: MULT_METHOD_ID,
             param_bytes: Some(bitcode::encode(&MultRequestParams {
                 numbers: vec![4.0, 5.0, 6.0, 3.14],
             })),
@@ -58,7 +58,7 @@ fn rpc_dispatcher_call_and_echo_response() {
 
         // Prepare a mock RPC request
         let rpc_request_3 = RpcRequest {
-            method_id: MULT_METHOD_ID,
+            rpc_method_id: MULT_METHOD_ID,
             param_bytes: Some(bitcode::encode(&MultRequestParams {
                 numbers: vec![10.0, 5.0, 6.0, 3.14],
             })),
@@ -69,7 +69,7 @@ fn rpc_dispatcher_call_and_echo_response() {
         let rpc_requests = vec![rpc_request_1, rpc_request_2, rpc_request_3];
 
         for rpc_request in rpc_requests {
-            let method_id = rpc_request.method_id;
+            let rpc_method_id = rpc_request.rpc_method_id;
 
             client_dispatcher
                 .call(
@@ -88,8 +88,8 @@ fn rpc_dispatcher_call_and_echo_response() {
                                 rpc_header,
                                 rpc_method_id,
                             } => {
-                                assert_eq!(rpc_header.rpc_method_id, method_id);
-                                assert_eq!(rpc_method_id, method_id);
+                                assert_eq!(rpc_header.rpc_method_id, rpc_method_id);
+                                assert_eq!(rpc_method_id, rpc_method_id);
                                 println!(
                                     "Client received header: ID = {}, Header = {:?}",
                                     rpc_request_id, rpc_header
@@ -149,7 +149,7 @@ fn rpc_dispatcher_call_and_echo_response() {
                     println!("Server received request header ID: {:?}", rpc_request_id);
                     println!("\t{:?}: {:?}", rpc_request_id, rpc_request);
 
-                    let rpc_response = match rpc_request.method_id {
+                    let rpc_response = match rpc_request.rpc_method_id {
                         id if id == ADD_METHOD_ID => {
                             let request_params: AddRequestParams =
                                 bitcode::decode(&rpc_request.param_bytes.unwrap()).unwrap();
@@ -162,7 +162,7 @@ fn rpc_dispatcher_call_and_echo_response() {
 
                             Some(RpcResponse {
                                 rpc_request_id,
-                                method_id: rpc_request.method_id,
+                                method_id: rpc_request.rpc_method_id,
                                 result_status: Some(0),
                                 prebuffered_payload_bytes: Some(response_bytes),
                                 is_finalized: true,
@@ -181,7 +181,7 @@ fn rpc_dispatcher_call_and_echo_response() {
 
                             Some(RpcResponse {
                                 rpc_request_id,
-                                method_id: rpc_request.method_id,
+                                method_id: rpc_request.rpc_method_id,
                                 result_status: Some(0),
                                 prebuffered_payload_bytes: Some(response_bytes),
                                 is_finalized: true,

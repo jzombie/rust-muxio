@@ -121,7 +121,7 @@ impl<'a> RpcDispatcher<'a> {
                         };
 
                         let rpc_request = RpcRequest {
-                            method_id: rpc_header.rpc_method_id,
+                            rpc_method_id: rpc_header.rpc_method_id,
                             param_bytes,
                             prebuffered_payload_bytes: None, // No payload yet
                             is_finalized: false,
@@ -199,7 +199,7 @@ impl<'a> RpcDispatcher<'a> {
         E: RpcEmit,
         R: RpcResponseHandler + 'a,
     {
-        let rpc_method_id = rpc_request.method_id;
+        let rpc_method_id = rpc_request.rpc_method_id;
 
         let rpc_request_id: u32 = self.next_rpc_request_id;
         self.next_rpc_request_id = increment_u32_id();

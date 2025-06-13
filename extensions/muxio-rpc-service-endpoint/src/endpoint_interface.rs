@@ -94,14 +94,14 @@ where
 
             let future = async move {
                 let handler = handlers_arc_clone
-                    .with_handlers(|handlers| handlers.get(&rpc_request.method_id).cloned())
+                    .with_handlers(|handlers| handlers.get(&rpc_request.rpc_method_id).cloned())
                     .await;
 
                 if let (Some(handler), Some(params)) = (handler, &rpc_request.param_bytes) {
                     match handler(context_clone, params.clone()).await {
                         Ok(encoded) => RpcResponse {
                             rpc_request_id,
-                            method_id: rpc_request.method_id,
+                            method_id: rpc_request.rpc_method_id,
                             result_status: Some(RpcResultStatus::Success.into()),
                             prebuffered_payload_bytes: Some(encoded),
                             is_finalized: true,
@@ -109,11 +109,11 @@ where
                         Err(e) => {
                             eprintln!(
                                 "Handler for method {} failed: {:?}",
-                                rpc_request.method_id, e
+                                rpc_request.rpc_method_id, e
                             );
                             RpcResponse {
                                 rpc_request_id,
-                                method_id: rpc_request.method_id,
+                                method_id: rpc_request.rpc_method_id,
                                 result_status: Some(RpcResultStatus::SystemError.into()),
                                 prebuffered_payload_bytes: Some(e.to_string().into_bytes()),
                                 is_finalized: true,
@@ -123,7 +123,7 @@ where
                 } else {
                     RpcResponse {
                         rpc_request_id,
-                        method_id: rpc_request.method_id,
+                        method_id: rpc_request.rpc_method_id,
                         result_status: Some(RpcResultStatus::MethodNotFound.into()),
                         prebuffered_payload_bytes: None,
                         is_finalized: true,

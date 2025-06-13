@@ -13,7 +13,7 @@ pub struct RpcRequest {
     ///
     /// This can be a sequential or a hashed ID (e.g., XXH3 or FNV) that maps
     /// to a known method on the remote server.
-    pub method_id: u64,
+    pub rpc_method_id: u64,
 
     /// Optional encoded metadata (typically parameters).
     ///

@@ -84,9 +84,9 @@ struct MultResponseParams {
     result: f64,
 }
 
-fn encode_request(method_id: u64, param_bytes: Vec<u8>) -> RpcRequest {
+fn encode_request(rpc_method_id: u64, param_bytes: Vec<u8>) -> RpcRequest {
     RpcRequest {
-        method_id,
+        rpc_method_id,
         param_bytes: Some(param_bytes),
         prebuffered_payload_bytes: None,
         is_finalized: true,
@@ -146,7 +146,7 @@ fn dispatch_call_and_get_prebuffered_response<T: for<'a> Decode<'a>>(
             let rpc_request = server_dispatcher.delete_rpc_request(rpc_request_id);
 
             if let Some(rpc_request) = rpc_request {
-                let rpc_response = match rpc_request.method_id {
+                let rpc_response = match rpc_request.rpc_method_id {
                     id if id == ADD_METHOD_ID => {
                         let request_params: AddRequestParams =
                             bitcode::decode(&rpc_request.param_bytes.unwrap()).unwrap();
