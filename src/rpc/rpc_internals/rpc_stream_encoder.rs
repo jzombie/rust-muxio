@@ -25,7 +25,7 @@ where
 
         let mut meta_buf = Vec::new();
         meta_buf.push(header.msg_type as u8);
-        meta_buf.extend(&header.id.to_le_bytes());
+        meta_buf.extend(&header.request_id.to_le_bytes());
         meta_buf.extend(&header.method_id.to_le_bytes());
 
         let metadata_bytes = &header.metadata_bytes;

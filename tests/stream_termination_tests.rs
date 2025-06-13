@@ -63,7 +63,7 @@ fn rpc_stream_aborts_on_cancel_frame() {
 
     let hdr = RpcHeader {
         msg_type: RpcMessageType::Call,
-        id: 42,
+        request_id: 42,
         method_id: 0x1234,
         metadata_bytes: b"test metadata bytes".into(),
     };
@@ -113,7 +113,7 @@ fn rpc_stream_aborts_on_end_frame() {
 
     let hdr = RpcHeader {
         msg_type: RpcMessageType::Call,
-        id: 42,
+        request_id: 42,
         method_id: 0x1234,
         metadata_bytes: b"test metadata bytes".into(),
     };

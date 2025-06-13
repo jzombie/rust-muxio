@@ -31,7 +31,7 @@ pub struct RpcDispatcher<'a> {
 
     // TODO: Document how this must be unique per session
     /// Monotonic ID generator for outbound RPC request headers.
-    next_header_id: u32,
+    next_request_id: u32,
 
     /// Queue of currently active inbound responses from remote peers.
     ///
@@ -52,7 +52,7 @@ impl<'a> RpcDispatcher<'a> {
 
         let mut instance = Self {
             rpc_respondable_session,
-            next_header_id: increment_u32_id(),
+            next_request_id: increment_u32_id(),
             rpc_request_queue: Arc::new(Mutex::new(VecDeque::new())),
         };
 
@@ -201,8 +201,8 @@ impl<'a> RpcDispatcher<'a> {
     {
         let method_id = rpc_request.method_id;
 
-        let header_id: u32 = self.next_header_id;
-        self.next_header_id = increment_u32_id();
+        let request_id: u32 = self.next_request_id;
+        self.next_request_id = increment_u32_id();
 
         // Convert parameter bytes to metadata
         let metadata_bytes = match rpc_request.param_bytes {
@@ -212,7 +212,7 @@ impl<'a> RpcDispatcher<'a> {
 
         let request_header = RpcHeader {
             msg_type: RpcMessageType::Call,
-            id: header_id,
+            request_id,
             method_id,
             metadata_bytes,
         };
@@ -260,7 +260,7 @@ impl<'a> RpcDispatcher<'a> {
         E: RpcEmit,
     {
         let rpc_response_header = RpcHeader {
-            id: rpc_response.request_id,
+            request_id: rpc_response.request_id,
             msg_type: RpcMessageType::Response,
             method_id: rpc_response.method_id,
             // TODO: Be sure to document how this works (on responses, the only metadata sent

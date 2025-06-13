@@ -22,7 +22,7 @@ fn rpc_parallel_streams_roundtrip() {
                     ..
                 } => {
                     // Validate headers and store the header with its msg ID
-                    match rpc_header.id {
+                    match rpc_header.request_id {
                         // 1 => assert_eq!(rpc_header.metadata["x"], "1".into()),
                         // 2 => assert_eq!(rpc_header.metadata["y"], "2".into()),
                         1 => assert_eq!(rpc_header.metadata_bytes, b"message 1 metadata"),
@@ -31,7 +31,7 @@ fn rpc_parallel_streams_roundtrip() {
                     }
 
                     assert!(
-                        rpc_request_id == rpc_header.id,
+                        rpc_request_id == rpc_header.request_id,
                         "rpc_request_id should be rpc_header.id"
                     );
 
@@ -61,14 +61,14 @@ fn rpc_parallel_streams_roundtrip() {
     // Setup headers for both streams
     let hdr1 = RpcHeader {
         msg_type: RpcMessageType::Call,
-        id: 1,
+        request_id: 1,
         method_id: 0xaaaabbbbccccdddd,
         // metadata: [("x".into(), "1".into())].into(),
         metadata_bytes: b"message 1 metadata".into(),
     };
     let hdr2 = RpcHeader {
         msg_type: RpcMessageType::Call,
-        id: 2,
+        request_id: 2,
         method_id: 0x1111222233334444,
         // metadata: [("y".into(), "2".into())].into(),
         metadata_bytes: b"message 2 metadata".into(),
@@ -186,7 +186,7 @@ fn rpc_stream_with_multiple_metadata_entries() {
     // Create a header with multiple metadata entries
     let hdr = RpcHeader {
         msg_type: RpcMessageType::Call,
-        id: 1,
+        request_id: 1,
         method_id: 0x1234,
         metadata_bytes,
     };
@@ -287,7 +287,7 @@ fn rpc_complex_shuffled_stream() {
     // Create a header with multiple metadata entries
     let hdr_1 = RpcHeader {
         msg_type: RpcMessageType::Call,
-        id: 1,
+        request_id: 1,
         method_id: 0x1234,
         metadata_bytes: metadata_bytes_1,
     };
@@ -306,7 +306,7 @@ fn rpc_complex_shuffled_stream() {
 
     let hdr_2 = RpcHeader {
         msg_type: RpcMessageType::Event,
-        id: 2,
+        request_id: 2,
         method_id: 0x5678,
         metadata_bytes: metadata_bytes_2,
     };
@@ -380,8 +380,8 @@ fn rpc_complex_shuffled_stream() {
         .expect("metadata_2 deserilization failed");
 
         // Verify payload correctness and metadata integrity
-        assert_eq!(decoded.get(&1).unwrap().0.as_ref().unwrap().id, 1);
-        assert_eq!(decoded.get(&2).unwrap().0.as_ref().unwrap().id, 2);
+        assert_eq!(decoded.get(&1).unwrap().0.as_ref().unwrap().request_id, 1);
+        assert_eq!(decoded.get(&2).unwrap().0.as_ref().unwrap().request_id, 2);
 
         assert_eq!(
             decoded.get(&1).unwrap().0.as_ref().unwrap().msg_type,
@@ -446,7 +446,7 @@ fn rpc_session_bidirectional_roundtrip() {
 
     let hdr = RpcHeader {
         msg_type: RpcMessageType::Call,
-        id: 42,
+        request_id: 42,
         method_id: 0x123,
         metadata_bytes: b"foo-bar".to_vec(),
     };
@@ -503,7 +503,7 @@ fn rpc_session_bidirectional_roundtrip() {
     // Send a reply back
     let reply_hdr = RpcHeader {
         msg_type: RpcMessageType::Response,
-        id: hdr.id,
+        request_id: hdr.request_id,
         method_id: hdr.method_id,
         metadata_bytes: b"baz-qux".to_vec(),
     };
