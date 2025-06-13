@@ -24,7 +24,7 @@ where
         let mut encoder = FrameStreamEncoder::new(stream_id, max_chunk_size, on_emit);
 
         let mut meta_buf = Vec::new();
-        meta_buf.push(header.msg_type as u8);
+        meta_buf.push(header.rpc_msg_type as u8);
         meta_buf.extend(&header.rpc_request_id.to_le_bytes());
         meta_buf.extend(&header.method_id.to_le_bytes());
 

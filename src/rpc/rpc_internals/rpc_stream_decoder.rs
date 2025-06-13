@@ -58,7 +58,7 @@ impl RpcStreamDecoder {
                     return Ok(events);
                 }
 
-                let msg_type =
+                let rpc_msg_type =
                     match RpcMessageType::try_from(self.buffer[RPC_FRAME_MSG_TYPE_OFFSET]) {
                         Ok(t) => t,
                         Err(_) => return Err(FrameDecodeError::CorruptFrame), // Frame type is invalid
@@ -99,7 +99,7 @@ impl RpcStreamDecoder {
                     .to_vec();
 
                 self.header = Some(RpcHeader {
-                    msg_type,
+                    rpc_msg_type,
                     rpc_request_id,
                     method_id,
                     metadata_bytes,

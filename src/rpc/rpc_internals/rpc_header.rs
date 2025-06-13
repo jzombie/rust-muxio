@@ -5,7 +5,7 @@ use crate::rpc::rpc_internals::RpcMessageType;
 #[derive(Debug, Clone)]
 pub struct RpcHeader {
     /// The type of the RPC message (Call, Response, Event, etc.).
-    pub msg_type: RpcMessageType,
+    pub rpc_msg_type: RpcMessageType,
 
     /// A unique identifier for this RPC message. It helps correlate requests and responses.
     ///

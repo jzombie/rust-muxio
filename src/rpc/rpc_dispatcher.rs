@@ -211,7 +211,7 @@ impl<'a> RpcDispatcher<'a> {
         };
 
         let request_header = RpcHeader {
-            msg_type: RpcMessageType::Call,
+            rpc_msg_type: RpcMessageType::Call,
             rpc_request_id,
             method_id,
             metadata_bytes,
@@ -261,7 +261,7 @@ impl<'a> RpcDispatcher<'a> {
     {
         let rpc_response_header = RpcHeader {
             rpc_request_id: rpc_response.rpc_request_id,
-            msg_type: RpcMessageType::Response,
+            rpc_msg_type: RpcMessageType::Response,
             method_id: rpc_response.method_id,
             // TODO: Be sure to document how this works (on responses, the only metadata sent
             // is the result status or nothing at all)
