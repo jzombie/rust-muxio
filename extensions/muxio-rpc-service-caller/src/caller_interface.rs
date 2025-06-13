@@ -11,7 +11,7 @@ use muxio_rpc_service::constants::{
     DEFAULT_RPC_STREAM_CHANNEL_BUFFER_SIZE, DEFAULT_SERVICE_MAX_CHUNK_SIZE,
 };
 use std::io;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 /// Defines a generic capability for making RPC calls.
 ///
@@ -45,86 +45,103 @@ pub trait RpcServiceCallerInterface: Send + Sync {
     ) -> Result<
         (
             RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>,
-            mpsc::Receiver<Vec<u8>>,
+            mpsc::Receiver<Result<Vec<u8>, Vec<u8>>>,
         ),
         io::Error,
     > {
-        let (tx, rx) = mpsc::channel::<Vec<u8>>(DEFAULT_RPC_STREAM_CHANNEL_BUFFER_SIZE);
-        let tx = Arc::new(std::sync::Mutex::new(Some(tx)));
+        // The channel now sends a Result where Err contains the error payload.
+        let (tx, rx) =
+            mpsc::channel::<Result<Vec<u8>, Vec<u8>>>(DEFAULT_RPC_STREAM_CHANNEL_BUFFER_SIZE);
+        let tx = Arc::new(Mutex::new(Some(tx)));
 
         let (ready_tx, ready_rx) = oneshot::channel::<Result<(), io::Error>>();
-        let ready_tx = Arc::new(std::sync::Mutex::new(Some(ready_tx)));
+        let ready_tx = Arc::new(Mutex::new(Some(ready_tx)));
 
-        // TODO: Does this really have to wrap here?
         let send_fn: Box<dyn RpcEmit + Send + Sync> = Box::new({
-            let on_emit = self.get_emit_fn(); // Get emit fn from the implementor
+            let on_emit = self.get_emit_fn();
             move |chunk: &[u8]| {
                 on_emit(chunk.to_vec());
             }
         });
 
-        let recv_fn: Box<dyn FnMut(RpcStreamEvent) + Send + 'static> = Box::new(move |evt| {
-            match evt {
-                RpcStreamEvent::Header { rpc_header, .. } => {
-                    let result_status = rpc_header
-                        .rpc_metadata_bytes
-                        .first()
-                        .copied()
-                        .and_then(|b| RpcResultStatus::try_from(b).ok())
-                        .unwrap_or(RpcResultStatus::Success);
+        // This closure is now stateful to handle error payloads correctly.
+        let recv_fn: Box<dyn FnMut(RpcStreamEvent) + Send + 'static> = {
+            let status = Arc::new(Mutex::new(None::<RpcResultStatus>));
 
-                    if result_status != RpcResultStatus::Success {
-                        // TODO: Don't use `unwrap`
+            Box::new(move |evt| {
+                match evt {
+                    RpcStreamEvent::Header { rpc_header, .. } => {
+                        let result_status = rpc_header
+                            .rpc_metadata_bytes
+                            .first()
+                            .copied()
+                            .and_then(|b| RpcResultStatus::try_from(b).ok())
+                            .unwrap_or(RpcResultStatus::Success);
+
+                        *status.lock().unwrap() = Some(result_status);
+
+                        // Signal readiness unless there's a critical setup failure.
                         if let Some(tx) = ready_tx.lock().unwrap().take() {
-                            let _ = tx.send(Err(io::Error::new(
-                                io::ErrorKind::Other,
-                                format!("RPC failed: {:?}", result_status),
-                            )));
+                            if matches!(
+                                result_status,
+                                RpcResultStatus::SystemError | RpcResultStatus::MethodNotFound
+                            ) {
+                                let _ = tx.send(Err(io::Error::new(
+                                    io::ErrorKind::Other,
+                                    format!("RPC setup failed: {:?}", result_status),
+                                )));
+                            } else {
+                                let _ = tx.send(Ok(()));
+                            }
                         }
-                        // TODO: Don't use `unwrap`
+                    }
+                    RpcStreamEvent::PayloadChunk { bytes, .. } => {
+                        let current_status = status.lock().unwrap();
+                        if let Some(sender) = tx.lock().unwrap().as_mut() {
+                            // Check the status received in the header.
+                            match *current_status {
+                                Some(RpcResultStatus::Success) => {
+                                    let _ = sender.try_send(Ok(bytes));
+                                }
+                                // If the status was a failure, this payload is the error message.
+                                Some(RpcResultStatus::Fail) => {
+                                    let _ = sender.try_send(Err(bytes));
+                                }
+                                // Ignore payloads for other statuses like SystemError.
+                                _ => {}
+                            }
+                        }
+                    }
+                    RpcStreamEvent::End { .. } => {
+                        // Close the channel by dropping the sender.
                         let _ = tx.lock().unwrap().take();
-                    } else {
-                        // TODO: Don't use `unwrap`
-                        let _ = ready_tx.lock().unwrap().take().map(|t| t.send(Ok(())));
                     }
+                    _ => {}
                 }
-                RpcStreamEvent::PayloadChunk { bytes, .. } => {
-                    // TODO: Don't use `unwrap`
-                    if let Some(sender) = tx.lock().unwrap().as_mut() {
-                        let _ = sender.try_send(bytes);
-                    }
-                }
-                RpcStreamEvent::End { .. } => {
-                    // TODO: Don't use `unwrap`
-                    let _ = tx.lock().unwrap().take();
-                }
-                _ => {
-                    // TODO: Handle unmatched condition?
-                }
-            }
-        });
+            })
+        };
 
-        let rpc_call_result = self
-            .get_dispatcher() // Get dispatcher from the implementor
+        let encoder = self
+            .get_dispatcher()
             .with_dispatcher(|d| {
                 d.call(
                     RpcRequest {
                         rpc_method_id,
                         rpc_param_bytes: Some(rpc_param_bytes.to_vec()),
-                        rpc_prebuffered_payload_bytes: None, // TODO: Send, if attached
+                        rpc_prebuffered_payload_bytes: None,
                         is_finalized,
                     },
                     DEFAULT_SERVICE_MAX_CHUNK_SIZE,
                     send_fn,
                     Some(recv_fn),
-                    true,
+                    // Pre-buffering is now set to false to allow streaming of error payloads.
+                    false,
                 )
             })
-            .await;
-
-        let encoder = rpc_call_result.map_err(|e: FrameEncodeError| {
-            io::Error::new(io::ErrorKind::Other, format!("Encode error: {e:?}"))
-        })?;
+            .await
+            .map_err(|e: FrameEncodeError| {
+                io::Error::new(io::ErrorKind::Other, format!("Encode error: {e:?}"))
+            })?;
 
         match ready_rx.await {
             Ok(Ok(())) => Ok((encoder, rx)),
@@ -137,7 +154,6 @@ pub trait RpcServiceCallerInterface: Send + Sync {
     }
 
     /// Performs a buffered RPC call.
-    /// This default method simply builds on top of `call_rpc_streaming`.
     async fn call_rpc_buffered<T, F>(
         &self,
         method_id: u64,
@@ -147,7 +163,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
     ) -> Result<
         (
             RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>,
-            Result<T, io::Error>,
+            Result<T, Vec<u8>>, // The error type is now Vec<u8>
         ),
         io::Error,
     >
@@ -159,11 +175,21 @@ pub trait RpcServiceCallerInterface: Send + Sync {
             .call_rpc_streaming(method_id, param_bytes, is_finalized)
             .await?;
 
-        let mut buf = Vec::new();
-        while let Some(chunk) = stream.next().await {
-            buf.extend_from_slice(&chunk);
+        let mut success_buf = Vec::new();
+
+        while let Some(result) = stream.next().await {
+            match result {
+                Ok(chunk) => {
+                    success_buf.extend_from_slice(&chunk);
+                }
+                Err(error_payload) => {
+                    // If we receive an error payload, the call has failed. Return it immediately.
+                    return Ok((encoder, Err(error_payload)));
+                }
+            }
         }
 
-        Ok((encoder, Ok(decode(&buf))))
+        // If the stream completes without an error, decode the success buffer.
+        Ok((encoder, Ok(decode(&success_buf))))
     }
 }

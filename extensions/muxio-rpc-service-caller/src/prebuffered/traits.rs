@@ -44,6 +44,21 @@ where
             .call_rpc_buffered(Self::METHOD_ID, &encoded, Self::decode_response, true)
             .await?;
 
-        inner?
+        // FIX: The `inner` value is a `Result<Result<Output, _>, Vec<u8>>`.
+        // We match on it to handle the custom error payload or the success/decode error.
+        match inner {
+            // `decode_result` is the `Result<Self::Output, io::Error>` from `decode_response`.
+            // We can return it directly as it matches our function's signature.
+            Ok(decode_result) => decode_result,
+            // The call failed with a remote error payload.
+            Err(error_payload) => {
+                // Convert the byte payload into a user-friendly string message.
+                let error_message = String::from_utf8_lossy(&error_payload);
+                Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    format!("RPC call failed with remote error: {}", error_message),
+                ))
+            }
+        }
     }
 }
