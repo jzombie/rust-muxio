@@ -263,6 +263,8 @@ impl<'a> RpcDispatcher<'a> {
             id: rpc_response.request_id,
             msg_type: RpcMessageType::Response,
             method_id: rpc_response.method_id,
+            // TODO: Be sure to document how this works (on responses, the only metadata sent
+            // is the result status or nothing at all)
             metadata_bytes: {
                 match rpc_response.result_status {
                     Some(result_status) => vec![result_status],

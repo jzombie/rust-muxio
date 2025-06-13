@@ -112,7 +112,7 @@ where
                                 request_id,
                                 method_id: request.method_id,
                                 result_status: Some(RpcResultStatus::SystemError.into()),
-                                prebuffered_payload_bytes: None,
+                                prebuffered_payload_bytes: Some(e.to_string().into_bytes()),
                                 is_finalized: true,
                             }
                         }

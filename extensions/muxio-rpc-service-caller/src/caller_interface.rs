@@ -111,7 +111,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                     RpcRequest {
                         method_id,
                         param_bytes: Some(param_bytes.to_vec()),
-                        prebuffered_payload_bytes: None,
+                        prebuffered_payload_bytes: None, // TODO: Send, if attached
                         is_finalized,
                     },
                     DEFAULT_SERVICE_MAX_CHUNK_SIZE,
