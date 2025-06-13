@@ -1,4 +1,4 @@
-TODO: Add example server/client in `examples` directory and show how information can be exchanged over multiple terminals
+TODO: Add example server/client in `examples` directory and show how information can be exchanged over multiple terminals (perhaps include an `echo` route and make a demo showing how typing in one terminal can update the other terminal in real-time)
 
 TODO: Mention something about "layered transport kit"
 
