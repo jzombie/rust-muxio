@@ -1,3 +1,5 @@
+TODO: Add example server/client in `examples` directory and show how information can be exchanged over multiple terminals
+
 TODO: Mention something about "layered transport kit"
 
 TODO: Ensure reading and writing is standardized to: `read_bytes` and `write_bytes`
