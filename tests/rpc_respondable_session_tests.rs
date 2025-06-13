@@ -83,7 +83,7 @@ fn rpc_respondable_session_stream_and_reply_roundtrip() {
                         metadata_clone
                             .lock()
                             .unwrap()
-                            .insert(rpc_request_id, rpc_header.rpc_metadata_bytes);
+                            .insert(rpc_request_id, rpc_header.rpc_metadata_bytes.clone());
                     }
                     RpcStreamEvent::PayloadChunk { bytes, .. } => {
                         payload_clone.lock().unwrap().extend(bytes);

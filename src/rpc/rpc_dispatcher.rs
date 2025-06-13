@@ -118,7 +118,7 @@ impl<'a> RpcDispatcher<'a> {
                         // Convert metadata to parameter bytes
                         let rpc_param_bytes = match rpc_header.rpc_metadata_bytes.len() {
                             0 => None,
-                            _ => Some(rpc_header.rpc_metadata_bytes),
+                            _ => Some(rpc_header.rpc_metadata_bytes.clone()),
                         };
 
                         let rpc_request = RpcRequest {

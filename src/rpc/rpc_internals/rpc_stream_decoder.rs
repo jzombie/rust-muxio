@@ -6,10 +6,11 @@ use crate::{
     frame::{DecodedFrame, FrameDecodeError, FrameKind},
     rpc::rpc_internals::{RpcHeader, RpcMessageType, RpcStreamEvent},
 };
+use std::sync::Arc;
 
 pub struct RpcStreamDecoder {
     state: RpcDecoderState,
-    header: Option<RpcHeader>,
+    header: Option<Arc<RpcHeader>>,
     rpc_request_id: Option<u32>,
     rpc_method_id: Option<u64>,
     buffer: Vec<u8>,
@@ -100,12 +101,14 @@ impl RpcStreamDecoder {
                     ..RPC_FRAME_METADATA_LENGTH_OFFSET + RPC_FRAME_METADATA_LENGTH_SIZE + meta_len]
                     .to_vec();
 
-                self.header = Some(RpcHeader {
+                // Create the header and immediately wrap it in an Arc.
+                let header_arc = Arc::new(RpcHeader {
                     rpc_msg_type,
                     rpc_request_id,
                     rpc_method_id,
                     rpc_metadata_bytes,
                 });
+                self.header = Some(header_arc.clone());
 
                 // Transition state to AwaitPayload after processing header
                 self.state = RpcDecoderState::AwaitPayload;
@@ -122,7 +125,7 @@ impl RpcStreamDecoder {
                 events.push(RpcStreamEvent::Header {
                     rpc_request_id,
                     rpc_method_id,
-                    rpc_header,
+                    rpc_header: header_arc.clone(),
                 });
 
                 // Continue processing payload if available
@@ -131,10 +134,18 @@ impl RpcStreamDecoder {
                         rpc_request_id,
                         rpc_method_id,
                         bytes: self.buffer.split_off(0),
+                        rpc_header: header_arc.clone(),
                     });
                 }
             }
             RpcDecoderState::AwaitPayload => {
+                // Get a cloned reference to the header; this will not compile if the header is None.
+                let header_arc = self
+                    .header
+                    .as_ref()
+                    .ok_or(FrameDecodeError::CorruptFrame)?
+                    .clone();
+
                 // If we encounter the end of the stream
                 if frame.inner.kind == FrameKind::End {
                     self.state = RpcDecoderState::Done;
@@ -143,6 +154,7 @@ impl RpcStreamDecoder {
                             .rpc_request_id
                             .ok_or(FrameDecodeError::CorruptFrame)?,
                         rpc_method_id: self.rpc_method_id.ok_or(FrameDecodeError::CorruptFrame)?,
+                        rpc_header: header_arc,
                     });
                 } else if frame.inner.kind == FrameKind::Cancel {
                     return Err(FrameDecodeError::ReadAfterCancel); // Stop processing further frames
@@ -154,6 +166,7 @@ impl RpcStreamDecoder {
                             .ok_or(FrameDecodeError::CorruptFrame)?,
                         rpc_method_id: self.rpc_method_id.ok_or(FrameDecodeError::CorruptFrame)?,
                         bytes: frame.inner.payload.clone(),
+                        rpc_header: header_arc,
                     });
                 }
             }

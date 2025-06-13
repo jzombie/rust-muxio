@@ -3,6 +3,7 @@ use muxio::rpc::rpc_internals::{RpcHeader, RpcMessageType, RpcSession, RpcStream
 use rand::prelude::SliceRandom;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 #[test]
 fn rpc_parallel_streams_roundtrip() {
@@ -10,7 +11,7 @@ fn rpc_parallel_streams_roundtrip() {
     let mut server = RpcSession::new();
 
     // The final validation logic for payload correctness and metadata integrity
-    let mut decoded: HashMap<u32, (Option<RpcHeader>, Vec<u8>)> = HashMap::new();
+    let mut decoded: HashMap<u32, (Option<Arc<RpcHeader>>, Vec<u8>)> = HashMap::new();
 
     // RefCell for processing received bytes on a simulated server
     let process_received_bytes = RefCell::new(|bytes: &[u8]| {
@@ -217,7 +218,7 @@ fn rpc_stream_with_multiple_metadata_entries() {
     enc.end_stream().expect("enc end stream failed");
 
     // Process the frames on the server side
-    let mut decoded: HashMap<u32, (Option<RpcHeader>, Vec<u8>)> = HashMap::new();
+    let mut decoded: HashMap<u32, (Option<Arc<RpcHeader>>, Vec<u8>)> = HashMap::new();
     for chunk in outbound.chunks(8).map(Vec::from) {
         server
             .read_bytes(&chunk, |evt| match evt {
@@ -361,7 +362,7 @@ fn rpc_complex_shuffled_stream() {
         outbound_chunks.borrow_mut().shuffle(&mut rand::rng());
 
         // Process the frames on the server side
-        let mut decoded: HashMap<u32, (Option<RpcHeader>, Vec<u8>)> = HashMap::new();
+        let mut decoded: HashMap<u32, (Option<Arc<RpcHeader>>, Vec<u8>)> = HashMap::new();
         for chunk in outbound_chunks.borrow().iter() {
             server
                 .read_bytes(&chunk, |evt| match evt {
