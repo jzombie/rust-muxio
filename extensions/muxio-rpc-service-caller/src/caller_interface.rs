@@ -1,11 +1,7 @@
-// FIX: Use `crate::` to refer to sibling modules within the same crate.
 use crate::{error::RpcCallerError, with_dispatcher_trait::WithDispatcher};
-use futures::StreamExt;
-use futures::channel::{mpsc, oneshot};
-use muxio::frame::FrameEncodeError;
+use futures::{StreamExt, channel::mpsc, channel::oneshot};
 use muxio::rpc::{
     RpcRequest,
-    // FIX: Removed unused RpcHeader, corrected path for RpcEmit
     rpc_internals::{RpcStreamEncoder, RpcStreamEvent, rpc_trait::RpcEmit},
 };
 use muxio_rpc_service::RpcResultStatus;
@@ -57,9 +53,6 @@ pub trait RpcServiceCallerInterface: Send + Sync {
 
             Box::new(move |evt| {
                 let mut tx_lock = tx.lock().expect("tx mutex poisoned");
-                let Some(sender) = tx_lock.as_mut() else {
-                    return;
-                };
 
                 match evt {
                     RpcStreamEvent::Header { rpc_header, .. } => {
@@ -72,26 +65,18 @@ pub trait RpcServiceCallerInterface: Send + Sync {
 
                         *status.lock().expect("status mutex poisoned") = Some(result_status);
 
+                        // Signal that the RPC call has been initiated successfully at the transport level.
                         if let Some(tx) = ready_tx.lock().expect("ready_tx mutex poisoned").take() {
-                            if matches!(
-                                result_status,
-                                RpcResultStatus::SystemError | RpcResultStatus::MethodNotFound
-                            ) {
-                                let _ = tx.send(Err(io::Error::new(
-                                    io::ErrorKind::Other,
-                                    format!("RPC setup failed: {:?}", result_status),
-                                )));
-                                *tx_lock = None;
-                            } else {
-                                let _ = tx.send(Ok(()));
-                            }
+                            let _ = tx.send(Ok(()));
                         }
                     }
                     RpcStreamEvent::PayloadChunk { bytes, .. } => {
                         let current_status = status.lock().expect("status mutex poisoned");
                         match *current_status {
                             Some(RpcResultStatus::Success) => {
-                                let _ = sender.try_send(Ok(bytes));
+                                if let Some(sender) = tx_lock.as_mut() {
+                                    let _ = sender.try_send(Ok(bytes));
+                                }
                             }
                             Some(_) => {
                                 error_buffer
@@ -99,29 +84,38 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                                     .expect("error buffer mutex poisoned")
                                     .extend(bytes);
                             }
-                            None => {}
+                            None => {} // Should not happen if protocol is followed correctly.
                         }
                     }
                     RpcStreamEvent::End { .. } => {
+                        // The stream is over. Check if we buffered an error payload.
                         let final_status = status.lock().expect("status mutex poisoned").take();
                         let payload = std::mem::take(
                             &mut *error_buffer.lock().expect("error buffer mutex poisoned"),
                         );
 
-                        match final_status {
-                            Some(RpcResultStatus::Fail) => {
-                                let _ =
-                                    sender.try_send(Err(RpcCallerError::RemoteError { payload }));
+                        if let Some(sender) = tx_lock.as_mut() {
+                            match final_status {
+                                Some(RpcResultStatus::Fail) => {
+                                    let _ = sender
+                                        .try_send(Err(RpcCallerError::RemoteError { payload }));
+                                }
+                                Some(status @ RpcResultStatus::SystemError)
+                                | Some(status @ RpcResultStatus::MethodNotFound) => {
+                                    let msg = String::from_utf8_lossy(&payload).to_string();
+                                    let final_msg = if msg.is_empty() {
+                                        format!("RPC failed with status: {:?}", status)
+                                    } else {
+                                        msg
+                                    };
+                                    let _ = sender.try_send(Err(
+                                        RpcCallerError::RemoteSystemError(final_msg),
+                                    ));
+                                }
+                                _ => { /* Success stream ended, no final action needed. */ }
                             }
-                            Some(
-                                RpcResultStatus::SystemError | RpcResultStatus::MethodNotFound,
-                            ) => {
-                                let msg = String::from_utf8_lossy(&payload).to_string();
-                                let _ =
-                                    sender.try_send(Err(RpcCallerError::RemoteSystemError(msg)));
-                            }
-                            _ => {}
                         }
+                        // Close the stream by dropping the sender.
                         *tx_lock = None;
                     }
                     _ => {}
@@ -146,15 +140,15 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                 )
             })
             .await
-            // FIX: Manually map the error to convert it to io::Error
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Encode error: {:?}", e)))?;
+            // FIX: Use debug formatting `{:?}` since FrameEncodeError doesn't implement Display.
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("{:?}", e)))?;
 
         match ready_rx.await {
             Ok(Ok(())) => Ok((encoder, rx)),
             Ok(Err(err)) => Err(err),
             Err(_) => Err(io::Error::new(
                 io::ErrorKind::Other,
-                "RPC response channel closed prematurely",
+                "RPC setup channel closed prematurely",
             )),
         }
     }
@@ -191,6 +185,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                 }
                 Err(e) => {
                     err = Some(e);
+                    // We can break here because the stream will end after an error.
                     break;
                 }
             }
