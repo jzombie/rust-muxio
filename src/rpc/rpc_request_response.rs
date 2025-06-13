@@ -1,6 +1,5 @@
 use crate::rpc::rpc_internals::RpcHeader;
 
-// TODO: Prefix all with `rpc`
 /// Represents an outbound RPC call request.
 ///
 /// An `RpcRequest` is initiated by a client and contains the encoded
