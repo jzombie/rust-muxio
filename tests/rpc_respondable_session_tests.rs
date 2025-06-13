@@ -21,7 +21,7 @@ fn rpc_respondable_session_stream_and_reply_roundtrip() {
             rpc_msg_type: RpcMessageType::Call,
             rpc_request_id: 1,
             rpc_method_id: 0xABCDABCDABCDABCD,
-            metadata_bytes: b"req-meta".to_vec(),
+            rpc_metadata_bytes: b"req-meta".to_vec(),
         };
 
         {
@@ -34,7 +34,7 @@ fn rpc_respondable_session_stream_and_reply_roundtrip() {
                 .unwrap()
                 .set_catch_all_response_handler(move |evt| match evt {
                     RpcStreamEvent::Header { rpc_header, .. } => {
-                        assert_eq!(rpc_header.metadata_bytes, b"req-meta");
+                        assert_eq!(rpc_header.rpc_metadata_bytes, b"req-meta");
                     }
                     RpcStreamEvent::PayloadChunk { bytes, .. } => {
                         recv_buf.lock().unwrap().extend(bytes);
@@ -49,7 +49,7 @@ fn rpc_respondable_session_stream_and_reply_roundtrip() {
                             rpc_msg_type: RpcMessageType::Response,
                             rpc_request_id,
                             rpc_method_id: 0xABCDABCDABCDABCD,
-                            metadata_bytes: b"resp-meta".to_vec(),
+                            rpc_metadata_bytes: b"resp-meta".to_vec(),
                         };
 
                         pending_reply.lock().unwrap().push_back((
@@ -83,7 +83,7 @@ fn rpc_respondable_session_stream_and_reply_roundtrip() {
                         metadata_clone
                             .lock()
                             .unwrap()
-                            .insert(rpc_request_id, rpc_header.metadata_bytes);
+                            .insert(rpc_request_id, rpc_header.rpc_metadata_bytes);
                     }
                     RpcStreamEvent::PayloadChunk { bytes, .. } => {
                         payload_clone.lock().unwrap().extend(bytes);

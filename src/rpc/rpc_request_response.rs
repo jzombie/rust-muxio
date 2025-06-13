@@ -93,9 +93,9 @@ impl RpcResponse {
             rpc_request_id: rpc_header.rpc_request_id,
             method_id: rpc_header.rpc_method_id,
             result_status: {
-                match rpc_header.metadata_bytes.len() {
+                match rpc_header.rpc_metadata_bytes.len() {
                     0 => None,
-                    _ => Some(rpc_header.metadata_bytes[0]),
+                    _ => Some(rpc_header.rpc_metadata_bytes[0]),
                 }
             },
             prebuffered_payload_bytes: None,

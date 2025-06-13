@@ -1,6 +1,5 @@
 use crate::rpc::rpc_internals::RpcMessageType;
 
-// TODO: Prefix all with `rpc`
 /// Represents the header of an RPC (Remote Procedure Call) message.
 #[derive(Debug, Clone)]
 pub struct RpcHeader {
@@ -18,8 +17,8 @@ pub struct RpcHeader {
     ///
     /// This field helps to identify which method is being called in the remote procedure.
     /// It's often hashed to ensure uniqueness and prevent collisions in method names.
-    pub rpc_method_id: u64, // TODO: Rename to `method_hash`?
+    pub rpc_method_id: u64,
 
     // TODO: Document; Schemaless metadata
-    pub metadata_bytes: Vec<u8>,
+    pub rpc_metadata_bytes: Vec<u8>,
 }

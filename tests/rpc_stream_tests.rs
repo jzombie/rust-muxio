@@ -25,8 +25,8 @@ fn rpc_parallel_streams_roundtrip() {
                     match rpc_header.rpc_request_id {
                         // 1 => assert_eq!(rpc_header.metadata["x"], "1".into()),
                         // 2 => assert_eq!(rpc_header.metadata["y"], "2".into()),
-                        1 => assert_eq!(rpc_header.metadata_bytes, b"message 1 metadata"),
-                        2 => assert_eq!(rpc_header.metadata_bytes, b"message 2 metadata"),
+                        1 => assert_eq!(rpc_header.rpc_metadata_bytes, b"message 1 metadata"),
+                        2 => assert_eq!(rpc_header.rpc_metadata_bytes, b"message 2 metadata"),
                         _ => panic!("unexpected header ID"),
                     }
 
@@ -64,14 +64,14 @@ fn rpc_parallel_streams_roundtrip() {
         rpc_request_id: 1,
         rpc_method_id: 0xaaaabbbbccccdddd,
         // metadata: [("x".into(), "1".into())].into(),
-        metadata_bytes: b"message 1 metadata".into(),
+        rpc_metadata_bytes: b"message 1 metadata".into(),
     };
     let hdr2 = RpcHeader {
         rpc_msg_type: RpcMessageType::Call,
         rpc_request_id: 2,
         rpc_method_id: 0x1111222233334444,
         // metadata: [("y".into(), "2".into())].into(),
-        metadata_bytes: b"message 2 metadata".into(),
+        rpc_metadata_bytes: b"message 2 metadata".into(),
     };
 
     // Prepare the payloads for both streams
@@ -128,11 +128,23 @@ fn rpc_parallel_streams_roundtrip() {
 
     // Validate `metadata` integrity
     assert_eq!(
-        decoded.get(&1).unwrap().0.as_ref().unwrap().metadata_bytes,
+        decoded
+            .get(&1)
+            .unwrap()
+            .0
+            .as_ref()
+            .unwrap()
+            .rpc_metadata_bytes,
         b"message 1 metadata"
     );
     assert_eq!(
-        decoded.get(&2).unwrap().0.as_ref().unwrap().metadata_bytes,
+        decoded
+            .get(&2)
+            .unwrap()
+            .0
+            .as_ref()
+            .unwrap()
+            .rpc_metadata_bytes,
         b"message 2 metadata"
     );
 
@@ -171,7 +183,7 @@ fn rpc_stream_with_multiple_metadata_entries() {
         some_bool_vec: Vec<bool>,
     }
 
-    let metadata_bytes = bitcode::encode(&Metadata {
+    let rpc_metadata_bytes = bitcode::encode(&Metadata {
         foo: "bar".into(),
         baz: "qux".into(),
         alpha: "beta".into(),
@@ -188,7 +200,7 @@ fn rpc_stream_with_multiple_metadata_entries() {
         rpc_msg_type: RpcMessageType::Call,
         rpc_request_id: 1,
         rpc_method_id: 0x1234,
-        metadata_bytes,
+        rpc_metadata_bytes,
     };
 
     // Start RPC stream with the header containing multiple metadata entries
@@ -233,9 +245,16 @@ fn rpc_stream_with_multiple_metadata_entries() {
             .unwrap();
     }
 
-    let decoded_metadata =
-        bitcode::decode::<Metadata>(&decoded.get(&1).unwrap().0.as_ref().unwrap().metadata_bytes)
-            .expect("metadata deserilization failed");
+    let decoded_metadata = bitcode::decode::<Metadata>(
+        &decoded
+            .get(&1)
+            .unwrap()
+            .0
+            .as_ref()
+            .unwrap()
+            .rpc_metadata_bytes,
+    )
+    .expect("metadata deserilization failed");
 
     // Verify payload correctness and metadata integrity
     assert_eq!(decoded.get(&1).unwrap().1, b"test multiple metadata");
@@ -289,7 +308,7 @@ fn rpc_complex_shuffled_stream() {
         rpc_msg_type: RpcMessageType::Call,
         rpc_request_id: 1,
         rpc_method_id: 0x1234,
-        metadata_bytes: metadata_bytes_1,
+        rpc_metadata_bytes: metadata_bytes_1,
     };
 
     let metadata_bytes_2 = bitcode::encode(&Metadata {
@@ -308,7 +327,7 @@ fn rpc_complex_shuffled_stream() {
         rpc_msg_type: RpcMessageType::Event,
         rpc_request_id: 2,
         rpc_method_id: 0x5678,
-        metadata_bytes: metadata_bytes_2,
+        rpc_metadata_bytes: metadata_bytes_2,
     };
 
     // Start RPC stream with the header containing multiple metadata entries
@@ -371,11 +390,23 @@ fn rpc_complex_shuffled_stream() {
         }
 
         let decoded_metadata_1 = bitcode::decode::<Metadata>(
-            &decoded.get(&1).unwrap().0.as_ref().unwrap().metadata_bytes,
+            &decoded
+                .get(&1)
+                .unwrap()
+                .0
+                .as_ref()
+                .unwrap()
+                .rpc_metadata_bytes,
         )
         .expect("metadata_1 deserilization failed");
         let decoded_metadata_2 = bitcode::decode::<Metadata>(
-            &decoded.get(&2).unwrap().0.as_ref().unwrap().metadata_bytes,
+            &decoded
+                .get(&2)
+                .unwrap()
+                .0
+                .as_ref()
+                .unwrap()
+                .rpc_metadata_bytes,
         )
         .expect("metadata_2 deserilization failed");
 
@@ -454,7 +485,7 @@ fn rpc_session_bidirectional_roundtrip() {
         rpc_msg_type: RpcMessageType::Call,
         rpc_request_id: 42,
         rpc_method_id: 0x123,
-        metadata_bytes: b"foo-bar".to_vec(),
+        rpc_metadata_bytes: b"foo-bar".to_vec(),
     };
 
     let mut outbound = Vec::new();
@@ -483,7 +514,7 @@ fn rpc_session_bidirectional_roundtrip() {
                     rpc_header,
                     ..
                 } => {
-                    assert_eq!(rpc_header.metadata_bytes, b"foo-bar");
+                    assert_eq!(rpc_header.rpc_metadata_bytes, b"foo-bar");
                     seen_hdr = Some(rpc_header);
 
                     Ok(())
@@ -511,7 +542,7 @@ fn rpc_session_bidirectional_roundtrip() {
         rpc_msg_type: RpcMessageType::Response,
         rpc_request_id: hdr.rpc_request_id,
         rpc_method_id: hdr.rpc_method_id,
-        metadata_bytes: b"baz-qux".to_vec(),
+        rpc_metadata_bytes: b"baz-qux".to_vec(),
     };
 
     let mut reply_bytes = Vec::new();
@@ -540,7 +571,7 @@ fn rpc_session_bidirectional_roundtrip() {
                     rpc_header,
                     ..
                 } => {
-                    assert_eq!(rpc_header.metadata_bytes, b"baz-qux");
+                    assert_eq!(rpc_header.rpc_metadata_bytes, b"baz-qux");
                     reply_hdr_seen = Some(rpc_header);
 
                     Ok(())

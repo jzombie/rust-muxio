@@ -115,9 +115,9 @@ impl<'a> RpcDispatcher<'a> {
                         ..
                     } => {
                         // Convert metadata to parameter bytes
-                        let param_bytes = match rpc_header.metadata_bytes.len() {
+                        let param_bytes = match rpc_header.rpc_metadata_bytes.len() {
                             0 => None,
-                            _ => Some(rpc_header.metadata_bytes),
+                            _ => Some(rpc_header.rpc_metadata_bytes),
                         };
 
                         let rpc_request = RpcRequest {
@@ -205,7 +205,7 @@ impl<'a> RpcDispatcher<'a> {
         self.next_rpc_request_id = increment_u32_id();
 
         // Convert parameter bytes to metadata
-        let metadata_bytes = match rpc_request.param_bytes {
+        let rpc_metadata_bytes = match rpc_request.param_bytes {
             Some(param_bytes) => param_bytes,
             None => vec![],
         };
@@ -214,7 +214,7 @@ impl<'a> RpcDispatcher<'a> {
             rpc_msg_type: RpcMessageType::Call,
             rpc_request_id,
             rpc_method_id,
-            metadata_bytes,
+            rpc_metadata_bytes,
         };
 
         // Directly pass the closure as `on_emit` without borrowing it
@@ -265,7 +265,7 @@ impl<'a> RpcDispatcher<'a> {
             rpc_method_id: rpc_response.method_id,
             // TODO: Be sure to document how this works (on responses, the only metadata sent
             // is the result status or nothing at all)
-            metadata_bytes: {
+            rpc_metadata_bytes: {
                 match rpc_response.result_status {
                     Some(result_status) => vec![result_status],
                     None => vec![],

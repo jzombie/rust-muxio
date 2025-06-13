@@ -65,7 +65,7 @@ fn rpc_stream_aborts_on_cancel_frame() {
         rpc_msg_type: RpcMessageType::Call,
         rpc_request_id: 42,
         rpc_method_id: 0x1234,
-        metadata_bytes: b"test metadata bytes".into(),
+        rpc_metadata_bytes: b"test metadata bytes".into(),
     };
 
     let decoder_error: RefCell<Option<FrameDecodeError>> = RefCell::new(None);
@@ -115,7 +115,7 @@ fn rpc_stream_aborts_on_end_frame() {
         rpc_msg_type: RpcMessageType::Call,
         rpc_request_id: 42,
         rpc_method_id: 0x1234,
-        metadata_bytes: b"test metadata bytes".into(),
+        rpc_metadata_bytes: b"test metadata bytes".into(),
     };
 
     let decoder_error: RefCell<Option<FrameDecodeError>> = RefCell::new(None);

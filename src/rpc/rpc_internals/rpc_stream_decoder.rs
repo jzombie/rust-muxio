@@ -95,7 +95,7 @@ impl RpcStreamDecoder {
                 }
 
                 // Now we can safely extract metadata
-                let metadata_bytes = self.buffer[RPC_FRAME_METADATA_LENGTH_OFFSET
+                let rpc_metadata_bytes = self.buffer[RPC_FRAME_METADATA_LENGTH_OFFSET
                     + RPC_FRAME_METADATA_LENGTH_SIZE
                     ..RPC_FRAME_METADATA_LENGTH_OFFSET + RPC_FRAME_METADATA_LENGTH_SIZE + meta_len]
                     .to_vec();
@@ -104,7 +104,7 @@ impl RpcStreamDecoder {
                     rpc_msg_type,
                     rpc_request_id,
                     rpc_method_id,
-                    metadata_bytes,
+                    rpc_metadata_bytes,
                 });
 
                 // Transition state to AwaitPayload after processing header

@@ -67,7 +67,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
             match evt {
                 RpcStreamEvent::Header { rpc_header, .. } => {
                     let result_status = rpc_header
-                        .metadata_bytes
+                        .rpc_metadata_bytes
                         .first()
                         .copied()
                         .and_then(|b| RpcResultStatus::try_from(b).ok())

@@ -28,14 +28,14 @@ where
         meta_buf.extend(&header.rpc_request_id.to_le_bytes());
         meta_buf.extend(&header.rpc_method_id.to_le_bytes());
 
-        let metadata_bytes = &header.metadata_bytes;
+        let rpc_metadata_bytes = &header.rpc_metadata_bytes;
 
         // Serialize metadata length (u16)
-        let meta_len = metadata_bytes.len() as u16;
+        let meta_len = rpc_metadata_bytes.len() as u16;
         meta_buf.extend(&meta_len.to_le_bytes());
 
         // Add metadata to the buffer
-        meta_buf.extend(metadata_bytes);
+        meta_buf.extend(rpc_metadata_bytes);
 
         encoder.write_bytes(&meta_buf)?;
 
