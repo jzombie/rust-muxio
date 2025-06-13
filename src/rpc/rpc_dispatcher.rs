@@ -159,14 +159,15 @@ impl<'a> RpcDispatcher<'a> {
                     }
 
                     RpcStreamEvent::Error {
+                        rpc_header,
                         rpc_request_id,
                         rpc_method_id,
                         frame_decode_error,
                     } => {
                         // TODO: Handle errors
                         println!(
-                            "Error in stream. Method: {:?} {:?}: {:?}",
-                            rpc_method_id, rpc_request_id, frame_decode_error
+                            "Error in stream. Method: {:?} {:?} {:?}: {:?}",
+                            rpc_method_id, rpc_header, rpc_request_id, frame_decode_error
                         );
                     }
                 }
