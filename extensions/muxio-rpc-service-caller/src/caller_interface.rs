@@ -1,9 +1,11 @@
-use super::with_dispatcher_trait::WithDispatcher;
+// FIX: Use `crate::` to refer to sibling modules within the same crate.
+use crate::{error::RpcCallerError, with_dispatcher_trait::WithDispatcher};
 use futures::StreamExt;
 use futures::channel::{mpsc, oneshot};
 use muxio::frame::FrameEncodeError;
 use muxio::rpc::{
     RpcRequest,
+    // FIX: Removed unused RpcHeader, corrected path for RpcEmit
     rpc_internals::{RpcStreamEncoder, RpcStreamEvent, rpc_trait::RpcEmit},
 };
 use muxio_rpc_service::RpcResultStatus;
@@ -14,44 +16,29 @@ use std::io;
 use std::sync::{Arc, Mutex};
 
 /// Defines a generic capability for making RPC calls.
-///
-/// Any struct that can provide an `RpcDispatcher` and an `on_emit` function
-/// (e.g., a client or a server acting as a client) can implement this trait
-/// to gain the ability to make outbound streaming and buffered RPC calls.
 #[async_trait::async_trait]
 pub trait RpcServiceCallerInterface: Send + Sync {
-    /// The specific Mutex type used to protect the dispatcher.
     type DispatcherLock: WithDispatcher;
 
-    // --- METHODS TO BE IMPLEMENTED BY THE STRUCT (e.g., RpcClient) ---
-
-    /// A required method that provides access to the shared dispatcher.
     fn get_dispatcher(&self) -> Arc<Self::DispatcherLock>;
-
-    /// A required method that provides the function for emitting raw bytes
-    /// over the underlying transport.
     fn get_emit_fn(&self) -> Arc<dyn Fn(Vec<u8>) + Send + Sync>;
 
-    // --- METHODS PROVIDED AUTOMATICALLY BY THE TRAIT ---
-
-    /// Performs a streaming RPC call.
-    /// This default method uses the required getters to orchestrate the call.
+    /// Performs a streaming RPC call, yielding a stream of success payloads or a terminal error.
     async fn call_rpc_streaming(
         &self,
-        rpc_method_id: u64,
-        rpc_param_bytes: &[u8], // TODO: Make this `Option` type
-        // TODO: Add `prebuffered_payload_bytes` (match `RpcDispatcher` in design)
+        method_id: u64,
+        param_bytes: &[u8],
         is_finalized: bool,
     ) -> Result<
         (
             RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>,
-            mpsc::Receiver<Result<Vec<u8>, Vec<u8>>>,
+            mpsc::Receiver<Result<Vec<u8>, RpcCallerError>>,
         ),
         io::Error,
     > {
-        // The channel now sends a Result where Err contains the error payload.
-        let (tx, rx) =
-            mpsc::channel::<Result<Vec<u8>, Vec<u8>>>(DEFAULT_RPC_STREAM_CHANNEL_BUFFER_SIZE);
+        let (tx, rx) = mpsc::channel::<Result<Vec<u8>, RpcCallerError>>(
+            DEFAULT_RPC_STREAM_CHANNEL_BUFFER_SIZE,
+        );
         let tx = Arc::new(Mutex::new(Some(tx)));
 
         let (ready_tx, ready_rx) = oneshot::channel::<Result<(), io::Error>>();
@@ -64,11 +51,16 @@ pub trait RpcServiceCallerInterface: Send + Sync {
             }
         });
 
-        // This closure is now stateful to handle error payloads correctly.
         let recv_fn: Box<dyn FnMut(RpcStreamEvent) + Send + 'static> = {
             let status = Arc::new(Mutex::new(None::<RpcResultStatus>));
+            let error_buffer = Arc::new(Mutex::new(Vec::new()));
 
             Box::new(move |evt| {
+                let mut tx_lock = tx.lock().expect("tx mutex poisoned");
+                let Some(sender) = tx_lock.as_mut() else {
+                    return;
+                };
+
                 match evt {
                     RpcStreamEvent::Header { rpc_header, .. } => {
                         let result_status = rpc_header
@@ -78,10 +70,9 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                             .and_then(|b| RpcResultStatus::try_from(b).ok())
                             .unwrap_or(RpcResultStatus::Success);
 
-                        *status.lock().unwrap() = Some(result_status);
+                        *status.lock().expect("status mutex poisoned") = Some(result_status);
 
-                        // Signal readiness unless there's a critical setup failure.
-                        if let Some(tx) = ready_tx.lock().unwrap().take() {
+                        if let Some(tx) = ready_tx.lock().expect("ready_tx mutex poisoned").take() {
                             if matches!(
                                 result_status,
                                 RpcResultStatus::SystemError | RpcResultStatus::MethodNotFound
@@ -90,31 +81,48 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                                     io::ErrorKind::Other,
                                     format!("RPC setup failed: {:?}", result_status),
                                 )));
+                                *tx_lock = None;
                             } else {
                                 let _ = tx.send(Ok(()));
                             }
                         }
                     }
                     RpcStreamEvent::PayloadChunk { bytes, .. } => {
-                        let current_status = status.lock().unwrap();
-                        if let Some(sender) = tx.lock().unwrap().as_mut() {
-                            // Check the status received in the header.
-                            match *current_status {
-                                Some(RpcResultStatus::Success) => {
-                                    let _ = sender.try_send(Ok(bytes));
-                                }
-                                // If the status was a failure, this payload is the error message.
-                                Some(RpcResultStatus::Fail) => {
-                                    let _ = sender.try_send(Err(bytes));
-                                }
-                                // Ignore payloads for other statuses like SystemError.
-                                _ => {}
+                        let current_status = status.lock().expect("status mutex poisoned");
+                        match *current_status {
+                            Some(RpcResultStatus::Success) => {
+                                let _ = sender.try_send(Ok(bytes));
                             }
+                            Some(_) => {
+                                error_buffer
+                                    .lock()
+                                    .expect("error buffer mutex poisoned")
+                                    .extend(bytes);
+                            }
+                            None => {}
                         }
                     }
                     RpcStreamEvent::End { .. } => {
-                        // Close the channel by dropping the sender.
-                        let _ = tx.lock().unwrap().take();
+                        let final_status = status.lock().expect("status mutex poisoned").take();
+                        let payload = std::mem::take(
+                            &mut *error_buffer.lock().expect("error buffer mutex poisoned"),
+                        );
+
+                        match final_status {
+                            Some(RpcResultStatus::Fail) => {
+                                let _ =
+                                    sender.try_send(Err(RpcCallerError::RemoteError { payload }));
+                            }
+                            Some(
+                                RpcResultStatus::SystemError | RpcResultStatus::MethodNotFound,
+                            ) => {
+                                let msg = String::from_utf8_lossy(&payload).to_string();
+                                let _ =
+                                    sender.try_send(Err(RpcCallerError::RemoteSystemError(msg)));
+                            }
+                            _ => {}
+                        }
+                        *tx_lock = None;
                     }
                     _ => {}
                 }
@@ -126,22 +134,20 @@ pub trait RpcServiceCallerInterface: Send + Sync {
             .with_dispatcher(|d| {
                 d.call(
                     RpcRequest {
-                        rpc_method_id,
-                        rpc_param_bytes: Some(rpc_param_bytes.to_vec()),
+                        rpc_method_id: method_id,
+                        rpc_param_bytes: Some(param_bytes.to_vec()),
                         rpc_prebuffered_payload_bytes: None,
                         is_finalized,
                     },
                     DEFAULT_SERVICE_MAX_CHUNK_SIZE,
                     send_fn,
                     Some(recv_fn),
-                    // Pre-buffering is now set to false to allow streaming of error payloads.
                     false,
                 )
             })
             .await
-            .map_err(|e: FrameEncodeError| {
-                io::Error::new(io::ErrorKind::Other, format!("Encode error: {e:?}"))
-            })?;
+            // FIX: Manually map the error to convert it to io::Error
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Encode error: {:?}", e)))?;
 
         match ready_rx.await {
             Ok(Ok(())) => Ok((encoder, rx)),
@@ -153,7 +159,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
         }
     }
 
-    /// Performs a buffered RPC call.
+    /// Performs a buffered RPC call that can resolve to a success value or a custom error.
     async fn call_rpc_buffered<T, F>(
         &self,
         method_id: u64,
@@ -163,7 +169,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
     ) -> Result<
         (
             RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>,
-            Result<T, Vec<u8>>, // The error type is now Vec<u8>
+            Result<T, RpcCallerError>,
         ),
         io::Error,
     >
@@ -176,20 +182,24 @@ pub trait RpcServiceCallerInterface: Send + Sync {
             .await?;
 
         let mut success_buf = Vec::new();
+        let mut err: Option<RpcCallerError> = None;
 
         while let Some(result) = stream.next().await {
             match result {
                 Ok(chunk) => {
                     success_buf.extend_from_slice(&chunk);
                 }
-                Err(error_payload) => {
-                    // If we receive an error payload, the call has failed. Return it immediately.
-                    return Ok((encoder, Err(error_payload)));
+                Err(e) => {
+                    err = Some(e);
+                    break;
                 }
             }
         }
 
-        // If the stream completes without an error, decode the success buffer.
-        Ok((encoder, Ok(decode(&success_buf))))
+        if let Some(e) = err {
+            Ok((encoder, Err(e)))
+        } else {
+            Ok((encoder, Ok(decode(&success_buf))))
+        }
     }
 }
