@@ -33,6 +33,7 @@ pub struct RpcDispatcher<'a> {
     /// Monotonic ID generator for outbound RPC request headers.
     next_rpc_request_id: u32,
 
+    // TODO: Rename to `rpc_inbound_request_queue`?
     /// Queue of currently active inbound responses from remote peers.
     ///
     /// Each entry is `(header_id, RpcRequest)` and is updated via stream
@@ -348,6 +349,7 @@ impl<'a> RpcDispatcher<'a> {
         }
     }
 
+    // TODO: Document this is for *inbound* requests
     /// Returns `true` if the request with `header_id` has received a
     /// complete stream (`End` event observed), or `None` if it is missing.
     pub fn is_rpc_request_finalized(&self, header_id: u32) -> Option<bool> {
