@@ -11,7 +11,7 @@ pub struct RpcHeader {
     /// For example:
     /// - For a call, this ID could represent the unique request ID.
     /// - For a response, this ID would match the request ID for which it is responding.
-    pub id: u32,
+    pub id: u32, // TODO: Rename to `request_id`
 
     /// The identifier (or hash) of the method being invoked in this RPC.
     ///

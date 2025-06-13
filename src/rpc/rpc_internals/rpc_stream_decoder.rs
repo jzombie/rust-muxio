@@ -10,7 +10,7 @@ use crate::{
 pub struct RpcStreamDecoder {
     state: RpcDecoderState,
     header: Option<RpcHeader>,
-    rpc_header_id: Option<u32>,
+    rpc_request_id: Option<u32>,
     rpc_method_id: Option<u64>,
     buffer: Vec<u8>,
     meta_len: usize,
@@ -27,15 +27,15 @@ impl RpcStreamDecoder {
         Self {
             state: RpcDecoderState::AwaitHeader,
             header: None,
-            rpc_header_id: None,
+            rpc_request_id: None,
             rpc_method_id: None,
             buffer: Vec::new(),
             meta_len: 0,
         }
     }
 
-    pub fn rpc_header_id(&self) -> Option<u32> {
-        self.rpc_header_id
+    pub fn rpc_request_id(&self) -> Option<u32> {
+        self.rpc_request_id
     }
 
     pub fn rpc_method_id(&self) -> Option<u64> {
@@ -114,11 +114,11 @@ impl RpcStreamDecoder {
                 );
 
                 let rpc_header = self.header.clone().ok_or(FrameDecodeError::CorruptFrame)?;
-                self.rpc_header_id = Some(rpc_header.id);
+                self.rpc_request_id = Some(rpc_header.id);
 
                 // Push the header event
                 events.push(RpcStreamEvent::Header {
-                    rpc_header_id: header_id,
+                    rpc_request_id: header_id,
                     rpc_method_id: method_id,
                     rpc_header,
                 });
@@ -126,7 +126,7 @@ impl RpcStreamDecoder {
                 // Continue processing payload if available
                 if !self.buffer.is_empty() {
                     events.push(RpcStreamEvent::PayloadChunk {
-                        rpc_header_id: header_id,
+                        rpc_request_id: header_id,
                         rpc_method_id: method_id,
                         bytes: self.buffer.split_off(0),
                     });
@@ -137,7 +137,9 @@ impl RpcStreamDecoder {
                 if frame.inner.kind == FrameKind::End {
                     self.state = RpcDecoderState::Done;
                     events.push(RpcStreamEvent::End {
-                        rpc_header_id: self.rpc_header_id.ok_or(FrameDecodeError::CorruptFrame)?,
+                        rpc_request_id: self
+                            .rpc_request_id
+                            .ok_or(FrameDecodeError::CorruptFrame)?,
                         rpc_method_id: self.rpc_method_id.ok_or(FrameDecodeError::CorruptFrame)?,
                     });
                 } else if frame.inner.kind == FrameKind::Cancel {
@@ -145,7 +147,9 @@ impl RpcStreamDecoder {
                 } else {
                     // If there's a payload chunk, append it to the events
                     events.push(RpcStreamEvent::PayloadChunk {
-                        rpc_header_id: self.rpc_header_id.ok_or(FrameDecodeError::CorruptFrame)?,
+                        rpc_request_id: self
+                            .rpc_request_id
+                            .ok_or(FrameDecodeError::CorruptFrame)?,
                         rpc_method_id: self.rpc_method_id.ok_or(FrameDecodeError::CorruptFrame)?,
                         bytes: frame.inner.payload.clone(),
                     });

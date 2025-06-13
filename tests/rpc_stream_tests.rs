@@ -17,7 +17,7 @@ fn rpc_parallel_streams_roundtrip() {
         server
             .read_bytes(bytes, |evt| match evt {
                 RpcStreamEvent::Header {
-                    rpc_header_id,
+                    rpc_request_id,
                     ref rpc_header,
                     ..
                 } => {
@@ -31,25 +31,25 @@ fn rpc_parallel_streams_roundtrip() {
                     }
 
                     assert!(
-                        rpc_header_id == rpc_header.id,
-                        "rpc_header_id should be rpc_header.id"
+                        rpc_request_id == rpc_header.id,
+                        "rpc_request_id should be rpc_header.id"
                     );
 
-                    decoded.entry(rpc_header_id).or_default().0 = Some(rpc_header.clone());
+                    decoded.entry(rpc_request_id).or_default().0 = Some(rpc_header.clone());
 
                     Ok(())
                 }
                 RpcStreamEvent::PayloadChunk {
-                    rpc_header_id,
+                    rpc_request_id,
                     bytes,
                     ..
                 } => {
-                    decoded.entry(rpc_header_id).or_default().1.extend(bytes);
+                    decoded.entry(rpc_request_id).or_default().1.extend(bytes);
 
                     Ok(())
                 }
-                RpcStreamEvent::End { rpc_header_id, .. } => {
-                    assert!(decoded.contains_key(&rpc_header_id));
+                RpcStreamEvent::End { rpc_request_id, .. } => {
+                    assert!(decoded.contains_key(&rpc_request_id));
 
                     Ok(())
                 }
@@ -210,20 +210,20 @@ fn rpc_stream_with_multiple_metadata_entries() {
         server
             .read_bytes(&chunk, |evt| match evt {
                 RpcStreamEvent::Header {
-                    rpc_header_id,
+                    rpc_request_id,
                     ref rpc_header,
                     ..
                 } => {
-                    decoded.entry(rpc_header_id).or_default().0 = Some(rpc_header.clone());
+                    decoded.entry(rpc_request_id).or_default().0 = Some(rpc_header.clone());
 
                     Ok(())
                 }
                 RpcStreamEvent::PayloadChunk {
-                    rpc_header_id,
+                    rpc_request_id,
                     bytes,
                     ..
                 } => {
-                    decoded.entry(rpc_header_id).or_default().1.extend(bytes);
+                    decoded.entry(rpc_request_id).or_default().1.extend(bytes);
 
                     Ok(())
                 }
@@ -347,20 +347,20 @@ fn rpc_complex_shuffled_stream() {
             server
                 .read_bytes(&chunk, |evt| match evt {
                     RpcStreamEvent::Header {
-                        rpc_header_id,
+                        rpc_request_id,
                         ref rpc_header,
                         ..
                     } => {
-                        decoded.entry(rpc_header_id).or_default().0 = Some(rpc_header.clone());
+                        decoded.entry(rpc_request_id).or_default().0 = Some(rpc_header.clone());
 
                         Ok(())
                     }
                     RpcStreamEvent::PayloadChunk {
-                        rpc_header_id,
+                        rpc_request_id,
                         bytes,
                         ..
                     } => {
-                        decoded.entry(rpc_header_id).or_default().1.extend(bytes);
+                        decoded.entry(rpc_request_id).or_default().1.extend(bytes);
 
                         Ok(())
                     }
@@ -473,7 +473,7 @@ fn rpc_session_bidirectional_roundtrip() {
         server
             .read_bytes(chunk, |evt| match evt {
                 RpcStreamEvent::Header {
-                    rpc_header_id: _,
+                    rpc_request_id: _,
                     rpc_header,
                     ..
                 } => {
@@ -483,7 +483,7 @@ fn rpc_session_bidirectional_roundtrip() {
                     Ok(())
                 }
                 RpcStreamEvent::PayloadChunk {
-                    rpc_header_id: _,
+                    rpc_request_id: _,
                     bytes,
                     ..
                 } => {
@@ -530,7 +530,7 @@ fn rpc_session_bidirectional_roundtrip() {
         client
             .read_bytes(chunk, |evt| match evt {
                 RpcStreamEvent::Header {
-                    rpc_header_id: _,
+                    rpc_request_id: _,
                     rpc_header,
                     ..
                 } => {
@@ -540,7 +540,7 @@ fn rpc_session_bidirectional_roundtrip() {
                     Ok(())
                 }
                 RpcStreamEvent::PayloadChunk {
-                    rpc_header_id: _,
+                    rpc_request_id: _,
                     bytes,
                     ..
                 } => {

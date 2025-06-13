@@ -39,7 +39,7 @@ fn rpc_respondable_session_stream_and_reply_roundtrip() {
                     RpcStreamEvent::PayloadChunk { bytes, .. } => {
                         recv_buf.lock().unwrap().extend(bytes);
                     }
-                    RpcStreamEvent::End { rpc_header_id, .. } => {
+                    RpcStreamEvent::End { rpc_request_id, .. } => {
                         let reply_bytes = match recv_buf.lock().unwrap().as_slice() {
                             b"ping" => b"pong".as_ref(),
                             _ => b"fail".as_ref(),
@@ -47,7 +47,7 @@ fn rpc_respondable_session_stream_and_reply_roundtrip() {
 
                         let reply_header = RpcHeader {
                             msg_type: RpcMessageType::Response,
-                            id: rpc_header_id,
+                            id: rpc_request_id,
                             method_id: 0xABCDABCDABCDABCD,
                             metadata_bytes: b"resp-meta".to_vec(),
                         };
@@ -74,16 +74,16 @@ fn rpc_respondable_session_stream_and_reply_roundtrip() {
                 |bytes| server_inbox.push(bytes.to_vec()),
                 Some(move |event| match event {
                     RpcStreamEvent::Header {
-                        rpc_header_id,
+                        rpc_request_id,
                         rpc_header,
                         ..
                     } => {
-                        assert_eq!(rpc_header_id, call_header.id);
+                        assert_eq!(rpc_request_id, call_header.id);
                         assert_eq!(rpc_header.msg_type, RpcMessageType::Response);
                         metadata_clone
                             .lock()
                             .unwrap()
-                            .insert(rpc_header_id, rpc_header.metadata_bytes);
+                            .insert(rpc_request_id, rpc_header.metadata_bytes);
                     }
                     RpcStreamEvent::PayloadChunk { bytes, .. } => {
                         payload_clone.lock().unwrap().extend(bytes);

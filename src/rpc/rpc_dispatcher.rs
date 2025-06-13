@@ -64,7 +64,7 @@ impl<'a> RpcDispatcher<'a> {
     /// Internal helper to register a global response event handler.
     ///
     /// This callback listens for all incoming response stream events and updates
-    /// the internal `rpc_request_queue` by `rpc_header_id`. It is installed as a
+    /// the internal `rpc_request_queue` by `rpc_request_id`. It is installed as a
     /// global fallback handler to track all incoming responses, even those without
     /// a dedicated handler.
     ///
@@ -110,7 +110,7 @@ impl<'a> RpcDispatcher<'a> {
                 // TODO: Delete from queue if request is canceled mid-flight
                 match event {
                     RpcStreamEvent::Header {
-                        rpc_header_id,
+                        rpc_request_id,
                         rpc_header,
                         ..
                     } => {
@@ -127,17 +127,17 @@ impl<'a> RpcDispatcher<'a> {
                             is_finalized: false,
                         };
 
-                        queue.push_back((rpc_header_id, rpc_request));
+                        queue.push_back((rpc_request_id, rpc_request));
                     }
 
                     RpcStreamEvent::PayloadChunk {
-                        rpc_header_id,
+                        rpc_request_id,
                         bytes,
                         ..
                     } => {
                         // Look for the existing RpcRequest in the queue and borrow it mutably
                         if let Some((_, rpc_request)) =
-                            queue.iter_mut().find(|(id, _)| *id == rpc_header_id)
+                            queue.iter_mut().find(|(id, _)| *id == rpc_request_id)
                         {
                             // Append bytes to the payload
                             let payload = rpc_request
@@ -147,10 +147,10 @@ impl<'a> RpcDispatcher<'a> {
                         }
                     }
 
-                    RpcStreamEvent::End { rpc_header_id, .. } => {
+                    RpcStreamEvent::End { rpc_request_id, .. } => {
                         // Finalize and process the full message when the stream ends
                         if let Some((_, rpc_request)) =
-                            queue.iter_mut().find(|(id, _)| *id == rpc_header_id)
+                            queue.iter_mut().find(|(id, _)| *id == rpc_request_id)
                         {
                             // Set the `is_finalized` flag to true when the stream ends
                             rpc_request.is_finalized = true;
@@ -158,14 +158,14 @@ impl<'a> RpcDispatcher<'a> {
                     }
 
                     RpcStreamEvent::Error {
-                        rpc_header_id,
+                        rpc_request_id,
                         rpc_method_id,
                         frame_decode_error,
                     } => {
                         // TODO: Handle errors
                         println!(
                             "Error in stream. Method: {:?} {:?}: {:?}",
-                            rpc_method_id, rpc_header_id, frame_decode_error
+                            rpc_method_id, rpc_request_id, frame_decode_error
                         );
                     }
                 }

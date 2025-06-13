@@ -84,7 +84,7 @@ fn rpc_dispatcher_call_and_echo_response() {
                     Some({
                         move |rpc_stream_event: RpcStreamEvent| match rpc_stream_event {
                             RpcStreamEvent::Header {
-                                rpc_header_id,
+                                rpc_request_id,
                                 rpc_header,
                                 rpc_method_id,
                             } => {
@@ -92,7 +92,7 @@ fn rpc_dispatcher_call_and_echo_response() {
                                 assert_eq!(rpc_method_id, method_id);
                                 println!(
                                     "Client received header: ID = {}, Header = {:?}",
-                                    rpc_header_id, rpc_header
+                                    rpc_request_id, rpc_header
                                 );
                             }
                             RpcStreamEvent::PayloadChunk {
