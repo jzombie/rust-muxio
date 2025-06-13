@@ -66,7 +66,7 @@ pub struct RpcResponse {
     /// Optional payload to return with the response.
     ///
     /// If set, this will be sent immediately as the response payload.
-    pub prebuffered_payload_bytes: Option<Vec<u8>>,
+    pub rpc_prebuffered_payload_bytes: Option<Vec<u8>>,
 
     /// Marks whether the response stream is complete.
     ///
@@ -98,7 +98,7 @@ impl RpcResponse {
                     _ => Some(rpc_header.rpc_metadata_bytes[0]),
                 }
             },
-            prebuffered_payload_bytes: None,
+            rpc_prebuffered_payload_bytes: None,
             is_finalized: false, // Hardcoded to false because it is currently non-determinable from the header alone
         }
     }

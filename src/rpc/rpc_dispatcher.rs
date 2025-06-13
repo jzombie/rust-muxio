@@ -279,8 +279,8 @@ impl<'a> RpcDispatcher<'a> {
             on_emit,
         )?;
 
-        if let Some(prebuffered_payload_bytes) = rpc_response.prebuffered_payload_bytes {
-            response_encoder.write_bytes(&prebuffered_payload_bytes)?;
+        if let Some(rpc_prebuffered_payload_bytes) = rpc_response.rpc_prebuffered_payload_bytes {
+            response_encoder.write_bytes(&rpc_prebuffered_payload_bytes)?;
         }
 
         if rpc_response.is_finalized {

@@ -155,9 +155,11 @@ fn dispatch_call_and_get_prebuffered_response<T: for<'a> Decode<'a>>(
                             rpc_request_id,
                             rpc_method_id,
                             rpc_result_status: Some(0),
-                            prebuffered_payload_bytes: Some(bitcode::encode(&AddResponseParams {
-                                result: request_params.numbers.iter().sum(),
-                            })),
+                            rpc_prebuffered_payload_bytes: Some(bitcode::encode(
+                                &AddResponseParams {
+                                    result: request_params.numbers.iter().sum(),
+                                },
+                            )),
                             is_finalized: true,
                         })
                     }
@@ -169,9 +171,11 @@ fn dispatch_call_and_get_prebuffered_response<T: for<'a> Decode<'a>>(
                             rpc_request_id,
                             rpc_method_id,
                             rpc_result_status: Some(0),
-                            prebuffered_payload_bytes: Some(bitcode::encode(&MultResponseParams {
-                                result: request_params.numbers.iter().product(),
-                            })),
+                            rpc_prebuffered_payload_bytes: Some(bitcode::encode(
+                                &MultResponseParams {
+                                    result: request_params.numbers.iter().product(),
+                                },
+                            )),
                             is_finalized: true,
                         })
                     }
