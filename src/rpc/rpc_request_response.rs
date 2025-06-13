@@ -19,7 +19,7 @@ pub struct RpcRequest {
     ///
     /// These are serialized function arguments and are transmitted in the
     /// `RpcHeader.metadata_bytes` field. If `None`, the metadata section is empty.
-    pub param_bytes: Option<Vec<u8>>,
+    pub rpc_param_bytes: Option<Vec<u8>>,
 
     /// Optional payload that should be sent immediately after the header.
     ///

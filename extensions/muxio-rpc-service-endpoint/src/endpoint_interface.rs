@@ -97,7 +97,7 @@ where
                     .with_handlers(|handlers| handlers.get(&rpc_request.rpc_method_id).cloned())
                     .await;
 
-                if let (Some(handler), Some(params)) = (handler, &rpc_request.param_bytes) {
+                if let (Some(handler), Some(params)) = (handler, &rpc_request.rpc_param_bytes) {
                     match handler(context_clone, params.clone()).await {
                         Ok(encoded) => RpcResponse {
                             rpc_request_id,

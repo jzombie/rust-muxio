@@ -39,7 +39,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
     async fn call_rpc_streaming(
         &self,
         rpc_method_id: u64,
-        param_bytes: &[u8], // TODO: Make this `Option` type
+        rpc_param_bytes: &[u8], // TODO: Make this `Option` type
         // TODO: Add `prebuffered_payload_bytes` (match `RpcDispatcher` in design)
         is_finalized: bool,
     ) -> Result<
@@ -110,7 +110,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                 d.call(
                     RpcRequest {
                         rpc_method_id,
-                        param_bytes: Some(param_bytes.to_vec()),
+                        rpc_param_bytes: Some(rpc_param_bytes.to_vec()),
                         prebuffered_payload_bytes: None, // TODO: Send, if attached
                         is_finalized,
                     },

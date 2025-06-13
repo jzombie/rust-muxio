@@ -115,14 +115,14 @@ impl<'a> RpcDispatcher<'a> {
                         ..
                     } => {
                         // Convert metadata to parameter bytes
-                        let param_bytes = match rpc_header.rpc_metadata_bytes.len() {
+                        let rpc_param_bytes = match rpc_header.rpc_metadata_bytes.len() {
                             0 => None,
                             _ => Some(rpc_header.rpc_metadata_bytes),
                         };
 
                         let rpc_request = RpcRequest {
                             rpc_method_id: rpc_header.rpc_method_id,
-                            param_bytes,
+                            rpc_param_bytes,
                             prebuffered_payload_bytes: None, // No payload yet
                             is_finalized: false,
                         };
@@ -205,7 +205,7 @@ impl<'a> RpcDispatcher<'a> {
         self.next_rpc_request_id = increment_u32_id();
 
         // Convert parameter bytes to metadata
-        let rpc_metadata_bytes = match rpc_request.param_bytes {
+        let rpc_metadata_bytes = match rpc_request.rpc_param_bytes {
             Some(param_bytes) => param_bytes,
             None => vec![],
         };

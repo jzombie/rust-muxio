@@ -39,7 +39,7 @@ fn rpc_dispatcher_call_and_echo_response() {
         // Prepare a mock RPC request
         let rpc_request_1 = RpcRequest {
             rpc_method_id: ADD_METHOD_ID,
-            param_bytes: Some(bitcode::encode(&AddRequestParams {
+            rpc_param_bytes: Some(bitcode::encode(&AddRequestParams {
                 numbers: vec![1.0, 2.0, 3.0],
             })),
             prebuffered_payload_bytes: None,
@@ -49,7 +49,7 @@ fn rpc_dispatcher_call_and_echo_response() {
         // Prepare a mock RPC request
         let rpc_request_2 = RpcRequest {
             rpc_method_id: MULT_METHOD_ID,
-            param_bytes: Some(bitcode::encode(&MultRequestParams {
+            rpc_param_bytes: Some(bitcode::encode(&MultRequestParams {
                 numbers: vec![4.0, 5.0, 6.0, 3.14],
             })),
             prebuffered_payload_bytes: None,
@@ -59,7 +59,7 @@ fn rpc_dispatcher_call_and_echo_response() {
         // Prepare a mock RPC request
         let rpc_request_3 = RpcRequest {
             rpc_method_id: MULT_METHOD_ID,
-            param_bytes: Some(bitcode::encode(&MultRequestParams {
+            rpc_param_bytes: Some(bitcode::encode(&MultRequestParams {
                 numbers: vec![10.0, 5.0, 6.0, 3.14],
             })),
             prebuffered_payload_bytes: None,
@@ -149,7 +149,7 @@ fn rpc_dispatcher_call_and_echo_response() {
                     let rpc_response = match rpc_request.rpc_method_id {
                         id if id == ADD_METHOD_ID => {
                             let request_params: AddRequestParams =
-                                bitcode::decode(&rpc_request.param_bytes.unwrap()).unwrap();
+                                bitcode::decode(&rpc_request.rpc_param_bytes.unwrap()).unwrap();
 
                             println!("Server received request params: {:?}", request_params);
 
@@ -168,7 +168,7 @@ fn rpc_dispatcher_call_and_echo_response() {
 
                         id if id == MULT_METHOD_ID => {
                             let request_params: MultRequestParams =
-                                bitcode::decode(&rpc_request.param_bytes.unwrap()).unwrap();
+                                bitcode::decode(&rpc_request.rpc_param_bytes.unwrap()).unwrap();
 
                             println!("Server received request params: {:?}", request_params);
 
