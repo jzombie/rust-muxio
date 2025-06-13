@@ -147,7 +147,7 @@ fn rpc_dispatcher_call_and_echo_response() {
                     println!("\t{:?}: {:?}", rpc_request_id, rpc_request);
 
                     let rpc_response = match rpc_request.rpc_method_id {
-                        id if id == ADD_METHOD_ID => {
+                        rpc_method_id if rpc_method_id == ADD_METHOD_ID => {
                             let request_params: AddRequestParams =
                                 bitcode::decode(&rpc_request.rpc_param_bytes.unwrap()).unwrap();
 
@@ -159,14 +159,14 @@ fn rpc_dispatcher_call_and_echo_response() {
 
                             Some(RpcResponse {
                                 rpc_request_id,
-                                method_id: rpc_request.rpc_method_id,
+                                rpc_method_id: rpc_request.rpc_method_id,
                                 result_status: Some(0),
                                 prebuffered_payload_bytes: Some(response_bytes),
                                 is_finalized: true,
                             })
                         }
 
-                        id if id == MULT_METHOD_ID => {
+                        rpc_method_id if rpc_method_id == MULT_METHOD_ID => {
                             let request_params: MultRequestParams =
                                 bitcode::decode(&rpc_request.rpc_param_bytes.unwrap()).unwrap();
 
@@ -178,7 +178,7 @@ fn rpc_dispatcher_call_and_echo_response() {
 
                             Some(RpcResponse {
                                 rpc_request_id,
-                                method_id: rpc_request.rpc_method_id,
+                                rpc_method_id: rpc_request.rpc_method_id,
                                 result_status: Some(0),
                                 prebuffered_payload_bytes: Some(response_bytes),
                                 is_finalized: true,

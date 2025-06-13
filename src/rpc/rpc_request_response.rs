@@ -52,7 +52,7 @@ pub struct RpcResponse {
     /// Note: While the internal routing mechanism relies on the header ID to correlate
     /// responses, user-defined services may still benefit from retaining the method ID to
     /// dispatch or verify responses against known handlers.
-    pub method_id: u64,
+    pub rpc_method_id: u64,
 
     /// Optional result status byte (e.g., success/fail/system error).
     ///
@@ -91,7 +91,7 @@ impl RpcResponse {
     pub fn from_rpc_header(rpc_header: &RpcHeader) -> RpcResponse {
         RpcResponse {
             rpc_request_id: rpc_header.rpc_request_id,
-            method_id: rpc_header.rpc_method_id,
+            rpc_method_id: rpc_header.rpc_method_id,
             result_status: {
                 match rpc_header.rpc_metadata_bytes.len() {
                     0 => None,

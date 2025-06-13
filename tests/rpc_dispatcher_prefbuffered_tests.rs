@@ -147,13 +147,13 @@ fn dispatch_call_and_get_prebuffered_response<T: for<'a> Decode<'a>>(
 
             if let Some(rpc_request) = rpc_request {
                 let rpc_response = match rpc_request.rpc_method_id {
-                    id if id == ADD_METHOD_ID => {
+                    rpc_method_id if rpc_method_id == ADD_METHOD_ID => {
                         let request_params: AddRequestParams =
                             bitcode::decode(&rpc_request.rpc_param_bytes.unwrap()).unwrap();
 
                         Some(RpcResponse {
                             rpc_request_id,
-                            method_id: id,
+                            rpc_method_id,
                             result_status: Some(0),
                             prebuffered_payload_bytes: Some(bitcode::encode(&AddResponseParams {
                                 result: request_params.numbers.iter().sum(),
@@ -161,13 +161,13 @@ fn dispatch_call_and_get_prebuffered_response<T: for<'a> Decode<'a>>(
                             is_finalized: true,
                         })
                     }
-                    id if id == MULT_METHOD_ID => {
+                    rpc_method_id if rpc_method_id == MULT_METHOD_ID => {
                         let request_params: MultRequestParams =
                             bitcode::decode(&rpc_request.rpc_param_bytes.unwrap()).unwrap();
 
                         Some(RpcResponse {
                             rpc_request_id,
-                            method_id: id,
+                            rpc_method_id,
                             result_status: Some(0),
                             prebuffered_payload_bytes: Some(bitcode::encode(&MultResponseParams {
                                 result: request_params.numbers.iter().product(),

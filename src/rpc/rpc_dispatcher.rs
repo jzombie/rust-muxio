@@ -262,7 +262,7 @@ impl<'a> RpcDispatcher<'a> {
         let rpc_response_header = RpcHeader {
             rpc_request_id: rpc_response.rpc_request_id,
             rpc_msg_type: RpcMessageType::Response,
-            rpc_method_id: rpc_response.method_id,
+            rpc_method_id: rpc_response.rpc_method_id,
             // TODO: Be sure to document how this works (on responses, the only metadata sent
             // is the result status or nothing at all)
             rpc_metadata_bytes: {
