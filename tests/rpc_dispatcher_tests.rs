@@ -69,8 +69,6 @@ fn rpc_dispatcher_call_and_echo_response() {
         let rpc_requests = vec![rpc_request_1, rpc_request_2, rpc_request_3];
 
         for rpc_request in rpc_requests {
-            let rpc_method_id = rpc_request.rpc_method_id;
-
             client_dispatcher
                 .call(
                     rpc_request,
@@ -89,7 +87,6 @@ fn rpc_dispatcher_call_and_echo_response() {
                                 rpc_method_id,
                             } => {
                                 assert_eq!(rpc_header.rpc_method_id, rpc_method_id);
-                                assert_eq!(rpc_method_id, rpc_method_id);
                                 println!(
                                     "Client received header: ID = {}, Header = {:?}",
                                     rpc_request_id, rpc_header
