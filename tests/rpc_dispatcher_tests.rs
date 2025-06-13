@@ -42,7 +42,7 @@ fn rpc_dispatcher_call_and_echo_response() {
             rpc_param_bytes: Some(bitcode::encode(&AddRequestParams {
                 numbers: vec![1.0, 2.0, 3.0],
             })),
-            prebuffered_payload_bytes: None,
+            rpc_prebuffered_payload_bytes: None,
             is_finalized: true,
         };
 
@@ -52,7 +52,7 @@ fn rpc_dispatcher_call_and_echo_response() {
             rpc_param_bytes: Some(bitcode::encode(&MultRequestParams {
                 numbers: vec![4.0, 5.0, 6.0, 3.14],
             })),
-            prebuffered_payload_bytes: None,
+            rpc_prebuffered_payload_bytes: None,
             is_finalized: true,
         };
 
@@ -62,7 +62,7 @@ fn rpc_dispatcher_call_and_echo_response() {
             rpc_param_bytes: Some(bitcode::encode(&MultRequestParams {
                 numbers: vec![10.0, 5.0, 6.0, 3.14],
             })),
-            prebuffered_payload_bytes: None,
+            rpc_prebuffered_payload_bytes: None,
             is_finalized: true,
         };
 

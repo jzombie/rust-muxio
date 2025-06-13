@@ -123,7 +123,7 @@ impl<'a> RpcDispatcher<'a> {
                         let rpc_request = RpcRequest {
                             rpc_method_id: rpc_header.rpc_method_id,
                             rpc_param_bytes,
-                            prebuffered_payload_bytes: None, // No payload yet
+                            rpc_prebuffered_payload_bytes: None, // No payload yet
                             is_finalized: false,
                         };
 
@@ -141,7 +141,7 @@ impl<'a> RpcDispatcher<'a> {
                         {
                             // Append bytes to the payload
                             let payload = rpc_request
-                                .prebuffered_payload_bytes
+                                .rpc_prebuffered_payload_bytes
                                 .get_or_insert_with(Vec::new);
                             payload.extend_from_slice(&bytes);
                         }
@@ -227,7 +227,7 @@ impl<'a> RpcDispatcher<'a> {
         )?;
 
         // If the RPC request has a buffered payload, send it here
-        if let Some(prebuffered_payload_bytes) = rpc_request.prebuffered_payload_bytes {
+        if let Some(prebuffered_payload_bytes) = rpc_request.rpc_prebuffered_payload_bytes {
             encoder.write_bytes(&prebuffered_payload_bytes)?;
         }
 

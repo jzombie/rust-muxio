@@ -88,7 +88,7 @@ fn encode_request(rpc_method_id: u64, rpc_param_bytes: Vec<u8>) -> RpcRequest {
     RpcRequest {
         rpc_method_id,
         rpc_param_bytes: Some(rpc_param_bytes),
-        prebuffered_payload_bytes: None,
+        rpc_prebuffered_payload_bytes: None,
         is_finalized: true,
     }
 }

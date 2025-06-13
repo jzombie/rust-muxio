@@ -25,7 +25,7 @@ pub struct RpcRequest {
     ///
     /// This is useful for single-frame RPCs where the entire message (metadata
     /// and payload) is known up front. If provided, it is sent during `call()`.
-    pub prebuffered_payload_bytes: Option<Vec<u8>>,
+    pub rpc_prebuffered_payload_bytes: Option<Vec<u8>>,
 
     /// Indicates whether the request is fully formed and no more payload is expected.
     ///
