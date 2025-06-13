@@ -61,7 +61,7 @@ pub struct RpcResponse {
     ///
     /// Note: Muxio's core library does not enforce any meaning behind any result status,
     /// though by convention, 0 represents success.
-    pub result_status: Option<u8>,
+    pub rpc_result_status: Option<u8>,
 
     /// Optional payload to return with the response.
     ///
@@ -92,7 +92,7 @@ impl RpcResponse {
         RpcResponse {
             rpc_request_id: rpc_header.rpc_request_id,
             rpc_method_id: rpc_header.rpc_method_id,
-            result_status: {
+            rpc_result_status: {
                 match rpc_header.rpc_metadata_bytes.len() {
                     0 => None,
                     _ => Some(rpc_header.rpc_metadata_bytes[0]),

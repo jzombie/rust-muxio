@@ -266,8 +266,8 @@ impl<'a> RpcDispatcher<'a> {
             // TODO: Be sure to document how this works (on responses, the only metadata sent
             // is the result status or nothing at all)
             rpc_metadata_bytes: {
-                match rpc_response.result_status {
-                    Some(result_status) => vec![result_status],
+                match rpc_response.rpc_result_status {
+                    Some(rpc_result_status) => vec![rpc_result_status],
                     None => vec![],
                 }
             },

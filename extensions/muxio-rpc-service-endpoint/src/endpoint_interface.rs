@@ -102,7 +102,7 @@ where
                         Ok(encoded) => RpcResponse {
                             rpc_request_id,
                             rpc_method_id: rpc_request.rpc_method_id,
-                            result_status: Some(RpcResultStatus::Success.into()),
+                            rpc_result_status: Some(RpcResultStatus::Success.into()),
                             prebuffered_payload_bytes: Some(encoded),
                             is_finalized: true,
                         },
@@ -114,7 +114,7 @@ where
                             RpcResponse {
                                 rpc_request_id,
                                 rpc_method_id: rpc_request.rpc_method_id,
-                                result_status: Some(RpcResultStatus::SystemError.into()),
+                                rpc_result_status: Some(RpcResultStatus::SystemError.into()),
                                 prebuffered_payload_bytes: Some(e.to_string().into_bytes()),
                                 is_finalized: true,
                             }
@@ -124,7 +124,7 @@ where
                     RpcResponse {
                         rpc_request_id,
                         rpc_method_id: rpc_request.rpc_method_id,
-                        result_status: Some(RpcResultStatus::MethodNotFound.into()),
+                        rpc_result_status: Some(RpcResultStatus::MethodNotFound.into()),
                         prebuffered_payload_bytes: None,
                         is_finalized: true,
                     }
