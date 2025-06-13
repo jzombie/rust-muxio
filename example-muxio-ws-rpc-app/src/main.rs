@@ -1,4 +1,6 @@
+// TODO: Migrate to example service definition package
 use example_muxio_ws_rpc_app::service_definition::prebuffered::{Add, Mult};
+
 use muxio_rpc_service::prebuffered::RpcMethodPrebuffered;
 use muxio_rpc_service_caller::prebuffered::RpcCallPrebuffered;
 use muxio_tokio_rpc_client::RpcClient;
@@ -19,13 +21,13 @@ async fn main() {
         // Register server method
         // Note: If not using `join!`, each `register` call must be awaited.
         let _ = join!(
-            server.register_prebuffered(Add::METHOD_ID, |bytes| async move {
+            server.register_prebuffered(Add::METHOD_ID, |_, bytes| async move {
                 let req = Add::decode_request(&bytes)?;
                 let result = req.iter().sum();
                 let resp = Add::encode_response(result)?;
                 Ok(resp)
             }),
-            server.register_prebuffered(Mult::METHOD_ID, |bytes| async move {
+            server.register_prebuffered(Mult::METHOD_ID, |_, bytes| async move {
                 let req = Mult::decode_request(&bytes)?;
                 let result = req.iter().product();
                 let resp = Mult::encode_response(result)?;

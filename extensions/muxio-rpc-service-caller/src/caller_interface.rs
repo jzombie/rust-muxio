@@ -49,7 +49,6 @@ pub trait RpcServiceCallerInterface: Send + Sync {
         ),
         io::Error,
     > {
-        // The logic from the old helper function now lives here.
         let (tx, rx) = mpsc::channel::<Vec<u8>>(DEFAULT_RPC_STREAM_CHANNEL_BUFFER_SIZE);
         let tx = Arc::new(std::sync::Mutex::new(Some(tx)));
 
@@ -65,7 +64,6 @@ pub trait RpcServiceCallerInterface: Send + Sync {
         });
 
         let recv_fn: Box<dyn FnMut(RpcStreamEvent) + Send + 'static> = Box::new(move |evt| {
-            /* ... exact same recv_fn logic as before ... */
             match evt {
                 RpcStreamEvent::Header { rpc_header, .. } => {
                     let result_status = rpc_header
@@ -83,8 +81,10 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                                 format!("RPC failed: {:?}", result_status),
                             )));
                         }
+                        // TODO: Don't use `unwrap`
                         let _ = tx.lock().unwrap().take();
                     } else {
+                        // TODO: Don't use `unwrap`
                         let _ = ready_tx.lock().unwrap().take().map(|t| t.send(Ok(())));
                     }
                 }
@@ -98,7 +98,9 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                     // TODO: Don't use `unwrap`
                     let _ = tx.lock().unwrap().take();
                 }
-                _ => {}
+                _ => {
+                    // TODO: Handle unmatched condition?
+                }
             }
         });
 

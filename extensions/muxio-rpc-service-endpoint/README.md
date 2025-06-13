@@ -31,9 +31,9 @@ Here is a typical workflow for using the `RpcServiceEndpoint` in a server contex
 
 ```rust
 use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface};
-use std::sync::Arc;
-use tokio::sync::mpsc;
+use std::sync::{Arc, mpsc};
 
+// TODO: Migrate to example service definition package
 // Assume `Add` is a defined RPC method structure.
 use service_definition::math::Add; 
 
