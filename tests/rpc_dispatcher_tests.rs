@@ -88,7 +88,7 @@ fn rpc_dispatcher_call_and_echo_response() {
                                 rpc_header,
                                 rpc_method_id,
                             } => {
-                                assert_eq!(rpc_header.method_id, method_id);
+                                assert_eq!(rpc_header.rpc_method_id, method_id);
                                 assert_eq!(rpc_method_id, method_id);
                                 println!(
                                     "Client received header: ID = {}, Header = {:?}",

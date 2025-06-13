@@ -91,7 +91,7 @@ impl RpcResponse {
     pub fn from_rpc_header(rpc_header: &RpcHeader) -> RpcResponse {
         RpcResponse {
             rpc_request_id: rpc_header.rpc_request_id,
-            method_id: rpc_header.method_id,
+            method_id: rpc_header.rpc_method_id,
             result_status: {
                 match rpc_header.metadata_bytes.len() {
                     0 => None,

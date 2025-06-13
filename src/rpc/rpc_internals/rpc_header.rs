@@ -18,7 +18,7 @@ pub struct RpcHeader {
     ///
     /// This field helps to identify which method is being called in the remote procedure.
     /// It's often hashed to ensure uniqueness and prevent collisions in method names.
-    pub method_id: u64, // TODO: Rename to `method_hash`?
+    pub rpc_method_id: u64, // TODO: Rename to `method_hash`?
 
     // TODO: Document; Schemaless metadata
     pub metadata_bytes: Vec<u8>,

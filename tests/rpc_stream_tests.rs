@@ -62,14 +62,14 @@ fn rpc_parallel_streams_roundtrip() {
     let hdr1 = RpcHeader {
         rpc_msg_type: RpcMessageType::Call,
         rpc_request_id: 1,
-        method_id: 0xaaaabbbbccccdddd,
+        rpc_method_id: 0xaaaabbbbccccdddd,
         // metadata: [("x".into(), "1".into())].into(),
         metadata_bytes: b"message 1 metadata".into(),
     };
     let hdr2 = RpcHeader {
         rpc_msg_type: RpcMessageType::Call,
         rpc_request_id: 2,
-        method_id: 0x1111222233334444,
+        rpc_method_id: 0x1111222233334444,
         // metadata: [("y".into(), "2".into())].into(),
         metadata_bytes: b"message 2 metadata".into(),
     };
@@ -126,7 +126,7 @@ fn rpc_parallel_streams_roundtrip() {
     enc2.flush().expect("enc2 flush failed");
     enc2.end_stream().expect("enc2 end stream failed");
 
-    // Validate `metadata`` integrity
+    // Validate `metadata` integrity
     assert_eq!(
         decoded.get(&1).unwrap().0.as_ref().unwrap().metadata_bytes,
         b"message 1 metadata"
@@ -138,11 +138,11 @@ fn rpc_parallel_streams_roundtrip() {
 
     // Validate `method_id` integrity
     assert_eq!(
-        decoded.get(&1).unwrap().0.as_ref().unwrap().method_id,
+        decoded.get(&1).unwrap().0.as_ref().unwrap().rpc_method_id,
         0xaaaabbbbccccdddd
     );
     assert_eq!(
-        decoded.get(&2).unwrap().0.as_ref().unwrap().method_id,
+        decoded.get(&2).unwrap().0.as_ref().unwrap().rpc_method_id,
         0x1111222233334444
     );
 
@@ -187,7 +187,7 @@ fn rpc_stream_with_multiple_metadata_entries() {
     let hdr = RpcHeader {
         rpc_msg_type: RpcMessageType::Call,
         rpc_request_id: 1,
-        method_id: 0x1234,
+        rpc_method_id: 0x1234,
         metadata_bytes,
     };
 
@@ -288,7 +288,7 @@ fn rpc_complex_shuffled_stream() {
     let hdr_1 = RpcHeader {
         rpc_msg_type: RpcMessageType::Call,
         rpc_request_id: 1,
-        method_id: 0x1234,
+        rpc_method_id: 0x1234,
         metadata_bytes: metadata_bytes_1,
     };
 
@@ -307,7 +307,7 @@ fn rpc_complex_shuffled_stream() {
     let hdr_2 = RpcHeader {
         rpc_msg_type: RpcMessageType::Event,
         rpc_request_id: 2,
-        method_id: 0x5678,
+        rpc_method_id: 0x5678,
         metadata_bytes: metadata_bytes_2,
     };
 
@@ -399,11 +399,11 @@ fn rpc_complex_shuffled_stream() {
         );
 
         assert_eq!(
-            decoded.get(&1).unwrap().0.as_ref().unwrap().method_id,
+            decoded.get(&1).unwrap().0.as_ref().unwrap().rpc_method_id,
             0x1234
         );
         assert_eq!(
-            decoded.get(&2).unwrap().0.as_ref().unwrap().method_id,
+            decoded.get(&2).unwrap().0.as_ref().unwrap().rpc_method_id,
             0x5678
         );
 
@@ -453,7 +453,7 @@ fn rpc_session_bidirectional_roundtrip() {
     let hdr = RpcHeader {
         rpc_msg_type: RpcMessageType::Call,
         rpc_request_id: 42,
-        method_id: 0x123,
+        rpc_method_id: 0x123,
         metadata_bytes: b"foo-bar".to_vec(),
     };
 
@@ -510,7 +510,7 @@ fn rpc_session_bidirectional_roundtrip() {
     let reply_hdr = RpcHeader {
         rpc_msg_type: RpcMessageType::Response,
         rpc_request_id: hdr.rpc_request_id,
-        method_id: hdr.method_id,
+        rpc_method_id: hdr.rpc_method_id,
         metadata_bytes: b"baz-qux".to_vec(),
     };
 

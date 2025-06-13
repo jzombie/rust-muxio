@@ -70,12 +70,14 @@ impl RpcStreamDecoder {
                         .map_err(|_| FrameDecodeError::CorruptFrame)?,
                 );
 
-                let method_id = u64::from_le_bytes(
+                let rpc_method_id = u64::from_le_bytes(
                     self.buffer[RPC_FRAME_METHOD_ID_OFFSET..RPC_FRAME_METADATA_LENGTH_OFFSET]
                         .try_into()
                         .map_err(|_| FrameDecodeError::CorruptFrame)?,
                 );
-                self.rpc_method_id = Some(method_id);
+
+                // Convert to `Option` type
+                self.rpc_method_id = Some(rpc_method_id);
 
                 // Read the metadata length and check if we have enough data
                 let meta_len = u16::from_le_bytes(
@@ -101,7 +103,7 @@ impl RpcStreamDecoder {
                 self.header = Some(RpcHeader {
                     rpc_msg_type,
                     rpc_request_id,
-                    method_id,
+                    rpc_method_id,
                     metadata_bytes,
                 });
 
@@ -119,7 +121,7 @@ impl RpcStreamDecoder {
                 // Push the header event
                 events.push(RpcStreamEvent::Header {
                     rpc_request_id,
-                    rpc_method_id: method_id,
+                    rpc_method_id,
                     rpc_header,
                 });
 
@@ -127,7 +129,7 @@ impl RpcStreamDecoder {
                 if !self.buffer.is_empty() {
                     events.push(RpcStreamEvent::PayloadChunk {
                         rpc_request_id,
-                        rpc_method_id: method_id,
+                        rpc_method_id,
                         bytes: self.buffer.split_off(0),
                     });
                 }

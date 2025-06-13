@@ -20,7 +20,7 @@ fn rpc_respondable_session_stream_and_reply_roundtrip() {
         let call_header = RpcHeader {
             rpc_msg_type: RpcMessageType::Call,
             rpc_request_id: 1,
-            method_id: 0xABCDABCDABCDABCD,
+            rpc_method_id: 0xABCDABCDABCDABCD,
             metadata_bytes: b"req-meta".to_vec(),
         };
 
@@ -48,7 +48,7 @@ fn rpc_respondable_session_stream_and_reply_roundtrip() {
                         let reply_header = RpcHeader {
                             rpc_msg_type: RpcMessageType::Response,
                             rpc_request_id,
-                            method_id: 0xABCDABCDABCDABCD,
+                            rpc_method_id: 0xABCDABCDABCDABCD,
                             metadata_bytes: b"resp-meta".to_vec(),
                         };
 
