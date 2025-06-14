@@ -11,6 +11,12 @@ use crate::utils::increment_u32_id;
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
+impl<'a> Default for RpcDispatcher<'a> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Manages RPC request dispatching and response handling over a framed transport.
 ///
 /// `RpcDispatcher` serves as a runtime coordinator for encoding outbound

@@ -6,6 +6,12 @@ use crate::{
 };
 use std::collections::HashMap;
 
+impl Default for RpcSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Low-level stream multiplexing engine for RPC.
 ///
 /// This struct manages the allocation of stream IDs, the decoding of framed

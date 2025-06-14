@@ -1,0 +1,27 @@
+name: Rust Lint
+on: [push, pull_request]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+
+      # Check formatting
+      - run: cargo fmt --all -- --check
+
+      # Run Clippy with warnings treated as errors
+      - run: cargo clippy --all-targets --all-features -- -D warnings
+
+      # Fail on documentation warnings
+      - run: RUSTDOCFLAGS="-Dwarnings" cargo doc --no-deps --document-private-items
+
+      # Install cargo-deny and check for security issues
+      - name: Install cargo-deny
+        run: cargo install cargo-deny
+      - run: cargo deny check
+
+      # Install and run cargo-audit for security vulnerabilities
+      - run: cargo install cargo-audit
+      - run: cargo audit

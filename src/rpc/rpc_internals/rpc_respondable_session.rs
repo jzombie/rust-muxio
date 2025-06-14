@@ -5,6 +5,12 @@ use crate::rpc::rpc_internals::{
 };
 use std::collections::HashMap;
 
+impl<'a> Default for RpcRespondableSession<'a> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Lightweight wrapper over `RpcSession` that tracks response handlers.
 ///
 /// This struct allows the caller to associate a response callback per
@@ -148,11 +154,9 @@ impl<'a> RpcRespondableSession<'a> {
                             tracing::error!("Unknown `RpcStreamEvent`");
                         }
                     };
-                } else {
-                    if let Some(cb) = self.response_handlers.get_mut(&rpc_id) {
-                        cb(evt.clone());
-                        handled = true;
-                    }
+                } else if let Some(cb) = self.response_handlers.get_mut(&rpc_id) {
+                    cb(evt.clone());
+                    handled = true;
                 }
 
                 if matches!(
