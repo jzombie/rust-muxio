@@ -13,6 +13,7 @@ muxio-rpc-service-caller = { path = "../muxio-rpc-service-caller" }
 
 # Optional dependencies
 tokio = { version = "1.45.1", features = ["sync"], optional = true }
+tracing = "0.1.41"
 
 [features]
 default = []
