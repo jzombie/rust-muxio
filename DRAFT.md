@@ -27,7 +27,7 @@ TODO: Use `tracing` for logging: tracing = { version = "x", default-features = f
 ## Test Coverage 
 
 ```sh
-cargo llvm-cov --summary-only
+cargo llvm-cov --summary-only --workspace
 ```
 
 ## Graph Modules
