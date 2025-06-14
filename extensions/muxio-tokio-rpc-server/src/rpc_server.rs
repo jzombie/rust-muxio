@@ -29,6 +29,12 @@ pub struct RpcServer {
     endpoint: Arc<RpcServiceEndpoint<WsSenderContext>>,
 }
 
+impl Default for RpcServer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RpcServer {
     /// Creates a new RpcServer instance with no routes started.
     pub fn new() -> Self {

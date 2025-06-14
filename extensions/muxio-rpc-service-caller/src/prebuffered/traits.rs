@@ -45,7 +45,7 @@ where
                     // For other errors (like system errors or I/O issues), just use their string representation.
                     _ => rpc_error.to_string(),
                 };
-                Err(io::Error::new(io::ErrorKind::Other, error_message))
+                Err(io::Error::other(error_message))
             }
         }
     }

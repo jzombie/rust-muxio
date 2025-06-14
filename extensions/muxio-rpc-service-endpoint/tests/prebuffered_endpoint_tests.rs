@@ -5,7 +5,6 @@ use muxio_rpc_service_endpoint::{
     error::{HandlerPayloadError, RpcServiceEndpointError},
 };
 use std::sync::{Arc, Mutex};
-use tokio;
 
 /// A helper that simulates a full client -> server -> client RPC roundtrip.
 /// It returns the final processed RpcRequest (which represents the response) from the
