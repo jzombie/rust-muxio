@@ -1,4 +1,4 @@
-use example_muxio_service_definition::prebuffered::{Add, Mult};
+use example_muxio_rpc_service_definition::prebuffered::{Add, Mult};
 
 use muxio_rpc_service::prebuffered::RpcMethodPrebuffered;
 use muxio_rpc_service_caller::prebuffered::RpcCallPrebuffered;

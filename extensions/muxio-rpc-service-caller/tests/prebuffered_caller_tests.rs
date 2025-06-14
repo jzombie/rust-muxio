@@ -1,4 +1,4 @@
-use example_muxio_service_definition::prebuffered::Echo;
+use example_muxio_rpc_service_definition::prebuffered::Echo;
 use futures::channel::mpsc;
 use muxio::rpc::rpc_internals::{RpcHeader, RpcMessageType, RpcStreamEncoder, rpc_trait::RpcEmit};
 use muxio_rpc_service::prebuffered::RpcMethodPrebuffered;
