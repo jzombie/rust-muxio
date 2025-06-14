@@ -13,12 +13,14 @@ use std::{
 
 // --- Test Setup: Mock Implementations ---
 
+type SharedResponseSender = Arc<Mutex<Option<mpsc::Sender<Result<Vec<u8>, RpcCallerError>>>>>;
+
 /// A mock client that allows us to inject specific stream responses for testing.
 #[derive(Clone)]
 struct MockRpcClient {
     /// A shared structure to allow the test harness to provide the sender half of the
     /// mpsc channel to the mock implementation after it's been created.
-    response_sender_provider: Arc<Mutex<Option<mpsc::Sender<Result<Vec<u8>, RpcCallerError>>>>>,
+    response_sender_provider: SharedResponseSender,
 }
 
 // Create a newtype wrapper around `Mutex<()>` to satisfy the orphan rule.
