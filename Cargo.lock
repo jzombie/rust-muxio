@@ -417,12 +417,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
 
 [[package]]
+name = "example-muxio-service-definition"
+version = "0.1.0"
+dependencies = [
+ "bitcode",
+ "muxio-rpc-service",
+]
+
+[[package]]
 name = "example-muxio-ws-rpc-app"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "bitcode",
  "criterion",
+ "example-muxio-service-definition",
  "futures",
  "muxio",
  "muxio-rpc-service",
