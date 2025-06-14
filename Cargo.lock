@@ -830,6 +830,7 @@ name = "muxio-rpc-service-caller"
 version = "0.1.0-alpha"
 dependencies = [
  "async-trait",
+ "example-muxio-service-definition",
  "futures",
  "muxio",
  "muxio-rpc-service",

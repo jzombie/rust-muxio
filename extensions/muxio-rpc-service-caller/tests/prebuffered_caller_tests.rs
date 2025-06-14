@@ -1,3 +1,4 @@
+use example_muxio_service_definition::prebuffered::Echo;
 use futures::channel::mpsc;
 use muxio::rpc::rpc_internals::{RpcHeader, RpcMessageType, RpcStreamEncoder, rpc_trait::RpcEmit};
 use muxio_rpc_service::prebuffered::RpcMethodPrebuffered;
@@ -92,29 +93,6 @@ impl RpcServiceCallerInterface for MockRpcClient {
     }
 }
 
-/// A dummy RPC method definition for testing the `RpcCallPrebuffered` trait.
-struct TestMethod;
-impl RpcMethodPrebuffered for TestMethod {
-    const METHOD_ID: u64 = 123;
-    type Input = String;
-    type Output = u32;
-
-    fn encode_request(input: Self::Input) -> Result<Vec<u8>, io::Error> {
-        Ok(input.into_bytes())
-    }
-
-    fn decode_response(bytes: &[u8]) -> Result<Self::Output, io::Error> {
-        Ok(bytes.len() as u32)
-    }
-
-    fn decode_request(_bytes: &[u8]) -> Result<Self::Input, io::Error> {
-        unimplemented!()
-    }
-    fn encode_response(_output: Self::Output) -> Result<Vec<u8>, io::Error> {
-        unimplemented!()
-    }
-}
-
 // --- Unit Tests ---
 
 #[tokio::test]
@@ -137,7 +115,7 @@ async fn test_buffered_call_success() {
     });
 
     let (_, result) = client
-        .call_rpc_buffered(TestMethod::METHOD_ID, &[], decode_fn, true)
+        .call_rpc_buffered(Echo::METHOD_ID, &[], decode_fn, true)
         .await
         .unwrap();
 
@@ -169,7 +147,7 @@ async fn test_buffered_call_remote_error() {
     });
 
     let (_, result) = client
-        .call_rpc_buffered(TestMethod::METHOD_ID, &[], decode_fn, true)
+        .call_rpc_buffered(Echo::METHOD_ID, &[], decode_fn, true)
         .await
         .unwrap();
 
@@ -201,7 +179,7 @@ async fn test_prebuffered_trait_converts_error() {
             .unwrap();
     });
 
-    let result = TestMethod::call(&client, "some input".to_string()).await;
+    let result = Echo::call(&client, b"some input".to_vec()).await;
 
     assert!(result.is_err());
     let io_error = result.unwrap_err();
