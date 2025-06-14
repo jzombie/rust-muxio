@@ -192,7 +192,7 @@ fn rpc_stream_with_multiple_metadata_entries() {
         truthy: true,
         falsy: false,
         some_integer: 42,
-        some_float: 3.14,
+        some_float: std::f32::consts::PI,
         some_bool_vec: vec![true, false, true],
     });
 
@@ -264,10 +264,10 @@ fn rpc_stream_with_multiple_metadata_entries() {
     assert_eq!(decoded_metadata.baz, "qux".to_string());
     assert_eq!(decoded_metadata.alpha, "beta".to_string());
     assert_eq!(decoded_metadata.gamma, "delta".to_string());
-    assert_eq!(decoded_metadata.truthy, true);
-    assert_eq!(decoded_metadata.falsy, false);
+    assert!(decoded_metadata.truthy);
+    assert!(!decoded_metadata.falsy);
     assert_eq!(decoded_metadata.some_integer, 42);
-    assert_eq!(decoded_metadata.some_float, 3.14);
+    assert_eq!(decoded_metadata.some_float, std::f32::consts::PI,);
     assert_eq!(decoded_metadata.some_bool_vec, vec![true, false, true]);
 }
 
@@ -300,7 +300,7 @@ fn rpc_complex_shuffled_stream() {
         truthy: true,
         falsy: false,
         some_integer: 42,
-        some_float: 3.14,
+        some_float: std::f32::consts::PI,
         some_bool_vec: vec![true, false, true],
     });
 
@@ -357,7 +357,7 @@ fn rpc_complex_shuffled_stream() {
     enc2.end_stream().expect("enc2 end stream failed");
 
     // Run this sequence multiple times with newly shuffled entries
-    for _ in [0..10] {
+    for _ in [0; 10] {
         // Randomize the outbound frames ordder
         outbound_chunks.borrow_mut().shuffle(&mut rand::rng());
 
@@ -365,7 +365,7 @@ fn rpc_complex_shuffled_stream() {
         let mut decoded: HashMap<u32, (Option<Arc<RpcHeader>>, Vec<u8>)> = HashMap::new();
         for chunk in outbound_chunks.borrow().iter() {
             server
-                .read_bytes(&chunk, |evt| match evt {
+                .read_bytes(chunk, |evt| match evt {
                     RpcStreamEvent::Header {
                         rpc_request_id,
                         ref rpc_header,
@@ -451,16 +451,16 @@ fn rpc_complex_shuffled_stream() {
         assert_eq!(decoded_metadata_1.gamma, "delta".to_string());
         assert_eq!(decoded_metadata_2.gamma, "delta2".to_string());
 
-        assert_eq!(decoded_metadata_1.truthy, true);
-        assert_eq!(decoded_metadata_2.truthy, false);
+        assert!(decoded_metadata_1.truthy);
+        assert!(!decoded_metadata_2.truthy);
 
-        assert_eq!(decoded_metadata_1.falsy, false);
-        assert_eq!(decoded_metadata_2.falsy, true);
+        assert!(!decoded_metadata_1.falsy);
+        assert!(decoded_metadata_2.falsy);
 
         assert_eq!(decoded_metadata_1.some_integer, 42);
         assert_eq!(decoded_metadata_2.some_integer, 142);
 
-        assert_eq!(decoded_metadata_1.some_float, 3.14);
+        assert_eq!(decoded_metadata_1.some_float, std::f32::consts::PI);
         assert_eq!(decoded_metadata_2.some_float, 14.3);
 
         assert_eq!(decoded_metadata_1.some_bool_vec, vec![true, false, true]);
