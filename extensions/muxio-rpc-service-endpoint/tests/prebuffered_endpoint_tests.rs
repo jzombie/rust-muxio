@@ -1,7 +1,8 @@
 use muxio::rpc::{RpcDispatcher, RpcRequest, rpc_internals::RpcStreamEvent};
 use muxio_rpc_service::RpcResultStatus;
 use muxio_rpc_service_endpoint::{
-    RpcServiceEndpoint, RpcServiceEndpointInterface, error::RpcServiceEndpointError,
+    RpcServiceEndpoint, RpcServiceEndpointInterface,
+    error::{HandlerPayloadError, RpcServiceEndpointError},
 };
 use std::sync::{Arc, Mutex};
 use tokio;
@@ -100,7 +101,6 @@ async fn test_read_bytes_success() {
 
     let response = perform_request_response_cycle(&endpoint, METHOD_ID, &5u32.to_le_bytes()).await;
 
-    // In the dispatcher's logic, the response status is stored in the metadata, which becomes the `rpc_param_bytes`.
     let status_byte = response.rpc_param_bytes.as_ref().unwrap()[0];
     let status = RpcResultStatus::try_from(status_byte).unwrap();
 
@@ -112,10 +112,10 @@ async fn test_read_bytes_success() {
 }
 
 #[tokio::test]
-async fn test_read_bytes_handler_error_payload() {
+async fn test_read_bytes_handler_system_error() {
     let endpoint = Arc::new(RpcServiceEndpoint::<()>::new());
     const METHOD_ID: u64 = 303;
-    let error_message = "a specific error occurred";
+    let error_message = "a specific internal error occurred";
 
     // Register a handler that returns a generic error.
     endpoint
@@ -138,6 +138,42 @@ async fn test_read_bytes_handler_error_payload() {
     assert_eq!(
         response.rpc_prebuffered_payload_bytes.as_deref(),
         Some(error_message.as_bytes())
+    );
+}
+
+#[tokio::test]
+async fn test_read_bytes_handler_fail_payload() {
+    let endpoint = Arc::new(RpcServiceEndpoint::<()>::new());
+    const METHOD_ID: u64 = 304;
+    let error_payload = b"INVALID_ARGUMENT".to_vec();
+
+    // Register a handler that returns our special payload error.
+    endpoint
+        .register_prebuffered(METHOD_ID, {
+            let error_payload = error_payload.clone();
+            move |_, _| {
+                let error_payload = error_payload.clone();
+                async move {
+                    Err(Box::new(HandlerPayloadError(error_payload))
+                        as Box<dyn std::error::Error + Send + Sync>)
+                }
+            }
+        })
+        .await
+        .unwrap();
+
+    let response = perform_request_response_cycle(&endpoint, METHOD_ID, &[]).await;
+
+    let status_byte = response.rpc_param_bytes.as_ref().unwrap()[0];
+    let status = RpcResultStatus::try_from(status_byte).unwrap();
+
+    // This should result in a `Fail` status, not a `SystemError`.
+    assert_eq!(status, RpcResultStatus::Fail);
+
+    // The payload should be the exact bytes we provided.
+    assert_eq!(
+        response.rpc_prebuffered_payload_bytes.as_deref(),
+        Some(&error_payload[..])
     );
 }
 
