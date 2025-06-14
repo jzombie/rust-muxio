@@ -1,0 +1,6 @@
+[licenses]
+allow = [
+    "MIT",
+    "Unicode-3.0",
+    "Apache-2.0",
+]
