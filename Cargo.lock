@@ -855,11 +855,13 @@ version = "0.1.0-alpha"
 dependencies = [
  "async-trait",
  "bytes",
+ "example-muxio-rpc-service-definition",
  "futures",
  "futures-util",
  "muxio",
  "muxio-rpc-service",
  "muxio-rpc-service-caller",
+ "muxio-tokio-rpc-server",
  "tokio",
  "tokio-tungstenite",
 ]
