@@ -14,3 +14,7 @@ muxio = { path = "../../" }
 muxio-rpc-service = { path = "../muxio-rpc-service" }
 muxio-rpc-service-caller = { path = "../muxio-rpc-service-caller", features=["tokio_support"] }
 futures = "0.3.31"
+
+[dev-dependencies]
+muxio-tokio-rpc-server = { path = "../muxio-tokio-rpc-server" }
+example-muxio-rpc-service-definition = { path = "../../example-muxio-rpc-service-definition" }

@@ -23,6 +23,7 @@ struct MockRpcClient {
 }
 
 // Create a newtype wrapper around `Mutex<()>` to satisfy the orphan rule.
+#[allow(dead_code)] // Ignores: field `0` is never read
 struct MockDispatcherLock(Mutex<()>);
 
 // Dummy implementation of the dispatcher trait for our newtype.

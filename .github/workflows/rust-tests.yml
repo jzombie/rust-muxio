@@ -22,5 +22,8 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Run tests
-        run: cargo test --workspace --all-targets --verbose
+      - name: Install cargo-all-features
+        run: cargo install cargo-all-features
+
+      - name: Run tests with all feature combinations
+        run: cargo test-all-features --workspace --all-targets --verbose
