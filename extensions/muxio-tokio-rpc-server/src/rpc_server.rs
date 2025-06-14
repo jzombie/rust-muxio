@@ -29,6 +29,12 @@ pub struct RpcServer {
     endpoint: Arc<RpcServiceEndpoint<WsSenderContext>>,
 }
 
+impl Default for RpcServer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RpcServer {
     /// Creates a new RpcServer instance with no routes started.
     pub fn new() -> Self {
@@ -74,7 +80,7 @@ impl RpcServer {
     }
 
     /// WebSocket route handler that sets up the WebSocket connection.
-    /// It receives an Arc<RpcServer> to share the server's state.
+    /// It receives an `Arc<RpcServer>` to share the server's state.
     async fn ws_handler(
         ws: WebSocketUpgrade,
         ConnectInfo(addr): ConnectInfo<SocketAddr>,

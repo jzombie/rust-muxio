@@ -11,6 +11,12 @@ use crate::utils::increment_u32_id;
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
+impl<'a> Default for RpcDispatcher<'a> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Manages RPC request dispatching and response handling over a framed transport.
 ///
 /// `RpcDispatcher` serves as a runtime coordinator for encoding outbound
@@ -210,10 +216,7 @@ impl<'a> RpcDispatcher<'a> {
         self.next_rpc_request_id = increment_u32_id();
 
         // Convert parameter bytes to metadata
-        let rpc_metadata_bytes = match rpc_request.rpc_param_bytes {
-            Some(param_bytes) => param_bytes,
-            None => vec![],
-        };
+        let rpc_metadata_bytes = rpc_request.rpc_param_bytes.unwrap_or_default();
 
         let request_header = RpcHeader {
             rpc_msg_type: RpcMessageType::Call,

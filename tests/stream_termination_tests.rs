@@ -22,7 +22,7 @@ fn cancel_stream_does_not_process_after_cancellation() {
     // Now simulate the canceling of the stream
     let result = encoder.cancel_stream();
     assert!(
-        !result.is_err(),
+        result.is_ok(),
         "Original `cancel_stream` attempt should not error"
     );
 
@@ -53,7 +53,7 @@ fn cancel_stream_does_not_process_after_cancellation() {
         }
     }
 
-    assert_eq!(has_stream_termination, true);
+    assert!(has_stream_termination);
 }
 
 #[test]
@@ -189,7 +189,7 @@ fn end_stream_auto_flushes_buffer() {
     // Aggregate the payloads of all frames (should be reassembled in order)
     let decoded_payload: Vec<u8> = decoded_frames
         .into_iter()
-        .filter(|f| f.inner.payload.len() > 0) // exclude cancel/end marker-only frames
+        .filter(|f| !f.inner.payload.is_empty()) // exclude cancel/end marker-only frames
         .flat_map(|f| f.inner.payload)
         .collect();
 

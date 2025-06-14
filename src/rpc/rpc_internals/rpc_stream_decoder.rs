@@ -23,6 +23,12 @@ pub enum RpcDecoderState {
     Done,
 }
 
+impl Default for RpcStreamDecoder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RpcStreamDecoder {
     pub fn new() -> Self {
         Self {

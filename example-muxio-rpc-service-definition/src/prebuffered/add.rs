@@ -25,7 +25,7 @@ impl RpcMethodPrebuffered for Add {
     }
 
     fn decode_request(bytes: &[u8]) -> Result<Self::Input, io::Error> {
-        let req_params = bitcode::decode::<AddRequestParams>(&bytes)
+        let req_params = bitcode::decode::<AddRequestParams>(bytes)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
         Ok(req_params.numbers)
@@ -36,7 +36,7 @@ impl RpcMethodPrebuffered for Add {
     }
 
     fn decode_response(bytes: &[u8]) -> Result<Self::Output, io::Error> {
-        let resp_params = bitcode::decode::<AddResponseParams>(&bytes)
+        let resp_params = bitcode::decode::<AddResponseParams>(bytes)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
         Ok(resp_params.result)

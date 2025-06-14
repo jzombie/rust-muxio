@@ -6,6 +6,12 @@ use crate::{
 };
 use std::collections::HashMap;
 
+impl Default for RpcSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Low-level stream multiplexing engine for RPC.
 ///
 /// This struct manages the allocation of stream IDs, the decoding of framed
@@ -59,10 +65,7 @@ impl RpcSession {
                 Ok(frame) => {
                     let stream_id = frame.inner.stream_id;
 
-                    let rpc_stream_decoder = self
-                        .rpc_stream_decoders
-                        .entry(stream_id)
-                        .or_insert_with(RpcStreamDecoder::new);
+                    let rpc_stream_decoder = self.rpc_stream_decoders.entry(stream_id).or_default();
 
                     match rpc_stream_decoder.decode_rpc_frame(&frame) {
                         Ok(events) => {

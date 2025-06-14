@@ -7,7 +7,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
 thread_local! {
-    pub static MUXIO_STATIC_RPC_CLIENT_REF: RefCell<Option<Arc<RpcWasmClient>>> = RefCell::new(None);
+    pub static MUXIO_STATIC_RPC_CLIENT_REF: RefCell<Option<Arc<RpcWasmClient>>> = const { RefCell::new(None) };
 }
 
 /// Initializes the global static RPC client if it has not been initialized.

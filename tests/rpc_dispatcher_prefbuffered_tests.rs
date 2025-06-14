@@ -9,26 +9,53 @@ fn test_rpc_dispatcher_prebuffered_calls() {
     let mut client_dispatcher: RpcDispatcher<'_> = RpcDispatcher::new();
     let mut server_dispatcher: RpcDispatcher<'_> = RpcDispatcher::new();
 
-    let add_result = add(
-        &mut client_dispatcher,
-        &mut server_dispatcher,
-        vec![1.0, 2.0, 3.0],
-    );
-    assert_eq!(add_result, 6.0);
+    {
+        let inputs = vec![1.0, 2.0, 3.0];
+        let expected: f64 = inputs.iter().sum();
+        let result = add(
+            &mut client_dispatcher,
+            &mut server_dispatcher,
+            inputs.clone(),
+        );
+        assert!(
+            (result - expected).abs() < 1e-10,
+            "Expected {}, got {}",
+            expected,
+            result
+        );
+    }
 
-    let mult_result = mult(
-        &mut client_dispatcher,
-        &mut server_dispatcher,
-        vec![4.0, 5.0, 6.0, 3.14],
-    );
-    assert!((mult_result - 376.8).abs() < 0.01);
+    {
+        let inputs = vec![4.0, 5.0, 6.0, std::f64::consts::PI];
+        let expected: f64 = inputs.iter().product();
+        let result = mult(
+            &mut client_dispatcher,
+            &mut server_dispatcher,
+            inputs.clone(),
+        );
+        assert!(
+            (result - expected).abs() < 1e-10,
+            "Expected {}, got {}",
+            expected,
+            result
+        );
+    }
 
-    let mult_result = mult(
-        &mut client_dispatcher,
-        &mut server_dispatcher,
-        vec![10.0, 5.0, 6.0, 3.14],
-    );
-    assert!((mult_result - 942.0).abs() < 0.1);
+    {
+        let inputs = vec![10.0, 5.0, 6.0, std::f64::consts::PI];
+        let expected: f64 = inputs.iter().product();
+        let result = mult(
+            &mut client_dispatcher,
+            &mut server_dispatcher,
+            inputs.clone(),
+        );
+        assert!(
+            (result - expected).abs() < 1e-10,
+            "Expected {}, got {}",
+            expected,
+            result
+        );
+    }
 }
 
 const ADD_METHOD_ID: u64 = 0x01;
@@ -118,14 +145,11 @@ fn dispatch_call_and_get_prebuffered_response<T: for<'a> Decode<'a>>(
             |bytes: &[u8]| {
                 outgoing_buf.extend_from_slice(bytes);
             },
-            Some(
-                move |rpc_stream_event: RpcStreamEvent| match rpc_stream_event {
-                    RpcStreamEvent::PayloadChunk { bytes, .. } => {
-                        result_buf_clone.lock().unwrap().extend_from_slice(&bytes);
-                    }
-                    _ => {}
-                },
-            ),
+            Some(move |rpc_stream_event: RpcStreamEvent| {
+                if let RpcStreamEvent::PayloadChunk { bytes, .. } = rpc_stream_event {
+                    result_buf_clone.lock().unwrap().extend_from_slice(&bytes);
+                }
+            }),
             true,
         )
         .expect("Server call failed");

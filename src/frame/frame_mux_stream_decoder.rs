@@ -52,6 +52,12 @@ impl Iterator for FrameDecoderIterator {
     }
 }
 
+impl Default for FrameMuxStreamDecoder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FrameMuxStreamDecoder {
     pub fn new() -> Self {
         Self {

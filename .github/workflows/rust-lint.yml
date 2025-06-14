@@ -1,0 +1,36 @@
+name: Rust Lint
+
+on: [push, pull_request]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install tools
+        run: |
+          cargo install cargo-deny
+          cargo install cargo-audit
+
+      # Check formatting across the entire workspace
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      # Run Clippy with all targets and features across workspace
+      - name: Run Clippy
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+      # Fail if any documentation warnings occur
+      - name: Check documentation
+        run: RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --document-private-items
+
+      # Security: cargo-deny across workspace
+      - name: Run cargo-deny
+        run: cargo deny check # Note: Apparently `-- --workspace` is not valid here
+
+      # Security: cargo-audit on root Cargo.lock
+      - name: Run cargo-audit
+        run: cargo audit

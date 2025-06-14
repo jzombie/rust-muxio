@@ -38,6 +38,16 @@ where
     _context: PhantomData<C>,
 }
 
+impl<C> Default for RpcServiceEndpoint<C>
+where
+    // This bound must also be present on the `impl` block.
+    C: Send + Sync + Clone + 'static,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<C> RpcServiceEndpoint<C>
 where
     // This bound must also be present on the `impl` block.

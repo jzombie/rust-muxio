@@ -141,15 +141,12 @@ pub trait RpcServiceCallerInterface: Send + Sync {
             })
             .await
             // FIX: Use debug formatting `{:?}` since FrameEncodeError doesn't implement Display.
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("{:?}", e)))?;
+            .map_err(|e| io::Error::other(format!("{:?}", e)))?;
 
         match ready_rx.await {
             Ok(Ok(())) => Ok((encoder, rx)),
             Ok(Err(err)) => Err(err),
-            Err(_) => Err(io::Error::new(
-                io::ErrorKind::Other,
-                "RPC setup channel closed prematurely",
-            )),
+            Err(_) => Err(io::Error::other("RPC setup channel closed prematurely")),
         }
     }
 

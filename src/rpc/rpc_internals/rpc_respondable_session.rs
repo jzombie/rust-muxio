@@ -5,6 +5,12 @@ use crate::rpc::rpc_internals::{
 };
 use std::collections::HashMap;
 
+impl<'a> Default for RpcRespondableSession<'a> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Lightweight wrapper over `RpcSession` that tracks response handlers.
 ///
 /// This struct allows the caller to associate a response callback per
@@ -103,17 +109,12 @@ impl<'a> RpcRespondableSession<'a> {
             let mut handled = false;
 
             if let Some(rpc_id) = id {
-                let is_prebuffering_response = match self.prebuffering_flags.get(&rpc_id) {
-                    Some(bool) => bool,
-                    None => &false,
-                };
+                let is_prebuffering_response =
+                    self.prebuffering_flags.get(&rpc_id).unwrap_or(&false);
 
                 if *is_prebuffering_response {
                     // Accumulate the bytes into the buffer for this request ID
-                    let buffer = self
-                        .prebuffered_responses
-                        .entry(rpc_id)
-                        .or_insert_with(|| Vec::new());
+                    let buffer = self.prebuffered_responses.entry(rpc_id).or_default();
 
                     match &evt {
                         RpcStreamEvent::Header { .. } => {
@@ -148,11 +149,9 @@ impl<'a> RpcRespondableSession<'a> {
                             tracing::error!("Unknown `RpcStreamEvent`");
                         }
                     };
-                } else {
-                    if let Some(cb) = self.response_handlers.get_mut(&rpc_id) {
-                        cb(evt.clone());
-                        handled = true;
-                    }
+                } else if let Some(cb) = self.response_handlers.get_mut(&rpc_id) {
+                    cb(evt.clone());
+                    handled = true;
                 }
 
                 if matches!(
