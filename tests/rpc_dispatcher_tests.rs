@@ -50,7 +50,7 @@ fn rpc_dispatcher_call_and_echo_response() {
         let rpc_request_2 = RpcRequest {
             rpc_method_id: MULT_METHOD_ID,
             rpc_param_bytes: Some(bitcode::encode(&MultRequestParams {
-                numbers: vec![4.0, 5.0, 6.0, 3.14],
+                numbers: vec![4.0, 5.0, 6.0, std::f64::consts::PI],
             })),
             rpc_prebuffered_payload_bytes: None,
             is_finalized: true,
@@ -60,7 +60,7 @@ fn rpc_dispatcher_call_and_echo_response() {
         let rpc_request_3 = RpcRequest {
             rpc_method_id: MULT_METHOD_ID,
             rpc_param_bytes: Some(bitcode::encode(&MultRequestParams {
-                numbers: vec![10.0, 5.0, 6.0, 3.14],
+                numbers: vec![10.0, 5.0, 6.0, std::f64::consts::PI],
             })),
             rpc_prebuffered_payload_bytes: None,
             is_finalized: true,
