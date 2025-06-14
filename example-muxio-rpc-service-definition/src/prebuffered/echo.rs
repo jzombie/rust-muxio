@@ -4,7 +4,7 @@ use std::io;
 pub struct Echo;
 
 impl RpcMethodPrebuffered for Echo {
-    const METHOD_ID: u64 = rpc_method_id!("math.add");
+    const METHOD_ID: u64 = rpc_method_id!("echo");
 
     type Input = Vec<u8>;
     type Output = Vec<u8>;
