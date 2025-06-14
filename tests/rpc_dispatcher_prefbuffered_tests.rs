@@ -118,14 +118,11 @@ fn dispatch_call_and_get_prebuffered_response<T: for<'a> Decode<'a>>(
             |bytes: &[u8]| {
                 outgoing_buf.extend_from_slice(bytes);
             },
-            Some(
-                move |rpc_stream_event: RpcStreamEvent| match rpc_stream_event {
-                    RpcStreamEvent::PayloadChunk { bytes, .. } => {
-                        result_buf_clone.lock().unwrap().extend_from_slice(&bytes);
-                    }
-                    _ => {}
-                },
-            ),
+            Some(move |rpc_stream_event: RpcStreamEvent| {
+                if let RpcStreamEvent::PayloadChunk { bytes, .. } = rpc_stream_event {
+                    result_buf_clone.lock().unwrap().extend_from_slice(&bytes);
+                }
+            }),
             true,
         )
         .expect("Server call failed");
