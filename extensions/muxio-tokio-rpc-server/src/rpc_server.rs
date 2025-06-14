@@ -80,7 +80,7 @@ impl RpcServer {
     }
 
     /// WebSocket route handler that sets up the WebSocket connection.
-    /// It receives an Arc<RpcServer> to share the server's state.
+    /// It receives an `Arc<RpcServer>` to share the server's state.
     async fn ws_handler(
         ws: WebSocketUpgrade,
         ConnectInfo(addr): ConnectInfo<SocketAddr>,

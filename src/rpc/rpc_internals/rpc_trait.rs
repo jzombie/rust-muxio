@@ -8,7 +8,6 @@ use crate::frame::FrameDecodeError;
 ///
 /// The function should emit a complete and valid frame fragment.
 /// Typically used as a sink.
-/// ```
 pub trait RpcEmit: FnMut(&[u8]) {}
 impl<T: FnMut(&[u8])> RpcEmit for T {}
 
@@ -19,7 +18,6 @@ impl<T: FnMut(&[u8])> RpcEmit for T {}
 ///
 /// Each event corresponds to part of an RPC response stream, such as [`RpcStreamEvent::Header`],
 /// [`RpcStreamEvent::PayloadChunk`], or [`RpcStreamEvent::End`].
-/// ```
 pub trait RpcResponseHandler: FnMut(RpcStreamEvent) + Send {}
 impl<T: FnMut(RpcStreamEvent) + Send> RpcResponseHandler for T {}
 
