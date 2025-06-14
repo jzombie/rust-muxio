@@ -125,7 +125,7 @@ impl<'a> RpcRespondableSession<'a> {
                         RpcStreamEvent::PayloadChunk { bytes, .. } => {
                             buffer.extend_from_slice(bytes);
                         }
-                        RpcStreamEvent::End { .. } => {
+                        RpcStreamEvent::End { rpc_header, .. } => {
                             // When the end of the stream is reached, call the response handler
                             if let Some(cb) = self.response_handlers.get_mut(&rpc_id) {
                                 let rpc_method_id =
@@ -135,6 +135,7 @@ impl<'a> RpcRespondableSession<'a> {
                                     rpc_request_id: rpc_id,
                                     rpc_method_id,
                                     bytes: buffer.clone(),
+                                    rpc_header: rpc_header.clone(),
                                 };
 
                                 cb(rpc_payload_event);
