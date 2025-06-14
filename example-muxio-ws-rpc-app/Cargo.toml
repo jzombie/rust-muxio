@@ -5,7 +5,6 @@ edition = "2024"
 publish = false
 
 [dependencies]
-bitcode = "0.6.6"
 tokio = { version = "1.45.1", features = ["full"] }
 muxio = { path = "../" }
 async-trait = "0.1.88"
@@ -13,6 +12,7 @@ muxio-tokio-rpc-server = { path = "../extensions/muxio-tokio-rpc-server" }
 muxio-tokio-rpc-client = { path = "../extensions/muxio-tokio-rpc-client" }
 muxio-rpc-service = { path = "../extensions/muxio-rpc-service" }
 muxio-rpc-service-caller = { path = "../extensions/muxio-rpc-service-caller", features=["tokio_support"] }
+example-muxio-rpc-service-definition = { path = "../example-muxio-rpc-service-definition" }
 
 [[bench]]
 name = "roundtrip"

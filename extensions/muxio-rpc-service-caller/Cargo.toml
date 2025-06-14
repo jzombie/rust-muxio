@@ -19,3 +19,4 @@ tokio_support = ["dep:tokio"]
 
 [dev-dependencies]
 tokio = { version = "1.45.1", features = ["full"] }
+example-muxio-rpc-service-definition = { path = "../../example-muxio-rpc-service-definition" }

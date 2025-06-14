@@ -1,0 +1,9 @@
+[package]
+name = "example-muxio-rpc-service-definition"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+bitcode = "0.6.6"
+muxio-rpc-service = { path = "../extensions/muxio-rpc-service" }

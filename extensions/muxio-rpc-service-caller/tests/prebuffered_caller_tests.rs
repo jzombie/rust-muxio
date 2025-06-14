@@ -1,3 +1,4 @@
+use example_muxio_rpc_service_definition::prebuffered::Echo;
 use futures::channel::mpsc;
 use muxio::rpc::rpc_internals::{RpcHeader, RpcMessageType, RpcStreamEncoder, rpc_trait::RpcEmit};
 use muxio_rpc_service::prebuffered::RpcMethodPrebuffered;
@@ -16,8 +17,8 @@ use tokio;
 /// A mock client that allows us to inject specific stream responses for testing.
 #[derive(Clone)]
 struct MockRpcClient {
-    /// A shared structure to allow the test harness to provide the sender half
-    /// of the mpsc channel to the mock implementation after it's been created.
+    /// A shared structure to allow the test harness to provide the sender half of the
+    /// mpsc channel to the mock implementation after it's been created.
     response_sender_provider: Arc<Mutex<Option<mpsc::Sender<Result<Vec<u8>, RpcCallerError>>>>>,
 }
 
@@ -92,29 +93,6 @@ impl RpcServiceCallerInterface for MockRpcClient {
     }
 }
 
-/// A dummy RPC method definition for testing the `RpcCallPrebuffered` trait.
-struct TestMethod;
-impl RpcMethodPrebuffered for TestMethod {
-    const METHOD_ID: u64 = 123;
-    type Input = String;
-    type Output = u32;
-
-    fn encode_request(input: Self::Input) -> Result<Vec<u8>, io::Error> {
-        Ok(input.into_bytes())
-    }
-
-    fn decode_response(bytes: &[u8]) -> Result<Self::Output, io::Error> {
-        Ok(bytes.len() as u32)
-    }
-
-    fn decode_request(_bytes: &[u8]) -> Result<Self::Input, io::Error> {
-        unimplemented!()
-    }
-    fn encode_response(_output: Self::Output) -> Result<Vec<u8>, io::Error> {
-        unimplemented!()
-    }
-}
-
 // --- Unit Tests ---
 
 #[tokio::test]
@@ -124,24 +102,33 @@ async fn test_buffered_call_success() {
         response_sender_provider: sender_provider.clone(),
     };
 
-    let decode_fn = |bytes: &[u8]| -> String { String::from_utf8(bytes.to_vec()).unwrap() };
+    // The data we expect to be echoed.
+    let echo_payload = b"hello world".to_vec();
 
-    tokio::spawn(async move {
-        let mut sender = loop {
-            if let Some(s) = sender_provider.lock().unwrap().take() {
-                break s;
-            }
-            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
-        };
-        sender.try_send(Ok(b"success payload".to_vec())).unwrap();
+    // The decode function now expects a Vec<u8> and returns it directly.
+    let decode_fn = |bytes: &[u8]| -> Vec<u8> { bytes.to_vec() };
+
+    tokio::spawn({
+        let echo_payload = echo_payload.clone();
+        async move {
+            let mut sender = loop {
+                if let Some(s) = sender_provider.lock().unwrap().take() {
+                    break s;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            };
+            // Simulate the server echoing the payload back.
+            sender.try_send(Ok(echo_payload)).unwrap();
+        }
     });
 
+    // Use the Echo service definition.
     let (_, result) = client
-        .call_rpc_buffered(TestMethod::METHOD_ID, &[], decode_fn, true)
+        .call_rpc_buffered(Echo::METHOD_ID, &echo_payload, decode_fn, true)
         .await
         .unwrap();
 
-    assert_eq!(result.unwrap(), "success payload");
+    assert_eq!(result.unwrap(), echo_payload);
 }
 
 #[tokio::test]
@@ -151,7 +138,7 @@ async fn test_buffered_call_remote_error() {
         response_sender_provider: sender_provider.clone(),
     };
 
-    let decode_fn = |bytes: &[u8]| -> String { String::from_utf8(bytes.to_vec()).unwrap() };
+    let decode_fn = |bytes: &[u8]| -> Vec<u8> { bytes.to_vec() };
 
     tokio::spawn(async move {
         let mut sender = loop {
@@ -169,7 +156,7 @@ async fn test_buffered_call_remote_error() {
     });
 
     let (_, result) = client
-        .call_rpc_buffered(TestMethod::METHOD_ID, &[], decode_fn, true)
+        .call_rpc_buffered(Echo::METHOD_ID, &[], decode_fn, true)
         .await
         .unwrap();
 
@@ -195,13 +182,14 @@ async fn test_prebuffered_trait_converts_error() {
             }
             tokio::time::sleep(std::time::Duration::from_millis(1)).await;
         };
-        let error_message = "Method 123 has panicked".to_string();
+        let error_message = "Method has panicked".to_string();
         sender
             .try_send(Err(RpcCallerError::RemoteSystemError(error_message)))
             .unwrap();
     });
 
-    let result = TestMethod::call(&client, "some input".to_string()).await;
+    // Use the Echo service with its RpcCallPrebuffered implementation.
+    let result = Echo::call(&client, b"some input".to_vec()).await;
 
     assert!(result.is_err());
     let io_error = result.unwrap_err();
@@ -209,6 +197,6 @@ async fn test_prebuffered_trait_converts_error() {
     assert!(
         io_error
             .to_string()
-            .contains("Remote system error: Method 123 has panicked")
+            .contains("Remote system error: Method has panicked")
     );
 }

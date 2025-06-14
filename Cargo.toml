@@ -26,5 +26,6 @@ members = [
     "extensions/muxio-rpc-service",
     "extensions/muxio-rpc-service-caller",
     "extensions/muxio-rpc-service-endpoint",
+    "example-muxio-rpc-service-definition",
 ]
 resolver = "2"

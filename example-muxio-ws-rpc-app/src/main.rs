@@ -1,5 +1,4 @@
-// TODO: Migrate to example service definition package
-use example_muxio_ws_rpc_app::service_definition::prebuffered::{Add, Mult};
+use example_muxio_rpc_service_definition::prebuffered::{Add, Echo, Mult};
 
 use muxio_rpc_service::prebuffered::RpcMethodPrebuffered;
 use muxio_rpc_service_caller::prebuffered::RpcCallPrebuffered;
@@ -32,6 +31,11 @@ async fn main() {
                 let result = req.iter().product();
                 let resp = Mult::encode_response(result)?;
                 Ok(resp)
+            }),
+            server.register_prebuffered(Echo::METHOD_ID, |_, bytes| async move {
+                let req = Echo::decode_request(&bytes)?;
+                let resp = Echo::encode_response(req)?;
+                Ok(resp)
             })
         );
 
@@ -52,14 +56,26 @@ async fn main() {
         let rpc_client = RpcClient::new(&format!("ws://{}/ws", addr)).await;
 
         // `join!` will await all responses before proceeding
-        let (res1, res2, res3) = join!(
+        let (res1, res2, res3, res4, res5, res6) = join!(
             Add::call(&rpc_client, vec![1.0, 2.0, 3.0]),
             Add::call(&rpc_client, vec![8.0, 3.0, 7.0]),
-            Mult::call(&rpc_client, vec![8.0, 3.0, 7.0])
+            Mult::call(&rpc_client, vec![8.0, 3.0, 7.0]),
+            Mult::call(&rpc_client, vec![1.5, 2.5, 8.5]),
+            Echo::call(&rpc_client, b"testing 1 2 3".into()),
+            Echo::call(&rpc_client, b"testing 4 5 6".into()),
         );
 
         println!("Result from first add(): {:?}", res1);
         println!("Result from second add(): {:?}", res2);
         println!("Result from first mult(): {:?}", res3);
+        println!("Result from second mult(): {:?}", res4);
+        println!(
+            "Result from first echo(): {:?}",
+            String::from_utf8(res5.unwrap())
+        );
+        println!(
+            "Result from second echo(): {:?}",
+            String::from_utf8(res6.unwrap())
+        );
     }
 }
