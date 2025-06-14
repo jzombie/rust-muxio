@@ -1,8 +1,7 @@
 use muxio::rpc::{RpcDispatcher, RpcRequest, rpc_internals::RpcStreamEvent};
 use muxio_rpc_service::RpcResultStatus;
 use muxio_rpc_service_endpoint::{
-    RpcServiceEndpoint, RpcServiceEndpointInterface,
-    error::{HandlerPayloadError, RpcServiceEndpointError},
+    RpcServiceEndpoint, RpcServiceEndpointInterface, error::RpcServiceEndpointError,
 };
 use std::sync::{Arc, Mutex};
 use tokio;
@@ -37,7 +36,6 @@ async fn perform_request_response_cycle(
     };
 
     // This initiates the call and registers a response handler inside the dispatcher.
-    // FIX: Provide an explicit type for the `None` argument to resolve type inference ambiguity.
     client_dispatcher
         .call(
             request,
@@ -117,19 +115,14 @@ async fn test_read_bytes_success() {
 async fn test_read_bytes_handler_error_payload() {
     let endpoint = Arc::new(RpcServiceEndpoint::<()>::new());
     const METHOD_ID: u64 = 303;
-    let error_message = b"invalid input parameter".to_vec();
+    let error_message = "a specific error occurred";
 
+    // Register a handler that returns a generic error.
     endpoint
-        .register_prebuffered(METHOD_ID, {
-            let error_message = error_message.clone();
-            move |_, _| {
-                let error_message = error_message.clone();
-                async move {
-                    Err(Box::new(HandlerPayloadError(error_message))
-                        as Box<dyn std::error::Error + Send + Sync>)
-                }
-            }
-        })
+        .register_prebuffered(
+            METHOD_ID,
+            move |_, _| async move { Err(error_message.into()) },
+        )
         .await
         .unwrap();
 
@@ -137,10 +130,14 @@ async fn test_read_bytes_handler_error_payload() {
 
     let status_byte = response.rpc_param_bytes.as_ref().unwrap()[0];
     let status = RpcResultStatus::try_from(status_byte).unwrap();
-    assert_eq!(status, RpcResultStatus::Fail);
+
+    // The endpoint logic should convert this into a SystemError.
+    assert_eq!(status, RpcResultStatus::SystemError);
+
+    // The payload should be the string representation of the error.
     assert_eq!(
         response.rpc_prebuffered_payload_bytes.as_deref(),
-        Some(&error_message[..])
+        Some(error_message.as_bytes())
     );
 }
 
