@@ -1,4 +1,3 @@
-// You'll need to import the derive macros
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 #[repr(u8)]

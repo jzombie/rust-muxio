@@ -16,3 +16,6 @@ tokio = { version = "1.45.1", features = ["sync"], optional = true }
 [features]
 default = []
 tokio_support = ["dep:tokio"]
+
+[dev-dependencies]
+tokio = { version = "1.45.1", features = ["full"] }
