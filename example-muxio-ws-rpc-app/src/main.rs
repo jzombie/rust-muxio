@@ -9,6 +9,8 @@ use tokio::net::TcpListener;
 
 #[tokio::main]
 async fn main() {
+    tracing_subscriber::fmt().with_env_filter("info").init();
+
     // Bind to a random available port
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
@@ -64,15 +66,15 @@ async fn main() {
             Echo::call(&rpc_client, b"testing 4 5 6".into()),
         );
 
-        println!("Result from first add(): {:?}", res1);
-        println!("Result from second add(): {:?}", res2);
-        println!("Result from first mult(): {:?}", res3);
-        println!("Result from second mult(): {:?}", res4);
-        println!(
+        tracing::info!("Result from first add(): {:?}", res1);
+        tracing::info!("Result from second add(): {:?}", res2);
+        tracing::info!("Result from first mult(): {:?}", res3);
+        tracing::info!("Result from second mult(): {:?}", res4);
+        tracing::info!(
             "Result from first echo(): {:?}",
             String::from_utf8(res5.unwrap())
         );
-        println!(
+        tracing::info!(
             "Result from second echo(): {:?}",
             String::from_utf8(res6.unwrap())
         );

@@ -62,7 +62,7 @@ impl RpcServer {
             }),
         );
 
-        println!("Server running on {:?}", addr);
+        tracing::info!("Server running on {:?}", addr);
 
         axum::serve(
             listener,
@@ -80,7 +80,7 @@ impl RpcServer {
         ConnectInfo(addr): ConnectInfo<SocketAddr>,
         server: Arc<RpcServer>,
     ) -> impl IntoResponse {
-        println!("Client connected: {}", addr);
+        tracing::info!("Client connected: {}", addr);
         // The `on_upgrade` closure now captures the `server` Arc
         // and calls the `handle_socket` method on it.
         ws.on_upgrade(move |socket| server.handle_socket(socket))
@@ -134,7 +134,7 @@ impl RpcServer {
 
                 // The context (the shareable WebSocket sender) is passed to `read_bytes`.
                 if let Err(err) = self.read_bytes(context.clone(), &bytes, on_emit).await {
-                    eprintln!("Caught err: {:?}", err);
+                    tracing::error!("Caught err: {:?}", err);
                 }
             }
         });

@@ -13,6 +13,8 @@ muxio-tokio-rpc-client = { path = "../extensions/muxio-tokio-rpc-client" }
 muxio-rpc-service = { path = "../extensions/muxio-rpc-service" }
 muxio-rpc-service-caller = { path = "../extensions/muxio-rpc-service-caller", features=["tokio_support"] }
 example-muxio-rpc-service-definition = { path = "../example-muxio-rpc-service-definition" }
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 
 [[bench]]
 name = "roundtrip"

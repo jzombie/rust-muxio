@@ -119,9 +119,10 @@ where
                                     is_finalized: true,
                                 }
                             } else {
-                                eprintln!(
+                                tracing::error!(
                                     "Handler for method {} failed with an internal error: {}",
-                                    request.rpc_method_id, e
+                                    request.rpc_method_id,
+                                    e
                                 );
                                 RpcResponse {
                                     rpc_request_id: request_id,
