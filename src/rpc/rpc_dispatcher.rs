@@ -216,10 +216,7 @@ impl<'a> RpcDispatcher<'a> {
         self.next_rpc_request_id = increment_u32_id();
 
         // Convert parameter bytes to metadata
-        let rpc_metadata_bytes = match rpc_request.rpc_param_bytes {
-            Some(param_bytes) => param_bytes,
-            None => vec![],
-        };
+        let rpc_metadata_bytes = rpc_request.rpc_param_bytes.unwrap_or_default();
 
         let request_header = RpcHeader {
             rpc_msg_type: RpcMessageType::Call,

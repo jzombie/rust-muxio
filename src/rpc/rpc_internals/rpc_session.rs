@@ -65,10 +65,7 @@ impl RpcSession {
                 Ok(frame) => {
                     let stream_id = frame.inner.stream_id;
 
-                    let rpc_stream_decoder = self
-                        .rpc_stream_decoders
-                        .entry(stream_id)
-                        .or_insert_with(RpcStreamDecoder::new);
+                    let rpc_stream_decoder = self.rpc_stream_decoders.entry(stream_id).or_default();
 
                     match rpc_stream_decoder.decode_rpc_frame(&frame) {
                         Ok(events) => {
