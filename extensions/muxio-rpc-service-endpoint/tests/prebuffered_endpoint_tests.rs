@@ -46,8 +46,11 @@ async fn perform_request_response_cycle(
         )
         .unwrap();
 
+    let request_bytes = server_bound_buffer.lock().unwrap().clone();
+
     // 3. The endpoint reads the request from the server buffer.
     //    Its on_emit sends the response to the client's buffer.
+
     let endpoint_on_emit = {
         let client_bound_buffer = client_bound_buffer.clone();
         move |chunk: &[u8]| {
@@ -55,15 +58,15 @@ async fn perform_request_response_cycle(
         }
     };
     endpoint
-        .read_bytes((), &server_bound_buffer.lock().unwrap(), endpoint_on_emit)
+        .read_bytes((), &request_bytes, endpoint_on_emit)
         .await
         .unwrap();
 
+    let response_bytes = client_bound_buffer.lock().unwrap().clone();
+
     // 4. The client dispatcher reads the response from the client buffer.
     //    This populates its internal response queue.
-    let request_ids = client_dispatcher
-        .read_bytes(&client_bound_buffer.lock().unwrap())
-        .unwrap();
+    let request_ids = client_dispatcher.read_bytes(&response_bytes).unwrap();
     assert_eq!(request_ids.len(), 1, "Client should have one response");
 
     // 5. Retrieve the processed response from the client's queue for verification.
