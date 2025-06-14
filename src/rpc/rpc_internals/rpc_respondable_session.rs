@@ -145,7 +145,7 @@ impl<'a> RpcRespondableSession<'a> {
                             }
                         }
                         _ => {
-                            eprintln!("Unknown `RpcStreamEvent`");
+                            tracing::error!("Unknown `RpcStreamEvent`");
                         }
                     };
                 } else {

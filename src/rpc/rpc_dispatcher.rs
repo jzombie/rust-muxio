@@ -165,9 +165,12 @@ impl<'a> RpcDispatcher<'a> {
                         frame_decode_error,
                     } => {
                         // TODO: Handle errors
-                        println!(
+                        tracing::error!(
                             "Error in stream. Method: {:?} {:?} {:?}: {:?}",
-                            rpc_method_id, rpc_header, rpc_request_id, frame_decode_error
+                            rpc_method_id,
+                            rpc_header,
+                            rpc_request_id,
+                            frame_decode_error
                         );
                     }
                 }
