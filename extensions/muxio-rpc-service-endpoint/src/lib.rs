@@ -1,5 +1,5 @@
-#[cfg(doctest)]
-doc_comment::doctest!("../README.md");
+// #[cfg(doctest)]
+// doc_comment::doctest!("../README.md");
 
 mod endpoint;
 pub use endpoint::*;

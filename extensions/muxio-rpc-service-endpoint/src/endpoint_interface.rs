@@ -1,4 +1,7 @@
-use super::{error::RpcServiceEndpointError, with_handlers_trait::WithHandlers};
+use super::{
+    error::{HandlerPayloadError, RpcServiceEndpointError},
+    with_handlers_trait::WithHandlers,
+};
 use futures::future::join_all;
 use muxio::rpc::{RpcResponse, rpc_internals::rpc_trait::RpcEmit};
 use muxio_rpc_service::RpcResultStatus;
@@ -69,7 +72,6 @@ where
                 .with_dispatcher(move |dispatcher| {
                     let request_ids = dispatcher.read_bytes(bytes)?;
                     let mut requests_found = Vec::new();
-
                     for id in request_ids {
                         if dispatcher.is_rpc_request_finalized(id).unwrap_or(false) {
                             if let Some(req) = dispatcher.delete_rpc_request(id) {
@@ -86,44 +88,55 @@ where
             return Ok(());
         }
 
-        // --- Stage 2: Concurrently process handlers WITHOUT holding locks ---
+        // --- Stage 2: Concurrently process handlers ---
         let mut response_futures = Vec::new();
-        for (rpc_request_id, rpc_request) in requests_to_process {
+        for (request_id, request) in requests_to_process {
             let handlers_arc_clone = handlers_arc.clone();
             let context_clone = context.clone();
 
             let future = async move {
                 let handler = handlers_arc_clone
-                    .with_handlers(|handlers| handlers.get(&rpc_request.rpc_method_id).cloned())
+                    .with_handlers(|handlers| handlers.get(&request.rpc_method_id).cloned())
                     .await;
 
-                if let (Some(handler), Some(params)) = (handler, &rpc_request.rpc_param_bytes) {
-                    match handler(context_clone, params.clone()).await {
+                if let Some(handler) = handler {
+                    let params = request.rpc_param_bytes.as_deref().unwrap_or(&[]);
+                    match handler(context_clone, params.to_vec()).await {
                         Ok(encoded) => RpcResponse {
-                            rpc_request_id,
-                            rpc_method_id: rpc_request.rpc_method_id,
+                            rpc_request_id: request_id,
+                            rpc_method_id: request.rpc_method_id,
                             rpc_result_status: Some(RpcResultStatus::Success.into()),
                             rpc_prebuffered_payload_bytes: Some(encoded),
                             is_finalized: true,
                         },
                         Err(e) => {
-                            eprintln!(
-                                "Handler for method {} failed: {:?}",
-                                rpc_request.rpc_method_id, e
-                            );
-                            RpcResponse {
-                                rpc_request_id,
-                                rpc_method_id: rpc_request.rpc_method_id,
-                                rpc_result_status: Some(RpcResultStatus::SystemError.into()),
-                                rpc_prebuffered_payload_bytes: Some(e.to_string().into_bytes()),
-                                is_finalized: true,
+                            if let Some(payload_error) = e.downcast_ref::<HandlerPayloadError>() {
+                                RpcResponse {
+                                    rpc_request_id: request_id,
+                                    rpc_method_id: request.rpc_method_id,
+                                    rpc_result_status: Some(RpcResultStatus::Fail.into()),
+                                    rpc_prebuffered_payload_bytes: Some(payload_error.0.clone()),
+                                    is_finalized: true,
+                                }
+                            } else {
+                                eprintln!(
+                                    "Handler for method {} failed with an internal error: {}",
+                                    request.rpc_method_id, e
+                                );
+                                RpcResponse {
+                                    rpc_request_id: request_id,
+                                    rpc_method_id: request.rpc_method_id,
+                                    rpc_result_status: Some(RpcResultStatus::SystemError.into()),
+                                    rpc_prebuffered_payload_bytes: Some(e.to_string().into_bytes()),
+                                    is_finalized: true,
+                                }
                             }
                         }
                     }
                 } else {
                     RpcResponse {
-                        rpc_request_id,
-                        rpc_method_id: rpc_request.rpc_method_id,
+                        rpc_request_id: request_id,
+                        rpc_method_id: request.rpc_method_id,
                         rpc_result_status: Some(RpcResultStatus::MethodNotFound.into()),
                         rpc_prebuffered_payload_bytes: None,
                         is_finalized: true,
@@ -135,7 +148,7 @@ where
 
         let responses = join_all(response_futures).await;
 
-        // --- Stage 3: Lock the dispatcher again to send all responses ---
+        // --- Stage 3: Send all responses ---
         self.get_dispatcher()
             .with_dispatcher(|dispatcher| {
                 for response in responses {
