@@ -4,7 +4,7 @@ edition.workspace = true # Inherit from workspace
 version.workspace = true # Inherit from workspace
 repository.workspace = true # Inherit from workspace
 license.workspace = true # Inherit from workspace
-publish.workspace = true # Inherit from workspace
+publish = true
 
 [dependencies]
 async-trait = "0.1.88"
