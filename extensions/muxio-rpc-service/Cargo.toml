@@ -1,5 +1,6 @@
 [package]
 name = "muxio-rpc-service"
+description = "Core traits, types, and compile-time method ID generation for Muxio."
 edition.workspace = true # Inherit from workspace
 version.workspace = true # Inherit from workspace
 repository.workspace = true # Inherit from workspace

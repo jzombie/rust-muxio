@@ -1,5 +1,6 @@
 [package]
 name = "muxio-tokio-rpc-client"
+description = "A Tokio-based Muxio WebSocket RPC client implementation."
 edition.workspace = true # Inherit from workspace
 version.workspace = true # Inherit from workspace
 repository.workspace = true # Inherit from workspace

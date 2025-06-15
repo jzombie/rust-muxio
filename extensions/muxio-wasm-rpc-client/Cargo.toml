@@ -1,5 +1,6 @@
 [package]
 name = "muxio-wasm-rpc-client"
+description = "A WASM-based Muxio RPC client implementation."
 edition.workspace = true # Inherit from workspace
 version.workspace = true # Inherit from workspace
 repository.workspace = true # Inherit from workspace
