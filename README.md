@@ -38,3 +38,107 @@ Muxio is engineered to solve specific challenges in building modern, distributed
 - **Shared Service Definitions for Type-Safe APIs**: Enforce integrity between your server and client by defining RPC methods, inputs, and outputs in a shared crate. By implementing the [`RpcMethodPrebuffered` trait](./extensions/muxio-rpc-service-caller/src/prebuffered/) , both client and server depend on a single source of truth for the API contract. This completely eliminates a common class of runtime errors, as any mismatch in data structures between the client and server will result in a compile-time error.
 
 - **A Strong Foundation for Foreign Function Interfaces (FFI)**: The framework's byte-oriented design makes it an ideal foundation for bridging Rust with other languages. Because the core dispatcher only needs to receive and emit byte slices, you can easily create an FFI layer that connects Muxio to C, C++, Swift, or any language that can handle byte array (including Python). The included [`muxio-wasm-rpc-client`](./extensions/muxio-wasm-rpc-client/) serves as a perfect example, using #[wasm_bindgen] to create a simple bridge between the Rust client and the JavaScript host environment.
+
+## Installation
+
+For Muxio's core:
+
+```sh
+cargo add muxio
+```
+
+This provides the low-level functionality, but [extensions](./extensions/) are likely desirable for most use cases.
+
+## Usage Example
+
+Let's build a simple sample app which spins up a Tokio-based WebSocket server, adds some routes, then spins up a client, performs some requests, then shuts everything down.
+
+```rust
+use example_muxio_rpc_service_definition::prebuffered::{Add, Echo, Mult};
+use muxio_rpc_service::prebuffered::RpcMethodPrebuffered;
+use muxio_rpc_service_caller::prebuffered::RpcCallPrebuffered;
+use muxio_tokio_rpc_client::RpcClient;
+use muxio_tokio_rpc_server::{RpcServer, RpcServiceEndpointInterface};
+use std::sync::Arc;
+use tokio::join;
+use tokio::net::TcpListener;
+
+#[tokio::main]
+async fn main() {
+    tracing_subscriber::fmt().with_env_filter("info").init();
+
+    // Bind to a random available port
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    {
+        let server = RpcServer::new();
+
+        // Register server method
+        // Note: If not using `join!`, each `register` call must be awaited.
+        let _ = join!(
+            server.register_prebuffered(Add::METHOD_ID, |_, bytes| async move {
+                let req = Add::decode_request(&bytes)?;
+                let result = req.iter().sum();
+                let resp = Add::encode_response(result)?;
+                Ok(resp)
+            }),
+            server.register_prebuffered(Mult::METHOD_ID, |_, bytes| async move {
+                let req = Mult::decode_request(&bytes)?;
+                let result = req.iter().product();
+                let resp = Mult::encode_response(result)?;
+                Ok(resp)
+            }),
+            server.register_prebuffered(Echo::METHOD_ID, |_, bytes| async move {
+                let req = Echo::decode_request(&bytes)?;
+                let resp = Echo::encode_response(req)?;
+                Ok(resp)
+            })
+        );
+
+        // Spawn the server using the pre-bound listener
+        let _server_task = tokio::spawn({
+            let server = server;
+            async move {
+                let _ = Arc::new(server).serve_with_listener(listener).await;
+            }
+        });
+    }
+
+    {
+        // Wait briefly for server to start
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+
+        // Use the actual bound address for the client
+        let rpc_client = RpcClient::new(&format!("ws://{}/ws", addr)).await;
+
+        // `join!` will await all responses before proceeding
+        let (res1, res2, res3, res4, res5, res6) = join!(
+            Add::call(&rpc_client, vec![1.0, 2.0, 3.0]),
+            Add::call(&rpc_client, vec![8.0, 3.0, 7.0]),
+            Mult::call(&rpc_client, vec![8.0, 3.0, 7.0]),
+            Mult::call(&rpc_client, vec![1.5, 2.5, 8.5]),
+            Echo::call(&rpc_client, b"testing 1 2 3".into()),
+            Echo::call(&rpc_client, b"testing 4 5 6".into()),
+        );
+
+        // TODO: Use assertions instead
+        tracing::info!("Result from first add(): {:?}", res1);
+        tracing::info!("Result from second add(): {:?}", res2);
+        tracing::info!("Result from first mult(): {:?}", res3);
+        tracing::info!("Result from second mult(): {:?}", res4);
+        tracing::info!(
+            "Result from first echo(): {:?}",
+            String::from_utf8(res5.unwrap())
+        );
+        tracing::info!(
+            "Result from second echo(): {:?}",
+            String::from_utf8(res6.unwrap())
+        );
+    }
+}
+```
+
+## License
+
+Licensed under the [Apache-2.0 License](./LICENSE).
