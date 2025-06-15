@@ -24,20 +24,20 @@ On top of this multiplexing layer, Muxio offers a minimal, unopinionated RPC fra
 
 - **Extensible by Design:** Muxio comes with pre-built extensions that demonstrate how to integrate the core library into real-world applications:.
 
-  - **Tokio-based [Server](./extensions/muxio-tokio-rpc-server)/[Client](./extensions/muxio-tokio-rpc-client)]**: For native, multi-threaded environments.
-  - **[WASM-based Web Client](./extensions/muxio-wasm-rpc-client)**: For seamless integration into web applications, communicating with a JavaScript host via a simple byte-passing bridge.
+  - **Tokio-based [Server](./extensions/muxio-tokio-rpc-server/)/[Client](./extensions/muxio-tokio-rpc-client/)]**: For native, multi-threaded environments.
+  - **[WASM-based Web Client](./extensions/muxio-wasm-rpc-client/)**: For seamless integration into web applications, communicating with a JavaScript host via a simple byte-passing bridge.
 
-TODO: Mention client/server abstractions (callers & endpoints)
+## Core Use Cases & Design Philosophy
 
-## Use Cases (TODO: Refine)
+Muxio is engineered to solve specific challenges in building modern, distributed systems. Its architecture and features are guided by the following principles:
 
-- Share service definitions between server and client: Enforce integrity between server and client by writing shared code that simply will not compile unless the server and client are expecting the same data structures.
+- **Shared Service Definitions for Type-Safe APIs**: Enforce integrity between your server and client by defining RPC methods, inputs, and outputs in a shared crate. By implementing the [`RpcMethodPrebuffered` trait](./extensions/muxio-rpc-service-caller/src/prebuffered/) , both client and server depend on a single source of truth for the API contract. This completely eliminates a common class of runtime errors, as any mismatch in data structures between the client and server will result in a compile-time error.
 
-- Write services with a mixture of native and WASM frontends, which use the same underlying code.  Code reuse is of paramount importance when designing this library, so improvements to one client generally are improvements to all clients.
+- **Cross-Platform Code with Agnostic Frontends**: Write your core application logic once and deploy it across multiple platforms. Muxio achieves this through its generic [`RpcServiceCallerInterface` trait](./extensions/muxio-rpc-service-caller/src/caller_interface.rs), which abstracts away the underlying transport. The same application code that calls an RPC method can run on a native [`RpcClient`](./extensions/muxio-tokio-rpc-client/) using Tokio or a RpcWasmClient in a web browser with no changes, while additional client types can be added with minimal code, provided they implement the same aformentioned `RpcServiceCallerInterface`. This design ensures that improvements to the core service logic benefit all clients simultaneously, even custom-built clients.
 
-- Good foundation for FFI.  A good example of this is the WASM bridge client example.  Use foreign function interfaces to bridge additional languages without porting the underlying protocol.
+- **A Strong Foundation for Foreign Function Interfaces (FFI)**: The framework's byte-oriented design makes it an ideal foundation for bridging Rust with other languages. Because the core dispatcher only needs to receive and emit byte slices, you can easily create an FFI layer that connects Muxio to C, C++, Swift, or any language that can handle byte arrays. The included muxio-wasm-rpc-client serves as a perfect example, using #[wasm_bindgen] to create a simple bridge between the Rust client and the JavaScript host environment.
 
-- Low-latency real-time services immediately benefit by using binary transmission (TODO: Explain further)
+- **Low-Latency, High-Performance Communication**: Muxio is built for speed. It uses a compact, **low-overhead binary protocol** (instead of text-based formats like JSON). This significantly reduces the size of data sent over the network and minimizes the CPU cycles needed for serialization and deserialization. By avoiding complex parsing, Muxio lowers end-to-end latency, making it well-suited for real-time applications such as financial data streaming, multiplayer games, and interactive remote tooling.
 
 
 ######################
