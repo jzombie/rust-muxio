@@ -9,8 +9,8 @@ publish.workspace = true # Inherit from workspace
 [dependencies]
 async-trait = "0.1.88"
 futures = "0.3.31"
-muxio = { path = "../../" }
-muxio-rpc-service = { path = "../muxio-rpc-service" }
+muxio = { workspace = true }
+muxio-rpc-service = { workspace = true }
 
 # Optional dependencies
 tokio = { version = "1.45.1", features = ["sync"], optional = true }
@@ -21,4 +21,4 @@ tokio_support = ["dep:tokio"]
 
 [dev-dependencies]
 tokio = { version = "1.45.1", features = ["full"] }
-example-muxio-rpc-service-definition = { path = "../../example-muxio-rpc-service-definition" }
+example-muxio-rpc-service-definition = { workspace = true }

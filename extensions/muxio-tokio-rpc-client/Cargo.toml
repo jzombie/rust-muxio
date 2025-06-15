@@ -12,11 +12,11 @@ bytes = "1.10.1"
 futures-util = "0.3.31"
 tokio = { version = "1.45.1", features = ["full"] }
 tokio-tungstenite = "0.26.2"
-muxio = { path = "../../" }
-muxio-rpc-service = { path = "../muxio-rpc-service" }
-muxio-rpc-service-caller = { path = "../muxio-rpc-service-caller", features=["tokio_support"] }
+muxio = { workspace = true }
+muxio-rpc-service = { workspace = true }
+muxio-rpc-service-caller = { workspace = true, features=["tokio_support"] }
 futures = "0.3.31"
 
 [dev-dependencies]
-muxio-tokio-rpc-server = { path = "../muxio-tokio-rpc-server" }
-example-muxio-rpc-service-definition = { path = "../../example-muxio-rpc-service-definition" }
+muxio-tokio-rpc-server = { workspace = true }
+example-muxio-rpc-service-definition = { workspace = true }

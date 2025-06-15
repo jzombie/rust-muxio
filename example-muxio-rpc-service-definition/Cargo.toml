@@ -8,4 +8,4 @@ publish = false # Explcitly false
 
 [dependencies]
 bitcode = "0.6.6"
-muxio-rpc-service = { path = "../extensions/muxio-rpc-service" }
+muxio-rpc-service = { workspace = true }

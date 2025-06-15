@@ -12,8 +12,8 @@ bytes = "1.10.1"
 futures-util = "0.3.31"
 tokio = { version = "1.45.1", features = ["full"] }
 tokio-tungstenite = "0.26.2"
-muxio = { path = "../../" }
-muxio-rpc-service = { path = "../muxio-rpc-service" }
-muxio-rpc-service-endpoint = { path = "../muxio-rpc-service-endpoint", features=["tokio_support"] }
+muxio = { workspace = true }
+muxio-rpc-service = { workspace = true }
+muxio-rpc-service-endpoint = { workspace = true, features=["tokio_support"] }
 async-trait = "0.1.88"
 tracing = "0.1.41"

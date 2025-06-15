@@ -10,16 +10,16 @@ publish.workspace = true # Inherit from workspace
 async-trait = "0.1.88"
 futures = "0.3.31"
 js-sys = "0.3.77"
-muxio = { path = "../../" }
 wasm-bindgen = "0.2.100"
-muxio-rpc-service = { path = "../muxio-rpc-service" }
-muxio-rpc-service-caller = { path = "../muxio-rpc-service-caller" }
+muxio = { workspace = true }
+muxio-rpc-service = { workspace = true }
+muxio-rpc-service-caller = { workspace = true }
 wasm-bindgen-futures = "0.4.50"
 
 [dev-dependencies]
 tokio = { version = "1.45.1", features = ["full"] }
-muxio-tokio-rpc-server = { path = "../muxio-tokio-rpc-server" }
-muxio-rpc-service-endpoint = { path = "../muxio-rpc-service-endpoint" }
-example-muxio-rpc-service-definition = { path = "../../example-muxio-rpc-service-definition" }
+muxio-tokio-rpc-server = { workspace = true }
+muxio-rpc-service-endpoint = { workspace = true }
+example-muxio-rpc-service-definition = { workspace = true }
 futures-util = "0.3.31"
 tokio-tungstenite = "0.27.0"

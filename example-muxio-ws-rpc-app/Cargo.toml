@@ -10,11 +10,11 @@ publish = false # Explcitly false
 tokio = { version = "1.45.1", features = ["full"] }
 muxio = { path = "../" }
 async-trait = "0.1.88"
-muxio-tokio-rpc-server = { path = "../extensions/muxio-tokio-rpc-server" }
-muxio-tokio-rpc-client = { path = "../extensions/muxio-tokio-rpc-client" }
-muxio-rpc-service = { path = "../extensions/muxio-rpc-service" }
-muxio-rpc-service-caller = { path = "../extensions/muxio-rpc-service-caller", features=["tokio_support"] }
-example-muxio-rpc-service-definition = { path = "../example-muxio-rpc-service-definition" }
+muxio-tokio-rpc-server = { workspace = true }
+muxio-tokio-rpc-client = { workspace = true }
+muxio-rpc-service = { workspace = true }
+muxio-rpc-service-caller = { workspace = true, features=["tokio_support"] }
+example-muxio-rpc-service-definition = { workspace = true }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 
