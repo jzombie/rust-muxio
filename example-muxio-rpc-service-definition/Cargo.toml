@@ -1,5 +1,6 @@
 [package]
 name = "example-muxio-rpc-service-definition"
+description = "Example service definitions for Muxio RPC servicing."
 edition.workspace = true # Inherit from workspace
 version.workspace = true # Inherit from workspace
 repository.workspace = true # Inherit from workspace
