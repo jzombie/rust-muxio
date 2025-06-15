@@ -4,6 +4,7 @@ version = "0.4.0-alpha"
 edition = "2024"
 repository = "https://github.com/jzombie/rust-muxio"
 license = "Apache-2.0"
+publish = true
 
 [package]
 name = "muxio"
@@ -12,6 +13,7 @@ edition.workspace = true
 version.workspace = true 
 repository.workspace = true
 license.workspace = true
+publish.workspace = true
 
 [workspace]
 members = [
