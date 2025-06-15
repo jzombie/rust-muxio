@@ -2,7 +2,7 @@
 
 **DRAFT -- WORK IN PROGRESS**
 
-<img src="./assets/Muxio-logo.svg" width=100 height=100 align="right" />
+<img src="./assets/Muxio-logo.svg" width=100 height=100 align="right" alt="Muxio Logo" />
 
 Muxio provides a robust and flexible foundation for building high-performance, transport-agnostic, and runtime-agnostic services in Rust. It offers a layered architecture that cleanly separates low-level binary stream multiplexing from high-level RPC logic, enabling you to create custom-tailored communication protocols.
 

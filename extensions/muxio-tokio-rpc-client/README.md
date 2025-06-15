@@ -1,3 +1,3 @@
-# muxio-tokio-rpc-client
+# Muxio Tokio RPC Client
 
-Provides an RPC client implementation over a WebSocket transport using `tokio-tungstenite`. It conforms to the `RpcServiceCallerInterface` and handles sending encoded RPC calls, receiving binary responses, and streaming them to user-defined handlers. Designed for native async environments.
+-- Work in Progress --

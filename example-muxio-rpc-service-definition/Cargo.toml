@@ -1,10 +1,12 @@
 [package]
 name = "example-muxio-rpc-service-definition"
-version = "0.1.0"
-edition = "2024"
-license = "Apache-2.0"
-publish = false
+description = "Example service definitions for Muxio RPC servicing."
+edition.workspace = true # Inherit from workspace
+version.workspace = true # Inherit from workspace
+repository.workspace = true # Inherit from workspace
+license.workspace = true # Inherit from workspace
+publish.workspace = true # Inherit from workspace
 
 [dependencies]
 bitcode = "0.6.6"
-muxio-rpc-service = { path = "../extensions/muxio-rpc-service" }
+muxio-rpc-service = { workspace = true }
