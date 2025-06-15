@@ -1,10 +1,10 @@
 [package]
 name = "example-muxio-rpc-service-definition"
-edition.workspace = true
-version.workspace = true 
-repository.workspace = true
-license.workspace = true
-publish = false # Explcitly false
+edition.workspace = true # Inherit from workspace
+version.workspace = true # Inherit from workspace
+repository.workspace = true # Inherit from workspace
+license.workspace = true # Inherit from workspace
+publish.workspace = true # Inherit from workspace
 
 [dependencies]
 bitcode = "0.6.6"
