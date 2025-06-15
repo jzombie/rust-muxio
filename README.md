@@ -69,8 +69,6 @@ use tokio::net::TcpListener;
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt().with_env_filter("info").init();
-
     // Bind to a random available port
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
