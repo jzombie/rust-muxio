@@ -29,7 +29,15 @@ On top of this multiplexing layer, Muxio offers a minimal, unopinionated RPC fra
 
 TODO: Mention client/server abstractions (callers & endpoints)
 
+## Use Cases (TODO: Refine)
 
+- Share service definitions between server and client: Enforce integrity between server and client by writing shared code that simply will not compile unless the server and client are expecting the same data structures.
+
+- Write services with a mixture of native and WASM frontends, which use the same underlying code.  Code reuse is of paramount importance when designing this library, so improvements to one client generally are improvements to all clients.
+
+- Good foundation for FFI.  A good example of this is the WASM bridge client example.  Use foreign function interfaces to bridge additional languages without porting the underlying protocol.
+
+- Low-latency real-time services immediately benefit by using binary transmission (TODO: Explain further)
 
 
 ######################
