@@ -47,7 +47,7 @@ For Muxio's core:
 cargo add muxio
 ```
 
-This provides the low-level functionality, but [extensions](./extensions/) are likely desirable for most use cases.
+This provides the low-level functionality, but [Muxio extensions](./extensions/) are likely more desirable for most use cases.
 
 ## Usage Example
 
