@@ -1,21 +1,17 @@
-[package]
-name = "muxio"
+[workspace.package]
 authors = ["Jeremy Harris <jeremy.harris@zenosmosis.com>"]
-version = "0.3.0-alpha"
+version = "0.4.0-alpha"
 edition = "2024"
-description = "Toolkit for layered stream multiplexing and schemaless RPC communication"
 repository = "https://github.com/jzombie/rust-muxio"
 license = "Apache-2.0"
 
-[dev-dependencies]
-bitcode = "0.6.6"
-rand = "0.9.1"
-tokio = { version = "1.45.1", features = ["full"] }
-
-[dependencies]
-chrono = "0.4.41"
-once_cell = "1.21.3"
-tracing = "0.1.41"
+[package]
+name = "muxio"
+description = "Toolkit for layered stream multiplexing and schemaless RPC communication."
+edition.workspace = true
+version.workspace = true 
+repository.workspace = true
+license.workspace = true
 
 [workspace]
 members = [
@@ -30,3 +26,14 @@ members = [
     "example-muxio-rpc-service-definition",
 ]
 resolver = "2"
+
+[dependencies]
+chrono = "0.4.41"
+once_cell = "1.21.3"
+tracing = "0.1.41"
+
+[dev-dependencies]
+bitcode = "0.6.6"
+rand = "0.9.1"
+tokio = { version = "1.45.1", features = ["full"] }
+
