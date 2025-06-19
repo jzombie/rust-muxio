@@ -9,6 +9,7 @@ publish = true
 [package]
 name = "muxio"
 description = "Toolkit for layered stream multiplexing and schemaless RPC communication."
+authors.workspace = true # Inherit from workspace
 edition.workspace = true # Inherit from workspace
 version.workspace = true  # Inherit from workspace
 repository.workspace = true # Inherit from workspace

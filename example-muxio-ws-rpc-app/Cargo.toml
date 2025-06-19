@@ -1,9 +1,10 @@
 [package]
 name = "example-muxio-ws-rpc-app"
-edition.workspace = true
-version.workspace = true 
-repository.workspace = true
-license.workspace = true
+authors.workspace = true # Inherit from workspace
+edition.workspace = true # Inherit from workspace
+version.workspace = true # Inherit from workspace
+repository.workspace = true # Inherit from workspace
+license.workspace = true # Inherit from workspace
 publish = false # Explcitly false
 
 [dependencies]
