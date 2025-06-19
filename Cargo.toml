@@ -9,11 +9,11 @@ publish = true
 [package]
 name = "muxio"
 description = "Toolkit for layered stream multiplexing and schemaless RPC communication."
-edition.workspace = true
-version.workspace = true 
-repository.workspace = true
-license.workspace = true
-publish.workspace = true
+edition.workspace = true # Inherit from workspace
+version.workspace = true  # Inherit from workspace
+repository.workspace = true # Inherit from workspace
+license.workspace = true # Inherit from workspace
+publish.workspace = true # Inherit from workspace
 
 [workspace]
 members = [
