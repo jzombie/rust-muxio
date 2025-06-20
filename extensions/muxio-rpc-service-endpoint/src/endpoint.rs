@@ -28,8 +28,6 @@ where
     C: Send + Sync + Clone + 'static,
 {
     prebuffered_handlers: Arc<Mutex<HashMap<u64, RpcPrebufferedHandler<C>>>>,
-    // CHANGED: The dispatcher is no longer a member of the struct.
-    // It will be passed into the `read_bytes` method.
     _context: PhantomData<C>,
 }
 

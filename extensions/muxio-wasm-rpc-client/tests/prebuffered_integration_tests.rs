@@ -21,16 +21,14 @@
 use example_muxio_rpc_service_definition::prebuffered::{Add, Echo, Mult};
 use futures_util::{SinkExt, StreamExt};
 use muxio_rpc_service::prebuffered::RpcMethodPrebuffered;
+use muxio_rpc_service_caller::RpcServiceCallerInterface;
 use muxio_rpc_service_caller::prebuffered::RpcCallPrebuffered;
-// CHANGED: This trait is needed to call register_prebuffered on the endpoint
 use muxio_tokio_rpc_server::{RpcServer, RpcServiceEndpointInterface};
 use muxio_wasm_rpc_client::RpcWasmClient;
 use std::sync::Arc;
 use tokio::join;
 use tokio::net::TcpListener;
 use tokio::sync::mpsc as tokio_mpsc;
-// CHANGED: task needs to be imported for spawn_blocking
-use muxio_rpc_service_caller::RpcServiceCallerInterface;
 use tokio::task;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message as WsMessage};
 
@@ -41,7 +39,7 @@ async fn test_success_client_server_roundtrip() {
     let addr = listener.local_addr().unwrap();
     let server_url = format!("ws://{}/ws", addr);
 
-    // FIXED: Wrap server in an Arc immediately to manage ownership correctly.
+    // Wrap server in an Arc immediately to manage ownership correctly.
     let server = Arc::new(RpcServer::new());
     let endpoint = server.endpoint(); // Get endpoint for registration
 
@@ -102,7 +100,6 @@ async fn test_success_client_server_roundtrip() {
         }
     });
 
-    // FIXED: This task now correctly handles the blocking Mutex from the WasmClient.
     tokio::spawn({
         let client = client.clone();
         async move {
@@ -144,7 +141,7 @@ async fn test_error_client_server_roundtrip() {
     let addr = listener.local_addr().unwrap();
     let server_url = format!("ws://{}/ws", addr);
 
-    // FIXED: Use the same Arc/endpoint pattern for consistency.
+    // Use the same Arc/endpoint pattern for consistency.
     let server = Arc::new(RpcServer::new());
     let endpoint = server.endpoint();
 
@@ -185,7 +182,7 @@ async fn test_error_client_server_roundtrip() {
         }
     });
 
-    // FIXED: This task is also updated to be non-blocking.
+    // This task is also updated to be non-blocking.
     tokio::spawn({
         let client = client.clone();
         async move {

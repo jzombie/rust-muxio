@@ -5,7 +5,7 @@ use muxio_rpc_service::{
 };
 use std::io;
 
-// NEW: Add this use statement to bring `futures::StreamExt` into scope.
+// Add this use statement to bring `futures::StreamExt` into scope.
 // This is needed for the `.next().await` call in the response buffering loop.
 use futures::stream::StreamExt;
 

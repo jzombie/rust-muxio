@@ -2,7 +2,6 @@ use example_muxio_rpc_service_definition::prebuffered::{Add, Echo, Mult};
 use muxio_rpc_service::prebuffered::RpcMethodPrebuffered;
 use muxio_rpc_service_caller::prebuffered::RpcCallPrebuffered;
 use muxio_tokio_rpc_client::RpcClient;
-// CHANGED: The RpcServiceEndpointInterface trait must be in scope to use its methods.
 use muxio_tokio_rpc_server::{RpcServer, RpcServiceEndpointInterface};
 use std::sync::Arc;
 use tokio::join;
@@ -18,12 +17,13 @@ async fn test_success_client_server_roundtrip() {
 
     // This block sets up and spawns the server
     {
-        // FIXED: Wrap the server in an Arc to manage ownership correctly.
+        // Wrap the server in an Arc to manage ownership correctly.
         let server = Arc::new(RpcServer::new());
-        // FIXED: Get a handle to the endpoint for registration.
+
+        // Get a handle to the endpoint for registration.
         let endpoint = server.endpoint();
 
-        // FIXED: Register handlers on the endpoint, not the server.
+        // Register handlers on the endpoint, not the server.
         let _ = join!(
             endpoint.register_prebuffered(Add::METHOD_ID, |_, bytes: Vec<u8>| async move {
                 let req = Add::decode_request(&bytes)?;
@@ -46,7 +46,7 @@ async fn test_success_client_server_roundtrip() {
 
         // Spawn the server using the pre-bound listener
         let _server_task = tokio::spawn({
-            // FIXED: Clone the Arc to move into the task.
+            // Clone the Arc to move into the task.
             let server = Arc::clone(&server);
             async move {
                 let _ = server.serve_with_listener(listener).await;
@@ -84,7 +84,7 @@ async fn test_error_client_server_roundtrip() {
 
     // This block sets up and spawns the server
     {
-        // FIXED: Use the same correct setup pattern.
+        // Use the same correct setup pattern.
         let server = Arc::new(RpcServer::new());
         let endpoint = server.endpoint();
 

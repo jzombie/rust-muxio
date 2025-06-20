@@ -3,7 +3,6 @@ use super::{
     with_handlers_trait::WithHandlers,
 };
 use futures::future::join_all;
-// CHANGED: Import the RpcDispatcher to use it as an argument.
 use muxio::rpc::{RpcDispatcher, RpcResponse, rpc_internals::rpc_trait::RpcEmit};
 use muxio_rpc_service::RpcResultStatus;
 use muxio_rpc_service::constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE;
@@ -59,7 +58,6 @@ where
 
     /// Reads raw bytes from the transport, decodes them into RPC requests,
     /// invokes the appropriate handler, and sends back a response.
-    // CHANGED: The signature now takes a mutable reference to a connection-specific dispatcher.
     async fn read_bytes<'a, E>(
         &self,
         dispatcher: &mut RpcDispatcher<'a>,
