@@ -141,7 +141,6 @@ where
                             }
                         }
                         Err(e) => {
-                            // ... (Error handling logic remains the same)
                             if let Some(payload_error) = e.downcast_ref::<HandlerPayloadError>() {
                                 RpcResponse {
                                     rpc_request_id: request_id,
