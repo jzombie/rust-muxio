@@ -57,7 +57,6 @@ impl RpcServiceCallerInterface for MockRpcClient {
 
     /// This is the core of the mock. It creates a new channel and gives the sender
     /// half back to the test harness via the shared `response_sender_provider`.
-    // CHANGED: The signature now correctly takes a single `RpcRequest` argument.
     async fn call_rpc_streaming(
         &self,
         _request: RpcRequest,
@@ -112,7 +111,7 @@ async fn test_buffered_call_success() {
         }
     });
 
-    // CHANGED: Construct an RpcRequest to pass to the mocked call.
+    // Construct an RpcRequest to pass to the mocked call.
     let request = RpcRequest {
         rpc_method_id: Echo::METHOD_ID,
         rpc_param_bytes: Some(echo_payload.clone()),
@@ -149,7 +148,7 @@ async fn test_buffered_call_remote_error() {
             .unwrap();
     });
 
-    // CHANGED: Construct an RpcRequest to pass to the mocked call.
+    // Construct an RpcRequest to pass to the mocked call.
     let request = RpcRequest {
         rpc_method_id: Echo::METHOD_ID,
         rpc_param_bytes: Some(vec![]),

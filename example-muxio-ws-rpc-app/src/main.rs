@@ -17,10 +17,10 @@ async fn main() {
 
     // This block sets up and spawns the server.
     {
-        // FIXED: Create the server and immediately wrap it in an Arc for sharing.
+        // Create the server and immediately wrap it in an Arc for sharing.
         let server = Arc::new(RpcServer::new());
 
-        // FIXED: Get a handle to the endpoint to register handlers.
+        //  Get a handle to the endpoint to register handlers.
         let endpoint = server.endpoint();
 
         // Register server methods on the endpoint.
@@ -47,7 +47,7 @@ async fn main() {
 
         // Spawn the server using the pre-bound listener
         let _server_task = tokio::spawn({
-            // FIXED: Clone the Arc for the server task.
+            // Clone the Arc for the server task.
             let server = Arc::clone(&server);
             async move {
                 let _ = server.serve_with_listener(listener).await;

@@ -1,7 +1,6 @@
 use crate::{error::RpcCallerError, with_dispatcher_trait::WithDispatcher};
 use futures::{StreamExt, channel::mpsc, channel::oneshot};
 use muxio::rpc::{
-    // CHANGED: Import RpcRequest here.
     RpcRequest,
     rpc_internals::{RpcStreamEncoder, RpcStreamEvent, rpc_trait::RpcEmit},
 };
@@ -23,7 +22,6 @@ pub trait RpcServiceCallerInterface: Send + Sync {
     /// Performs a streaming RPC call, yielding a stream of success payloads or a terminal error.
     async fn call_rpc_streaming(
         &self,
-        // CHANGED: This function now takes a complete `RpcRequest` object.
         request: RpcRequest,
     ) -> Result<
         (
@@ -52,7 +50,6 @@ pub trait RpcServiceCallerInterface: Send + Sync {
             let error_buffer = Arc::new(Mutex::new(Vec::new()));
 
             Box::new(move |evt| {
-                // ... (no changes inside this closure)
                 let mut tx_lock = tx.lock().expect("tx mutex poisoned");
                 match evt {
                     RpcStreamEvent::Header { rpc_header, .. } => {
@@ -117,7 +114,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
             })
         };
 
-        // CHANGED: Pass the `request` object directly to the dispatcher's `call` method.
+        // Pass the `request` object directly to the dispatcher's `call` method.
         let encoder = self
             .get_dispatcher()
             .with_dispatcher(|d| {
@@ -142,7 +139,6 @@ pub trait RpcServiceCallerInterface: Send + Sync {
     /// Performs a buffered RPC call that can resolve to a success value or a custom error.
     async fn call_rpc_buffered<T, F>(
         &self,
-        // CHANGED: This function also now takes a complete `RpcRequest`.
         request: RpcRequest,
         decode: F,
     ) -> Result<
@@ -156,7 +152,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
         T: Send + 'static,
         F: Fn(&[u8]) -> T + Send + Sync + 'static,
     {
-        // CHANGED: Pass the request object to `call_rpc_streaming`.
+        // Pass the request object to `call_rpc_streaming`.
         let (encoder, mut stream) = self.call_rpc_streaming(request).await?;
 
         let mut success_buf = Vec::new();

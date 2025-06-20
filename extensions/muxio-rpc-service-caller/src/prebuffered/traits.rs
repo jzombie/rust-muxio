@@ -65,7 +65,7 @@ where
             rpc_method_id: Self::METHOD_ID,
             rpc_param_bytes: param_bytes,
             rpc_prebuffered_payload_bytes: payload_bytes,
-            is_finalized: true,
+            is_finalized: true, // IMPORTANT: All prebuffered requests should be considered finalized
         };
 
         // We call call_rpc_streaming directly because we need to manually construct the request
@@ -92,7 +92,7 @@ where
         };
 
         match inner_result {
-            // CORRECTED LOGIC: The `output` variable here is the Result we want to return.
+            // The `output` variable here is the Result we want to return.
             // We just pass it through directly without wrapping it in another Ok().
             Ok(output) => output,
             Err(rpc_error) => {
