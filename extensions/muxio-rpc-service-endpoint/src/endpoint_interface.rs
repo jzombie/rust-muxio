@@ -32,7 +32,6 @@ where
             + Send
             + 'static,
     {
-        // ... (This function remains unchanged)
         self.get_prebuffered_handlers()
             .with_handlers(|handlers| match handlers.entry(method_id) {
                 Entry::Occupied(_) => {
@@ -54,7 +53,27 @@ where
             .await
     }
 
-    /// Reads raw bytes and passes the provided context to the invoked handler.
+    /// Reads raw bytes from the transport, decodes them into RPC requests,
+    /// invokes the appropriate handler, and sends back a response.
+    ///
+    /// ### Large Argument Handling
+    ///
+    /// This method is the counterpart to the "smart" client's calling strategy.
+    /// Because a client will send large arguments in the payload field of a request,
+    /// this handler must accommodate that possibility.
+    ///
+    /// The logic to find the handler's arguments is as follows:
+    ///
+    /// 1.  It checks the `rpc_prebuffered_payload_bytes` field of the `RpcRequest` first.
+    ///     If this field contains data, it is assumed to be the arguments for the handler,
+    ///     as this is the only place large arguments can be sent.
+    ///
+    /// 2.  If the payload field is empty, it falls back to checking the `rpc_param_bytes`
+    ///     field, which is the standard location for small arguments that fit in the
+    ///     initial header frame.
+    ///
+    /// This ensures the handler receives the correct block of argument bytes, regardless
+    /// of how their size dictated they be sent over the network.
     async fn read_bytes<E>(
         &self,
         context: C,
