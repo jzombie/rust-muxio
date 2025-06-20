@@ -46,21 +46,21 @@ async fn test_success_client_server_roundtrip() {
     // Register handlers on the server.
     let _ = join!(
         endpoint.register_prebuffered(Add::METHOD_ID, |_, bytes| async move {
-            let req = Add::decode_request(&bytes)?;
-            let result = req.iter().sum();
-            let resp = Add::encode_response(result)?;
-            Ok(resp)
+            let params = Add::decode_request(&bytes)?;
+            let sum = params.iter().sum();
+            let response_bytes = Add::encode_response(sum)?;
+            Ok(response_bytes)
         }),
         endpoint.register_prebuffered(Mult::METHOD_ID, |_, bytes| async move {
-            let req = Mult::decode_request(&bytes)?;
-            let result = req.iter().product();
-            let resp = Mult::encode_response(result)?;
-            Ok(resp)
+            let params = Mult::decode_request(&bytes)?;
+            let product = params.iter().product();
+            let response_bytes = Mult::encode_response(product)?;
+            Ok(response_bytes)
         }),
         endpoint.register_prebuffered(Echo::METHOD_ID, |_, bytes| async move {
-            let req = Echo::decode_request(&bytes)?;
-            let resp = Echo::encode_response(req)?;
-            Ok(resp)
+            let params = Echo::decode_request(&bytes)?;
+            let response_bytes = Echo::encode_response(params)?;
+            Ok(response_bytes)
         })
     );
 

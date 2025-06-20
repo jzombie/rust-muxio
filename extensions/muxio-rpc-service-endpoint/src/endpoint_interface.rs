@@ -6,8 +6,6 @@ use futures::future::join_all;
 use muxio::rpc::{RpcDispatcher, RpcResponse, rpc_internals::rpc_trait::RpcEmit};
 use muxio_rpc_service::RpcResultStatus;
 use muxio_rpc_service::constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE;
-// REMOVED: No longer need WithDispatcher as it's passed directly.
-// use muxio_rpc_service_caller::WithDispatcher;
 use std::{collections::hash_map::Entry, future::Future, marker::Send, sync::Arc};
 
 #[async_trait::async_trait]
@@ -15,15 +13,10 @@ pub trait RpcServiceEndpointInterface<C>: Send + Sync
 where
     C: Send + Sync + Clone + 'static,
 {
-    // REMOVED: DispatcherLock is no longer part of the trait's contract.
-    // type DispatcherLock: WithDispatcher;
     type HandlersLock: WithHandlers<C>;
 
-    // REMOVED: get_dispatcher is no longer needed.
-    // fn get_dispatcher(&self) -> Arc<Self::DispatcherLock>;
     fn get_prebuffered_handlers(&self) -> Arc<Self::HandlersLock>;
 
-    // ... (register_prebuffered method remains unchanged) ...
     async fn register_prebuffered<F, Fut>(
         &self,
         method_id: u64,
