@@ -7,12 +7,9 @@ use axum::{
 };
 use bytes::Bytes;
 use futures_util::stream::SplitSink;
-use futures_util::{SinkExt, StreamExt, future::join_all};
-use muxio::rpc::{RpcDispatcher, RpcResponse};
-use muxio_rpc_service::RpcResultStatus;
-use muxio_rpc_service_endpoint::{
-    RpcServiceEndpoint, RpcServiceEndpointInterface, error::HandlerPayloadError,
-};
+use futures_util::{SinkExt, StreamExt};
+use muxio::rpc::RpcDispatcher;
+use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::{

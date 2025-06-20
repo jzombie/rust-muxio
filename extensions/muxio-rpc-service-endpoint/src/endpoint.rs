@@ -1,5 +1,4 @@
 use super::RpcServiceEndpointInterface;
-use muxio::rpc::RpcDispatcher;
 use std::collections::HashMap;
 use std::{future::Future, marker::PhantomData, pin::Pin, sync::Arc};
 
