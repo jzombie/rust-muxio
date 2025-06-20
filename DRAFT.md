@@ -39,6 +39,12 @@ cargo modules dependencies --no-externs --no-fns --no-sysroot --no-traits --no-t
 dot -Tsvg mods.dot -o mods.svg
 ```
 
+## Release
+
+```sh
+ cargo release --workspace 0.5.0-alpha --dry-run
+```
+
 ## Runtime Model (Draft)
 
 This library is written in a non-async style, using synchronous control flow with callbacks. Despite not depending on async/await, it supports streaming, interleaving, and cancellation through a layered transport kit design. This enables integration with both single-threaded and multi-threaded runtimes, including compatibility with WASM environments where true async tasks may be limited.
