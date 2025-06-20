@@ -59,8 +59,6 @@ impl<C> RpcServiceEndpointInterface<C> for RpcServiceEndpoint<C>
 where
     C: Send + Sync + Clone + 'static,
 {
-    // REMOVED: `get_dispatcher` is no longer needed as the endpoint doesn't own it.
-    // type DispatcherLock = Mutex<RpcDispatcher<'static>>;
     type HandlersLock = Mutex<HashMap<u64, RpcPrebufferedHandler<C>>>;
 
     fn get_prebuffered_handlers(&self) -> Arc<Self::HandlersLock> {
