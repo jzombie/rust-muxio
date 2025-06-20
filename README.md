@@ -76,22 +76,24 @@ async fn main() {
     {
         let server = RpcServer::new();
 
+        let endpoint = server.endpoint();
+
         // Register server method
         // Note: If not using `join!`, each `register` call must be awaited.
         let _ = join!(
-            server.register_prebuffered(Add::METHOD_ID, |_, bytes| async move {
+            endpoint.register_prebuffered(Add::METHOD_ID, |_, bytes| async move {
                 let req = Add::decode_request(&bytes)?;
                 let result = req.iter().sum();
                 let resp = Add::encode_response(result)?;
                 Ok(resp)
             }),
-            server.register_prebuffered(Mult::METHOD_ID, |_, bytes| async move {
+            endpoint.register_prebuffered(Mult::METHOD_ID, |_, bytes| async move {
                 let req = Mult::decode_request(&bytes)?;
                 let result = req.iter().product();
                 let resp = Mult::encode_response(result)?;
                 Ok(resp)
             }),
-            server.register_prebuffered(Echo::METHOD_ID, |_, bytes| async move {
+            endpoint.register_prebuffered(Echo::METHOD_ID, |_, bytes| async move {
                 let req = Echo::decode_request(&bytes)?;
                 let resp = Echo::encode_response(req)?;
                 Ok(resp)
