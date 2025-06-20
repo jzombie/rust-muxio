@@ -133,6 +133,9 @@ impl RpcServer {
             while let Some(Some(Ok(Message::Binary(bytes)))) = recv_rx.recv().await {
                 let tx_clone = tx.clone();
 
+                // TODO: Remove
+                // println!("Received bytes: {:?}, chunk size: {:?}", bytes, bytes.len());
+
                 // The `on_emit` closure sends RPC responses back via the WebSocket.
                 let on_emit = |chunk: &[u8]| {
                     let _ = tx_clone.send(Message::Binary(Bytes::copy_from_slice(chunk)));

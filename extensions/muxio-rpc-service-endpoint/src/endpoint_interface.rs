@@ -32,6 +32,7 @@ where
             + Send
             + 'static,
     {
+        // ... (This function remains unchanged)
         self.get_prebuffered_handlers()
             .with_handlers(|handlers| match handlers.entry(method_id) {
                 Entry::Occupied(_) => {
@@ -63,11 +64,10 @@ where
     where
         E: RpcEmit + Send + Sync + Clone,
     {
-        // --- Stage 1: Decode incoming requests ---
+        // ... (Stage 1 remains unchanged)
         let (requests_to_process, handlers_arc) = {
             let dispatcher_arc = self.get_dispatcher();
             let handlers_arc = self.get_prebuffered_handlers();
-
             dispatcher_arc
                 .with_dispatcher(move |dispatcher| {
                     let request_ids = dispatcher.read_bytes(bytes)?;
@@ -88,6 +88,8 @@ where
             return Ok(());
         }
 
+        println!("Processing request....");
+
         // --- Stage 2: Concurrently process handlers ---
         let mut response_futures = Vec::new();
         for (request_id, request) in requests_to_process {
@@ -98,18 +100,31 @@ where
                 let handler = handlers_arc_clone
                     .with_handlers(|handlers| handlers.get(&request.rpc_method_id).cloned())
                     .await;
-
                 if let Some(handler) = handler {
+                    // SERVER-SIDE FIX: Find the arguments wherever they were sent.
+                    let payload = request
+                        .rpc_prebuffered_payload_bytes
+                        .as_deref()
+                        .unwrap_or(&[]);
                     let params = request.rpc_param_bytes.as_deref().unwrap_or(&[]);
-                    match handler(context_clone, params.to_vec()).await {
-                        Ok(encoded) => RpcResponse {
-                            rpc_request_id: request_id,
-                            rpc_method_id: request.rpc_method_id,
-                            rpc_result_status: Some(RpcResultStatus::Success.into()),
-                            rpc_prebuffered_payload_bytes: Some(encoded),
-                            is_finalized: true,
-                        },
+
+                    // This logic correctly finds the handler's arguments, regardless of their size.
+                    let args_for_handler = if !payload.is_empty() { payload } else { params };
+
+                    // Call the handler with the single, correct set of arguments.
+                    match handler(context_clone, args_for_handler.to_vec()).await {
+                        Ok(encoded) => {
+                            RpcResponse {
+                                rpc_request_id: request_id,
+                                rpc_method_id: request.rpc_method_id,
+                                rpc_result_status: Some(RpcResultStatus::Success.into()),
+                                // CHANGED: Ensure response payload is a Vec<u8>
+                                rpc_prebuffered_payload_bytes: Some(encoded),
+                                is_finalized: true,
+                            }
+                        }
                         Err(e) => {
+                            // ... (Error handling logic remains the same)
                             if let Some(payload_error) = e.downcast_ref::<HandlerPayloadError>() {
                                 RpcResponse {
                                     rpc_request_id: request_id,
@@ -147,9 +162,8 @@ where
             response_futures.push(future);
         }
 
+        // ... (Stage 3 remains unchanged)
         let responses = join_all(response_futures).await;
-
-        // --- Stage 3: Send all responses ---
         self.get_dispatcher()
             .with_dispatcher(|dispatcher| {
                 for response in responses {

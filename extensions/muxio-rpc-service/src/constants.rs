@@ -1,4 +1,5 @@
 pub const DEFAULT_SERVICE_MAX_CHUNK_SIZE: usize = 1024 * 64;
+// pub const DEFAULT_SERVICE_MAX_CHUNK_SIZE: usize = 1024;
 
 /// The default buffer size for the MPSC channel used in streaming RPC calls.
 ///
