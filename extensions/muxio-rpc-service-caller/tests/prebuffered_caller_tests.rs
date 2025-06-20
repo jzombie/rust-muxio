@@ -1,6 +1,9 @@
 use example_muxio_rpc_service_definition::prebuffered::Echo;
 use futures::channel::mpsc;
-use muxio::rpc::rpc_internals::{RpcHeader, RpcMessageType, RpcStreamEncoder, rpc_trait::RpcEmit};
+use muxio::rpc::{
+    RpcRequest,
+    rpc_internals::{RpcHeader, RpcMessageType, RpcStreamEncoder, rpc_trait::RpcEmit},
+};
 use muxio_rpc_service::prebuffered::RpcMethodPrebuffered;
 use muxio_rpc_service_caller::{
     RpcServiceCallerInterface, WithDispatcher, error::RpcCallerError,
@@ -54,11 +57,10 @@ impl RpcServiceCallerInterface for MockRpcClient {
 
     /// This is the core of the mock. It creates a new channel and gives the sender
     /// half back to the test harness via the shared `response_sender_provider`.
+    // CHANGED: The signature now correctly takes a single `RpcRequest` argument.
     async fn call_rpc_streaming(
         &self,
-        _method_id: u64,
-        _param_bytes: &[u8],
-        _is_finalized: bool,
+        _request: RpcRequest,
     ) -> Result<
         (
             RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>,
@@ -68,7 +70,6 @@ impl RpcServiceCallerInterface for MockRpcClient {
     > {
         let (tx, rx) = mpsc::channel(8);
 
-        // This dummy encoder is required by the trait signature but is not used in the tests.
         let dummy_encoder = {
             let dummy_header = RpcHeader {
                 rpc_msg_type: RpcMessageType::Call,
@@ -76,17 +77,8 @@ impl RpcServiceCallerInterface for MockRpcClient {
                 rpc_method_id: 0,
                 rpc_metadata_bytes: vec![],
             };
-            // The `on_emit` closure must be correctly typed and boxed.
             let on_emit: Box<dyn RpcEmit + Send + Sync> = Box::new(|_| {});
-            // Call the constructor with the correct arguments in the correct order,
-            // based on the provided source code.
-            RpcStreamEncoder::new(
-                0,             // stream_id
-                1024,          // max_chunk_size
-                &dummy_header, // header
-                on_emit,       // on_emit
-            )
-            .unwrap()
+            RpcStreamEncoder::new(0, 1024, &dummy_header, on_emit).unwrap()
         };
 
         *self.response_sender_provider.lock().unwrap() = Some(tx);
@@ -104,10 +96,7 @@ async fn test_buffered_call_success() {
         response_sender_provider: sender_provider.clone(),
     };
 
-    // The data we expect to be echoed.
     let echo_payload = b"hello world".to_vec();
-
-    // The decode function now expects a Vec<u8> and returns it directly.
     let decode_fn = |bytes: &[u8]| -> Vec<u8> { bytes.to_vec() };
 
     tokio::spawn({
@@ -119,16 +108,19 @@ async fn test_buffered_call_success() {
                 }
                 tokio::time::sleep(std::time::Duration::from_millis(1)).await;
             };
-            // Simulate the server echoing the payload back.
             sender.try_send(Ok(echo_payload)).unwrap();
         }
     });
 
-    // Use the Echo service definition.
-    let (_, result) = client
-        .call_rpc_buffered(Echo::METHOD_ID, &echo_payload, decode_fn, true)
-        .await
-        .unwrap();
+    // CHANGED: Construct an RpcRequest to pass to the mocked call.
+    let request = RpcRequest {
+        rpc_method_id: Echo::METHOD_ID,
+        rpc_param_bytes: Some(echo_payload.clone()),
+        rpc_prebuffered_payload_bytes: None,
+        is_finalized: true,
+    };
+
+    let (_, result) = client.call_rpc_buffered(request, decode_fn).await.unwrap();
 
     assert_eq!(result.unwrap(), echo_payload);
 }
@@ -157,10 +149,15 @@ async fn test_buffered_call_remote_error() {
             .unwrap();
     });
 
-    let (_, result) = client
-        .call_rpc_buffered(Echo::METHOD_ID, &[], decode_fn, true)
-        .await
-        .unwrap();
+    // CHANGED: Construct an RpcRequest to pass to the mocked call.
+    let request = RpcRequest {
+        rpc_method_id: Echo::METHOD_ID,
+        rpc_param_bytes: Some(vec![]),
+        rpc_prebuffered_payload_bytes: None,
+        is_finalized: true,
+    };
+
+    let (_, result) = client.call_rpc_buffered(request, decode_fn).await.unwrap();
 
     match result {
         Err(RpcCallerError::RemoteError { payload }) => {
@@ -170,6 +167,8 @@ async fn test_buffered_call_remote_error() {
     }
 }
 
+// NOTE: This test does not need to change because it calls the high-level
+// `Echo::call` which was already updated to handle RpcRequest construction internally.
 #[tokio::test]
 async fn test_prebuffered_trait_converts_error() {
     let sender_provider = Arc::new(Mutex::new(None));
@@ -190,7 +189,6 @@ async fn test_prebuffered_trait_converts_error() {
             .unwrap();
     });
 
-    // Use the Echo service with its RpcCallPrebuffered implementation.
     let result = Echo::call(&client, b"some input".to_vec()).await;
 
     assert!(result.is_err());
