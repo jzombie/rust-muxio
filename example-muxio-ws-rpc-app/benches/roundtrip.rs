@@ -17,7 +17,10 @@ fn bench_roundtrip(c: &mut Criterion) {
         let addr = listener.local_addr().unwrap();
 
         let server = RpcServer::new();
-        server
+
+        let endpoint = server.endpoint();
+
+        endpoint
             .register_prebuffered(Add::METHOD_ID, |_, bytes| async move {
                 let req = Add::decode_request(&bytes)?;
                 let result = req.iter().sum();

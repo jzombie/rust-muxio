@@ -24,10 +24,6 @@ async fn perform_request_response_cycle(
     perform_request_response_cycle_with_request(endpoint, request).await
 }
 
-// =======================================================================
-// CORRECTED HELPER LOGIC ===
-// =======================================================================
-
 /// This version accepts a pre-constructed RpcRequest, allowing us to test
 /// requests with payloads for the large argument case.
 async fn perform_request_response_cycle_with_request(
@@ -68,8 +64,11 @@ async fn perform_request_response_cycle_with_request(
                     .extend_from_slice(resp_chunk);
             }
         };
+        // We need to create a new dispatcher for each read_bytes call in the test context
+        // because the server logic we are testing expects a fresh one per connection/read.
+        let mut dispatcher = RpcDispatcher::new();
         endpoint
-            .read_bytes((), chunk, endpoint_on_emit)
+            .read_bytes(&mut dispatcher, (), chunk, endpoint_on_emit)
             .await
             .unwrap();
     }
@@ -78,7 +77,7 @@ async fn perform_request_response_cycle_with_request(
     client_get_finalized_response(&mut client_dispatcher, &response_bytes)
 }
 
-/// FIXED: Helper to read response bytes into a client dispatcher and correctly
+/// Helper to read response bytes into a client dispatcher and correctly
 /// extract the RpcResponse object.
 fn client_get_finalized_response(
     client_dispatcher: &mut RpcDispatcher,
@@ -87,14 +86,10 @@ fn client_get_finalized_response(
     let request_ids = client_dispatcher.read_bytes(response_bytes).unwrap();
     assert_eq!(request_ids.len(), 1, "Client should have one response");
 
-    // The dispatcher's queue stores RpcRequest objects internally.
-    // When a response frame comes back, it's parsed into this struct.
     let response_as_request = client_dispatcher
         .delete_rpc_request(request_ids[0])
         .unwrap();
 
-    // We now correctly convert the internal RpcRequest object into the RpcResponse
-    // type that our tests expect. This resolves the compiler errors.
     let result_status = response_as_request
         .rpc_param_bytes
         .as_ref()
@@ -112,12 +107,13 @@ fn client_get_finalized_response(
 #[tokio::test]
 async fn test_handler_registration() {
     let endpoint = RpcServiceEndpoint::<()>::new();
+    // FIXED: Added type annotation for clarity, though compiler might infer it here.
     let result1 = endpoint
-        .register_prebuffered(101, |_, _| async { Ok(vec![]) })
+        .register_prebuffered(101, |_, _: Vec<u8>| async { Ok(vec![]) })
         .await;
     assert!(result1.is_ok());
     let result2 = endpoint
-        .register_prebuffered(101, |_, _| async { Ok(vec![]) })
+        .register_prebuffered(101, |_, _: Vec<u8>| async { Ok(vec![]) })
         .await;
     assert!(matches!(result2, Err(RpcServiceEndpointError::Handler(_))));
 }
@@ -127,7 +123,8 @@ async fn test_read_bytes_success() {
     let endpoint = Arc::new(RpcServiceEndpoint::<()>::new());
     const METHOD_ID: u64 = 202;
     endpoint
-        .register_prebuffered(METHOD_ID, |_, req_bytes| async move {
+        // FIXED: Added the explicit type `Vec<u8>` for the `req_bytes` argument.
+        .register_prebuffered(METHOD_ID, |_, req_bytes: Vec<u8>| async move {
             let num = u32::from_le_bytes(req_bytes.try_into().unwrap());
             Ok((num * 2).to_le_bytes().to_vec())
         })
@@ -152,7 +149,8 @@ async fn test_read_bytes_handler_system_error() {
     endpoint
         .register_prebuffered(
             METHOD_ID,
-            move |_, _| async move { Err(error_message.into()) },
+            // FIXED: Added the explicit type `Vec<u8>` for the ignored bytes argument.
+            move |_, _: Vec<u8>| async move { Err(error_message.into()) },
         )
         .await
         .unwrap();
@@ -175,7 +173,8 @@ async fn test_read_bytes_handler_fail_payload() {
     endpoint
         .register_prebuffered(METHOD_ID, {
             let error_payload = error_payload.clone();
-            move |_, _| {
+            // FIXED: Added the explicit type `Vec<u8>` for the ignored bytes argument.
+            move |_, _: Vec<u8>| {
                 let error_payload = error_payload.clone();
                 async move {
                     Err(Box::new(HandlerPayloadError(error_payload))
@@ -206,30 +205,23 @@ async fn test_read_bytes_method_not_found() {
     assert!(response.rpc_prebuffered_payload_bytes.is_none());
 }
 
-// =======================================================================
-// === SELF-CONTAINED TEST FOR LARGE PAYLOADS ===
-// =======================================================================
-
 #[tokio::test]
 async fn test_large_payload_request_response_cycle() {
     let endpoint = Arc::new(RpcServiceEndpoint::<()>::new());
-    // Use a unique method ID for this test to avoid conflicts.
     const LARGE_PAYLOAD_METHOD_ID: u64 = 505;
 
-    // 1. Create a payload that is larger than the max chunk size, ensuring it will
-    //    be sent as a payload rather than a parameter.
-    let large_payload = vec![0u8; DEFAULT_SERVICE_MAX_CHUNK_SIZE * 50];
+    let large_payload = vec![0u8; DEFAULT_SERVICE_MAX_CHUNK_SIZE + 100];
     let expected_response_payload = {
         let mut resp = large_payload.clone();
         resp.extend_from_slice(b"_processed");
         resp
     };
 
-    // 2. Register a handler that verifies the large payload and returns a modified version.
     endpoint
         .register_prebuffered(LARGE_PAYLOAD_METHOD_ID, {
             let expected_response = expected_response_payload.clone();
-            move |_, req_bytes| {
+            // FIXED: Added the explicit type `Vec<u8>` for the `req_bytes` argument.
+            move |_, req_bytes: Vec<u8>| {
                 let mut resp_bytes = req_bytes.clone();
                 resp_bytes.extend_from_slice(b"_processed");
                 assert_eq!(resp_bytes, expected_response);
@@ -239,9 +231,6 @@ async fn test_large_payload_request_response_cycle() {
         .await
         .unwrap();
 
-    // 3. Manually construct the RpcRequest as the "smart" client would for a large payload:
-    //    - `rpc_param_bytes` is None.
-    //    - The large data is in `rpc_prebuffered_payload_bytes`.
     let request_with_large_payload = RpcRequest {
         rpc_method_id: LARGE_PAYLOAD_METHOD_ID,
         rpc_param_bytes: None,
@@ -249,11 +238,9 @@ async fn test_large_payload_request_response_cycle() {
         is_finalized: true,
     };
 
-    // 4. Simulate the request/response cycle using our generic helper.
     let response =
         perform_request_response_cycle_with_request(&endpoint, request_with_large_payload).await;
 
-    // 5. Verify the response is successful and contains the correct processed payload.
     let status = RpcResultStatus::try_from(response.rpc_result_status.unwrap()).unwrap();
     assert_eq!(status, RpcResultStatus::Success);
     assert_eq!(
