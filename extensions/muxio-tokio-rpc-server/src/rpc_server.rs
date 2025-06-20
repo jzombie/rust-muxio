@@ -36,7 +36,6 @@ impl RpcServer {
         }
     }
 
-    // --- NEW: A clean way to access the endpoint ---
     /// Returns a clone of the underlying RPC service endpoint.
     /// This allows for registering handlers without tying the registration
     /// logic to the server implementation.
@@ -45,10 +44,6 @@ impl RpcServer {
     }
     // --------------------------------------------------
 
-    // --- REMOVED: The registration logic no longer lives here. ---
-    // pub async fn register_prebuffered(...) { ... }
-
-    // ... The rest of the server implementation (serve, serve_with_listener, etc.) is correct ...
     pub async fn serve(self, address: &str) -> Result<SocketAddr, axum::BoxError> {
         let listener = TcpListener::bind(address).await?;
         let server = Arc::new(self);
