@@ -867,6 +867,7 @@ name = "muxio-rpc-service-endpoint"
 version = "0.4.0-alpha"
 dependencies = [
  "async-trait",
+ "example-muxio-rpc-service-definition",
  "futures",
  "muxio",
  "muxio-rpc-service",
