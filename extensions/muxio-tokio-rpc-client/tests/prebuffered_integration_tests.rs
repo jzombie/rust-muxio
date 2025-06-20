@@ -15,48 +15,50 @@ async fn test_success_client_server_roundtrip() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
 
+    // This block sets up and spawns the server
     {
-        let server = RpcServer::new();
+        // Wrap the server in an Arc to manage ownership correctly.
+        let server = Arc::new(RpcServer::new());
 
-        // Register server method
-        // Note: If not using `join!`, each `register` call must be awaited.
+        // Get a handle to the endpoint for registration.
+        let endpoint = server.endpoint();
+
+        // Register handlers on the endpoint, not the server.
         let _ = join!(
-            server.register_prebuffered(Add::METHOD_ID, |_, bytes| async move {
-                let req = Add::decode_request(&bytes)?;
-                let result = req.iter().sum();
-                let resp = Add::encode_response(result)?;
-                Ok(resp)
+            endpoint.register_prebuffered(Add::METHOD_ID, |_, bytes: Vec<u8>| async move {
+                let params = Add::decode_request(&bytes)?;
+                let sum = params.iter().sum();
+                let response_bytes = Add::encode_response(sum)?;
+                Ok(response_bytes)
             }),
-            server.register_prebuffered(Mult::METHOD_ID, |_, bytes| async move {
-                let req = Mult::decode_request(&bytes)?;
-                let result = req.iter().product();
-                let resp = Mult::encode_response(result)?;
-                Ok(resp)
+            endpoint.register_prebuffered(Mult::METHOD_ID, |_, bytes: Vec<u8>| async move {
+                let params = Mult::decode_request(&bytes)?;
+                let product = params.iter().product();
+                let response_bytes = Mult::encode_response(product)?;
+                Ok(response_bytes)
             }),
-            server.register_prebuffered(Echo::METHOD_ID, |_, bytes| async move {
-                let req = Echo::decode_request(&bytes)?;
-                let resp = Echo::encode_response(req)?;
-                Ok(resp)
+            endpoint.register_prebuffered(Echo::METHOD_ID, |_, bytes: Vec<u8>| async move {
+                let params = Echo::decode_request(&bytes)?;
+                let response_bytes = Echo::encode_response(params)?;
+                Ok(response_bytes)
             })
         );
 
         // Spawn the server using the pre-bound listener
         let _server_task = tokio::spawn({
-            let server = server;
+            // Clone the Arc to move into the task.
+            let server = Arc::clone(&server);
             async move {
-                let _ = Arc::new(server).serve_with_listener(listener).await;
+                let _ = server.serve_with_listener(listener).await;
             }
         });
     }
 
+    // This block runs the client
     {
-        // Wait briefly for server to start
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-
-        // Use the actual bound address for the client
         let rpc_client = RpcClient::new(&format!("ws://{}/ws", addr)).await;
 
-        // `join!` will await all responses before proceeding
         let (res1, res2, res3, res4, res5, res6) = join!(
             Add::call(&rpc_client, vec![1.0, 2.0, 3.0]),
             Add::call(&rpc_client, vec![8.0, 3.0, 7.0]),
@@ -66,7 +68,6 @@ async fn test_success_client_server_roundtrip() {
             Echo::call(&rpc_client, b"testing 4 5 6".into()),
         );
 
-        // Assert that all results are correct.
         assert_eq!(res1.unwrap(), 6.0);
         assert_eq!(res2.unwrap(), 18.0);
         assert_eq!(res3.unwrap(), 168.0);
@@ -78,51 +79,40 @@ async fn test_success_client_server_roundtrip() {
 
 #[tokio::test]
 async fn test_error_client_server_roundtrip() {
-    // Bind to a random available port
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
 
+    // This block sets up and spawns the server
     {
-        let server = RpcServer::new();
+        // Use the same correct setup pattern.
+        let server = Arc::new(RpcServer::new());
+        let endpoint = server.endpoint();
 
-        // Register server method
-        // Note: If not using `join!`, each `register` call must be awaited.
+        // Note: The `join!` macro is not strictly necessary for a single future,
+        // but we use it here to show the pattern is consistent.
         let _ = join!(
-            server.register_prebuffered(Add::METHOD_ID, |_, _bytes| async move {
+            endpoint.register_prebuffered(Add::METHOD_ID, |_, _bytes: Vec<u8>| async move {
                 Err("Addition failed".into())
             }),
         );
 
-        // Spawn the server using the pre-bound listener
         let _server_task = tokio::spawn({
-            let server = server;
+            let server = Arc::clone(&server);
             async move {
-                let _ = Arc::new(server).serve_with_listener(listener).await;
+                let _ = server.serve_with_listener(listener).await;
             }
         });
     }
 
+    // This block runs the client
     {
-        // Wait briefly for server to start
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-
-        // Use the actual bound address for the client
         let rpc_client = RpcClient::new(&format!("ws://{}/ws", addr)).await;
-
-        // `join!` will await all responses before proceeding
         let res = Add::call(&rpc_client, vec![1.0, 2.0, 3.0]).await;
 
-        // 1. Assert that the result is indeed an error.
         assert!(res.is_err());
-
-        // 2. Unwrap the error. This is now safe because we know it's an Err.
         let err = res.unwrap_err();
-
-        // 3. Assert that the io::Error is the kind we expect.
         assert_eq!(err.kind(), std::io::ErrorKind::Other);
-
-        // 4. Assert that the error message contains the specific string from the server.
-        // The endpoint logic converts the generic handler error into a "Remote system error".
         assert!(
             err.to_string()
                 .contains("Remote system error: Addition failed")

@@ -9,7 +9,7 @@ struct AddRequestParams {
 
 #[derive(Encode, Decode, PartialEq, Debug)]
 struct AddResponseParams {
-    pub result: f64,
+    pub sum: f64,
 }
 
 pub struct Add;
@@ -31,14 +31,14 @@ impl RpcMethodPrebuffered for Add {
         Ok(req_params.numbers)
     }
 
-    fn encode_response(result: Self::Output) -> Result<Vec<u8>, io::Error> {
-        Ok(bitcode::encode(&AddResponseParams { result }))
+    fn encode_response(sum: Self::Output) -> Result<Vec<u8>, io::Error> {
+        Ok(bitcode::encode(&AddResponseParams { sum }))
     }
 
     fn decode_response(bytes: &[u8]) -> Result<Self::Output, io::Error> {
         let resp_params = bitcode::decode::<AddResponseParams>(bytes)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
-        Ok(resp_params.result)
+        Ok(resp_params.sum)
     }
 }

@@ -29,3 +29,4 @@ tokio_support = [
 [dev-dependencies]
 # doc-comment = "0.3.3" # TODO: Re-enable
 tokio = { version = "1.45.1", features = ["full"] }
+example-muxio-rpc-service-definition = { workspace = true }

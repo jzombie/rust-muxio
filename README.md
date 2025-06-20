@@ -1,8 +1,10 @@
+<div align="center">
+    <img src="./assets/Muxio-logo.svg" width=250 height=250 />
+</div>
+
 # Muxio: A High-Performance Multiplexing and RPC Framework for Rust
 
 **DRAFT -- WORK IN PROGRESS**
-
-<img src="./assets/Muxio-logo.svg" width=100 height=100 align="right" alt="Muxio Logo" />
 
 Muxio provides a robust and flexible foundation for building high-performance, transport-agnostic, and runtime-agnostic services in Rust. It offers a layered architecture that cleanly separates low-level binary stream multiplexing from high-level RPC logic, enabling you to create custom-tailored communication protocols.
 
@@ -76,25 +78,27 @@ async fn main() {
     {
         let server = RpcServer::new();
 
+        let endpoint = server.endpoint();
+
         // Register server method
         // Note: If not using `join!`, each `register` call must be awaited.
         let _ = join!(
-            server.register_prebuffered(Add::METHOD_ID, |_, bytes| async move {
-                let req = Add::decode_request(&bytes)?;
-                let result = req.iter().sum();
-                let resp = Add::encode_response(result)?;
-                Ok(resp)
+            endpoint.register_prebuffered(Add::METHOD_ID, |_, bytes| async move {
+                let params = Add::decode_request(&bytes)?;
+                let sum = params.iter().sum();
+                let response_bytes = Add::encode_response(sum)?;
+                Ok(response_bytes)
             }),
-            server.register_prebuffered(Mult::METHOD_ID, |_, bytes| async move {
-                let req = Mult::decode_request(&bytes)?;
-                let result = req.iter().product();
-                let resp = Mult::encode_response(result)?;
-                Ok(resp)
+            endpoint.register_prebuffered(Mult::METHOD_ID, |_, bytes| async move {
+                let params = Mult::decode_request(&bytes)?;
+                let product = params.iter().product();
+                let response_bytes = Mult::encode_response(product)?;
+                Ok(response_bytes)
             }),
-            server.register_prebuffered(Echo::METHOD_ID, |_, bytes| async move {
-                let req = Echo::decode_request(&bytes)?;
-                let resp = Echo::encode_response(req)?;
-                Ok(resp)
+            endpoint.register_prebuffered(Echo::METHOD_ID, |_, bytes| async move {
+                let params = Echo::decode_request(&bytes)?;
+                let response_bytes = Echo::encode_response(params)?;
+                Ok(response_bytes)
             })
         );
 

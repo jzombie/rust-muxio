@@ -22,9 +22,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
     /// Performs a streaming RPC call, yielding a stream of success payloads or a terminal error.
     async fn call_rpc_streaming(
         &self,
-        method_id: u64,
-        param_bytes: &[u8],
-        is_finalized: bool,
+        request: RpcRequest,
     ) -> Result<
         (
             RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>,
@@ -53,7 +51,6 @@ pub trait RpcServiceCallerInterface: Send + Sync {
 
             Box::new(move |evt| {
                 let mut tx_lock = tx.lock().expect("tx mutex poisoned");
-
                 match evt {
                     RpcStreamEvent::Header { rpc_header, .. } => {
                         let result_status = rpc_header
@@ -62,10 +59,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                             .copied()
                             .and_then(|b| RpcResultStatus::try_from(b).ok())
                             .unwrap_or(RpcResultStatus::Success);
-
                         *status.lock().expect("status mutex poisoned") = Some(result_status);
-
-                        // Signal that the RPC call has been initiated successfully at the transport level.
                         if let Some(tx) = ready_tx.lock().expect("ready_tx mutex poisoned").take() {
                             let _ = tx.send(Ok(()));
                         }
@@ -84,16 +78,14 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                                     .expect("error buffer mutex poisoned")
                                     .extend(bytes);
                             }
-                            None => {} // Should not happen if protocol is followed correctly.
+                            None => {}
                         }
                     }
                     RpcStreamEvent::End { .. } => {
-                        // The stream is over. Check if we buffered an error payload.
                         let final_status = status.lock().expect("status mutex poisoned").take();
                         let payload = std::mem::take(
                             &mut *error_buffer.lock().expect("error buffer mutex poisoned"),
                         );
-
                         if let Some(sender) = tx_lock.as_mut() {
                             match final_status {
                                 Some(RpcResultStatus::Fail) => {
@@ -112,10 +104,9 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                                         RpcCallerError::RemoteSystemError(final_msg),
                                     ));
                                 }
-                                _ => { /* Success stream ended, no final action needed. */ }
+                                _ => {}
                             }
                         }
-                        // Close the stream by dropping the sender.
                         *tx_lock = None;
                     }
                     _ => {}
@@ -123,16 +114,12 @@ pub trait RpcServiceCallerInterface: Send + Sync {
             })
         };
 
+        // Pass the `request` object directly to the dispatcher's `call` method.
         let encoder = self
             .get_dispatcher()
             .with_dispatcher(|d| {
                 d.call(
-                    RpcRequest {
-                        rpc_method_id: method_id,
-                        rpc_param_bytes: Some(param_bytes.to_vec()),
-                        rpc_prebuffered_payload_bytes: None,
-                        is_finalized,
-                    },
+                    request, // Use the provided request
                     DEFAULT_SERVICE_MAX_CHUNK_SIZE,
                     send_fn,
                     Some(recv_fn),
@@ -140,7 +127,6 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                 )
             })
             .await
-            // FIX: Use debug formatting `{:?}` since FrameEncodeError doesn't implement Display.
             .map_err(|e| io::Error::other(format!("{:?}", e)))?;
 
         match ready_rx.await {
@@ -153,10 +139,8 @@ pub trait RpcServiceCallerInterface: Send + Sync {
     /// Performs a buffered RPC call that can resolve to a success value or a custom error.
     async fn call_rpc_buffered<T, F>(
         &self,
-        method_id: u64,
-        param_bytes: &[u8],
+        request: RpcRequest,
         decode: F,
-        is_finalized: bool,
     ) -> Result<
         (
             RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>,
@@ -168,9 +152,8 @@ pub trait RpcServiceCallerInterface: Send + Sync {
         T: Send + 'static,
         F: Fn(&[u8]) -> T + Send + Sync + 'static,
     {
-        let (encoder, mut stream) = self
-            .call_rpc_streaming(method_id, param_bytes, is_finalized)
-            .await?;
+        // Pass the request object to `call_rpc_streaming`.
+        let (encoder, mut stream) = self.call_rpc_streaming(request).await?;
 
         let mut success_buf = Vec::new();
         let mut err: Option<RpcCallerError> = None;
@@ -182,7 +165,6 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                 }
                 Err(e) => {
                     err = Some(e);
-                    // We can break here because the stream will end after an error.
                     break;
                 }
             }

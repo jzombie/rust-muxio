@@ -31,6 +31,8 @@ impl<'a> Default for RpcDispatcher<'a> {
 ///
 /// Internally, it wraps a `RpcRespondableSession` and maintains a synchronized
 /// request queue for tracking inbound response metadata and payloads.
+///
+/// IMPORTANT: A unique dispatcher should be used per-client.
 pub struct RpcDispatcher<'a> {
     /// Core session responsible for managing stream lifecycles and handlers.
     rpc_respondable_session: RpcRespondableSession<'a>,

@@ -9,7 +9,7 @@ struct MultRequestParams {
 
 #[derive(Encode, Decode, PartialEq, Debug)]
 struct MultResponseParams {
-    pub result: f64,
+    pub product: f64,
 }
 
 pub struct Mult;
@@ -31,14 +31,14 @@ impl RpcMethodPrebuffered for Mult {
         Ok(req_params.numbers)
     }
 
-    fn encode_response(result: Self::Output) -> Result<Vec<u8>, io::Error> {
-        Ok(bitcode::encode(&MultResponseParams { result }))
+    fn encode_response(product: Self::Output) -> Result<Vec<u8>, io::Error> {
+        Ok(bitcode::encode(&MultResponseParams { product }))
     }
 
     fn decode_response(bytes: &[u8]) -> Result<Self::Output, io::Error> {
         let resp_params = bitcode::decode::<MultResponseParams>(bytes)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
-        Ok(resp_params.result)
+        Ok(resp_params.product)
     }
 }

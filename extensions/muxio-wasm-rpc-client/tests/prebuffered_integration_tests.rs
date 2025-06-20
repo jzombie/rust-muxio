@@ -21,48 +21,53 @@
 use example_muxio_rpc_service_definition::prebuffered::{Add, Echo, Mult};
 use futures_util::{SinkExt, StreamExt};
 use muxio_rpc_service::prebuffered::RpcMethodPrebuffered;
-use muxio_rpc_service_caller::{RpcServiceCallerInterface, prebuffered::RpcCallPrebuffered};
+use muxio_rpc_service_caller::RpcServiceCallerInterface;
+use muxio_rpc_service_caller::prebuffered::RpcCallPrebuffered;
 use muxio_tokio_rpc_server::{RpcServer, RpcServiceEndpointInterface};
 use muxio_wasm_rpc_client::RpcWasmClient;
 use std::sync::Arc;
 use tokio::join;
 use tokio::net::TcpListener;
 use tokio::sync::mpsc as tokio_mpsc;
+use tokio::task;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message as WsMessage};
 
 #[tokio::test]
 async fn test_success_client_server_roundtrip() {
-    // 1. Start a real Tokio-based RPC Server (identical to the non-WASM test)
+    // 1. Start a real Tokio-based RPC Server
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
     let server_url = format!("ws://{}/ws", addr);
 
-    let server = RpcServer::new();
+    // Wrap server in an Arc immediately to manage ownership correctly.
+    let server = Arc::new(RpcServer::new());
+    let endpoint = server.endpoint(); // Get endpoint for registration
 
     // Register handlers on the server.
     let _ = join!(
-        server.register_prebuffered(Add::METHOD_ID, |_, bytes| async move {
-            let req = Add::decode_request(&bytes)?;
-            let result = req.iter().sum();
-            let resp = Add::encode_response(result)?;
-            Ok(resp)
+        endpoint.register_prebuffered(Add::METHOD_ID, |_, bytes| async move {
+            let params = Add::decode_request(&bytes)?;
+            let sum = params.iter().sum();
+            let response_bytes = Add::encode_response(sum)?;
+            Ok(response_bytes)
         }),
-        server.register_prebuffered(Mult::METHOD_ID, |_, bytes| async move {
-            let req = Mult::decode_request(&bytes)?;
-            let result = req.iter().product();
-            let resp = Mult::encode_response(result)?;
-            Ok(resp)
+        endpoint.register_prebuffered(Mult::METHOD_ID, |_, bytes| async move {
+            let params = Mult::decode_request(&bytes)?;
+            let product = params.iter().product();
+            let response_bytes = Mult::encode_response(product)?;
+            Ok(response_bytes)
         }),
-        server.register_prebuffered(Echo::METHOD_ID, |_, bytes| async move {
-            let req = Echo::decode_request(&bytes)?;
-            let resp = Echo::encode_response(req)?;
-            Ok(resp)
+        endpoint.register_prebuffered(Echo::METHOD_ID, |_, bytes| async move {
+            let params = Echo::decode_request(&bytes)?;
+            let response_bytes = Echo::encode_response(params)?;
+            Ok(response_bytes)
         })
     );
 
     // Spawn the server to run in the background.
     tokio::spawn({
-        let server = Arc::new(server);
+        // Clone the Arc for the spawned server task.
+        let server = Arc::clone(&server);
         async move {
             let _ = server.serve_with_listener(listener).await;
         }
@@ -71,19 +76,18 @@ async fn test_success_client_server_roundtrip() {
     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
     // 2. Create the WASM client instance.
-    // This channel will capture bytes emitted by the client.
     let (to_bridge_tx, mut to_bridge_rx) = tokio_mpsc::unbounded_channel::<Vec<u8>>();
     let client = Arc::new(RpcWasmClient::new(move |bytes| {
         to_bridge_tx.send(bytes).unwrap();
     }));
 
-    // 3. Setup the WebSocket bridge to connect the WASM client to the real server.
+    // 3. Setup the WebSocket bridge.
     let (ws_stream, _) = connect_async(&server_url)
         .await
         .expect("Failed to connect to server");
     let (mut ws_sender, mut ws_receiver) = ws_stream.split();
 
-    // This task forwards messages from our client's emit callback to the WebSocket server.
+    // This task is fine as it only deals with async channels.
     tokio::spawn(async move {
         while let Some(bytes) = to_bridge_rx.recv().await {
             if ws_sender
@@ -96,24 +100,22 @@ async fn test_success_client_server_roundtrip() {
         }
     });
 
-    // This task forwards messages from the WebSocket server to our client's dispatcher.
     tokio::spawn({
         let client = client.clone();
         async move {
             while let Some(Ok(WsMessage::Binary(bytes))) = ws_receiver.next().await {
-                // Lock the dispatcher and feed it the incoming bytes.
-                client
-                    .get_dispatcher()
-                    .lock()
-                    .unwrap()
-                    .read_bytes(&bytes)
-                    .unwrap();
+                let dispatcher = client.get_dispatcher();
+                // We move the blocking lock() and synchronous read_bytes() call
+                // onto a dedicated blocking thread to avoid freezing the test runtime.
+                task::spawn_blocking(move || dispatcher.lock().unwrap().read_bytes(&bytes))
+                    .await
+                    .unwrap() // Unwrap JoinError
+                    .unwrap(); // Unwrap Result from read_bytes
             }
         }
     });
 
     // 4. Make RPC calls using the WASM client instance.
-    // The bridge ensures these calls are transparently sent to the real server.
     let (res1, res2, res3, res4, res5, res6) = join!(
         Add::call(client.as_ref(), vec![1.0, 2.0, 3.0]),
         Add::call(client.as_ref(), vec![8.0, 3.0, 7.0]),
@@ -139,9 +141,11 @@ async fn test_error_client_server_roundtrip() {
     let addr = listener.local_addr().unwrap();
     let server_url = format!("ws://{}/ws", addr);
 
-    let server = RpcServer::new();
-    // Register a handler that always returns an error.
-    server
+    // Use the same Arc/endpoint pattern for consistency.
+    let server = Arc::new(RpcServer::new());
+    let endpoint = server.endpoint();
+
+    endpoint
         .register_prebuffered(Add::METHOD_ID, |_, _bytes| async move {
             Err("Addition failed".into())
         })
@@ -149,7 +153,7 @@ async fn test_error_client_server_roundtrip() {
         .unwrap();
 
     tokio::spawn({
-        let server = Arc::new(server);
+        let server = Arc::clone(&server);
         async move {
             let _ = server.serve_with_listener(listener).await;
         }
@@ -178,15 +182,15 @@ async fn test_error_client_server_roundtrip() {
         }
     });
 
+    // This task is also updated to be non-blocking.
     tokio::spawn({
         let client = client.clone();
         async move {
             while let Some(Ok(WsMessage::Binary(bytes))) = ws_receiver.next().await {
-                client
-                    .get_dispatcher()
-                    .lock()
+                let dispatcher = client.get_dispatcher();
+                task::spawn_blocking(move || dispatcher.lock().unwrap().read_bytes(&bytes))
+                    .await
                     .unwrap()
-                    .read_bytes(&bytes)
                     .unwrap();
             }
         }

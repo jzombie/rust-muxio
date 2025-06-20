@@ -15,40 +15,47 @@ async fn main() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
 
+    // This block sets up and spawns the server.
     {
-        let server = RpcServer::new();
+        // Create the server and immediately wrap it in an Arc for sharing.
+        let server = Arc::new(RpcServer::new());
 
-        // Register server method
-        // Note: If not using `join!`, each `register` call must be awaited.
+        //  Get a handle to the endpoint to register handlers.
+        let endpoint = server.endpoint();
+
+        // Register server methods on the endpoint.
         let _ = join!(
-            server.register_prebuffered(Add::METHOD_ID, |_, bytes| async move {
-                let req = Add::decode_request(&bytes)?;
-                let result = req.iter().sum();
-                let resp = Add::encode_response(result)?;
-                Ok(resp)
+            endpoint.register_prebuffered(Add::METHOD_ID, |_, bytes: Vec<u8>| async move {
+                // The `?` operator works here because we map the error at the end.
+                let params = Add::decode_request(&bytes)?;
+                let sum = params.iter().sum();
+                let response_bytes = Add::encode_response(sum)?;
+                Ok(response_bytes)
             }),
-            server.register_prebuffered(Mult::METHOD_ID, |_, bytes| async move {
-                let req = Mult::decode_request(&bytes)?;
-                let result = req.iter().product();
-                let resp = Mult::encode_response(result)?;
-                Ok(resp)
+            endpoint.register_prebuffered(Mult::METHOD_ID, |_, bytes: Vec<u8>| async move {
+                let params = Mult::decode_request(&bytes)?;
+                let product = params.iter().product();
+                let response_bytes = Mult::encode_response(product)?;
+                Ok(response_bytes)
             }),
-            server.register_prebuffered(Echo::METHOD_ID, |_, bytes| async move {
-                let req = Echo::decode_request(&bytes)?;
-                let resp = Echo::encode_response(req)?;
-                Ok(resp)
+            endpoint.register_prebuffered(Echo::METHOD_ID, |_, bytes: Vec<u8>| async move {
+                let params = Echo::decode_request(&bytes)?;
+                let response_bytes = Echo::encode_response(params)?;
+                Ok(response_bytes)
             })
         );
 
         // Spawn the server using the pre-bound listener
         let _server_task = tokio::spawn({
-            let server = server;
+            // Clone the Arc for the server task.
+            let server = Arc::clone(&server);
             async move {
-                let _ = Arc::new(server).serve_with_listener(listener).await;
+                let _ = server.serve_with_listener(listener).await;
             }
         });
     }
 
+    // This block runs the client against the server.
     {
         // Wait briefly for server to start
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
