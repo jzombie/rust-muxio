@@ -107,8 +107,6 @@ where
             return Ok(());
         }
 
-        println!("Processing request....");
-
         // --- Stage 2: Concurrently process handlers ---
         let mut response_futures = Vec::new();
         for (request_id, request) in requests_to_process {
