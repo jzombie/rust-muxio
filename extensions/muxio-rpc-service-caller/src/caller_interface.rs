@@ -1,11 +1,17 @@
-use crate::{error::RpcCallerError, with_dispatcher_trait::WithDispatcher};
+use crate::{
+    dynamic_channel::{DynamicReceiver, DynamicSender},
+    error::RpcCallerError,
+    with_dispatcher_trait::WithDispatcher,
+};
 use futures::{StreamExt, channel::mpsc, channel::oneshot};
 use muxio::rpc::{
     RpcRequest,
     rpc_internals::{RpcStreamEncoder, RpcStreamEvent, rpc_trait::RpcEmit},
 };
 use muxio_rpc_service::RpcResultStatus;
-use muxio_rpc_service::constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE;
+use muxio_rpc_service::constants::{
+    DEFAULT_RPC_STREAM_CHANNEL_BUFFER_SIZE, DEFAULT_SERVICE_MAX_CHUNK_SIZE,
+};
 use std::io;
 use std::sync::{Arc, Mutex};
 
@@ -18,18 +24,32 @@ pub trait RpcServiceCallerInterface: Send + Sync {
     fn get_emit_fn(&self) -> Arc<dyn Fn(Vec<u8>) + Send + Sync>;
 
     /// Performs a streaming RPC call, yielding a stream of success payloads or a terminal error.
-
     async fn call_rpc_streaming(
         &self,
         request: RpcRequest,
+        use_unbounded_channel: bool,
     ) -> Result<
         (
             RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>,
-            mpsc::UnboundedReceiver<Result<Vec<u8>, RpcCallerError>>,
+            DynamicReceiver,
         ),
         io::Error,
     > {
-        let (tx, rx) = mpsc::unbounded::<Result<Vec<u8>, RpcCallerError>>();
+        // Dynamically create the chosen channel type based on the flag
+        let (tx, rx) = if use_unbounded_channel {
+            let (sender, receiver) = mpsc::unbounded();
+            (
+                DynamicSender::Unbounded(sender),
+                DynamicReceiver::Unbounded(receiver),
+            )
+        } else {
+            // Correctly uses the constant when creating the bounded channel
+            let (sender, receiver) = mpsc::channel(DEFAULT_RPC_STREAM_CHANNEL_BUFFER_SIZE);
+            (
+                DynamicSender::Bounded(sender),
+                DynamicReceiver::Bounded(receiver),
+            )
+        };
 
         let tx = Arc::new(Mutex::new(Some(tx)));
 
@@ -67,7 +87,8 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                         match *current_status {
                             Some(RpcResultStatus::Success) => {
                                 if let Some(sender) = tx_lock.as_mut() {
-                                    let _ = sender.unbounded_send(Ok(bytes));
+                                    // Use the unified send method from our new enum
+                                    sender.send_and_ignore(Ok(bytes));
                                 }
                             }
                             Some(_) => {
@@ -87,10 +108,9 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                         if let Some(sender) = tx_lock.as_mut() {
                             match final_status {
                                 Some(RpcResultStatus::Fail) => {
-                                    let _ =
-                                        sender.unbounded_send(Err(RpcCallerError::RemoteError {
-                                            payload,
-                                        }));
+                                    sender.send_and_ignore(Err(RpcCallerError::RemoteError {
+                                        payload,
+                                    }));
                                 }
                                 Some(status @ RpcResultStatus::SystemError)
                                 | Some(status @ RpcResultStatus::MethodNotFound) => {
@@ -100,9 +120,9 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                                     } else {
                                         msg
                                     };
-                                    let _ = sender.unbounded_send(Err(
-                                        RpcCallerError::RemoteSystemError(final_msg),
-                                    ));
+                                    sender.send_and_ignore(Err(RpcCallerError::RemoteSystemError(
+                                        final_msg,
+                                    )));
                                 }
                                 _ => {}
                             }
@@ -114,12 +134,12 @@ pub trait RpcServiceCallerInterface: Send + Sync {
             })
         };
 
-        // Pass the `request` object directly to the dispatcher's `call` method.
+        // The rest of the function remains unchanged
         let encoder = self
             .get_dispatcher()
             .with_dispatcher(|d| {
                 d.call(
-                    request, // Use the provided request
+                    request,
                     DEFAULT_SERVICE_MAX_CHUNK_SIZE,
                     send_fn,
                     Some(recv_fn),
@@ -152,8 +172,8 @@ pub trait RpcServiceCallerInterface: Send + Sync {
         T: Send + 'static,
         F: Fn(&[u8]) -> T + Send + Sync + 'static,
     {
-        // Pass the request object to `call_rpc_streaming`.
-        let (encoder, mut stream) = self.call_rpc_streaming(request).await?;
+        // Defaults to using the safer, bounded channel.
+        let (encoder, mut stream) = self.call_rpc_streaming(request, false).await?;
 
         let mut success_buf = Vec::new();
         let mut err: Option<RpcCallerError> = None;
