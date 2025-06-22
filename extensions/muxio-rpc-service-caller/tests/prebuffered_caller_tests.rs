@@ -135,7 +135,7 @@ async fn test_buffered_call_remote_error() {
     let decode_fn = |bytes: &[u8]| -> Vec<u8> { bytes.to_vec() };
 
     tokio::spawn(async move {
-        let mut sender = loop {
+        let sender = loop {
             if let Some(s) = sender_provider.lock().unwrap().take() {
                 break s;
             }
