@@ -67,8 +67,9 @@ where
             is_finalized: true, // IMPORTANT: All prebuffered requests should be considered finalized
         };
 
+        // TODO: Call rpc_client.call_rpc_buffered
         // We call call_rpc_streaming directly because we need to manually construct the request
-        let (_, mut stream) = rpc_client.call_rpc_streaming(request).await?;
+        let (_, mut stream) = rpc_client.call_rpc_streaming(request, true).await?;
 
         // Buffer the response
         let mut success_buf = Vec::new();
