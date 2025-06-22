@@ -67,35 +67,28 @@ where
             is_finalized: true, // IMPORTANT: All prebuffered requests should be considered finalized
         };
 
-        // TODO: Call rpc_client.call_rpc_buffered
-        // We call call_rpc_streaming directly because we need to manually construct the request
-        let (_, mut stream) = rpc_client.call_rpc_streaming(request).await?;
+        // 1. Define the specific decode closure to pass to the generic helper.
+        // Its job is to call our trait's `decode_response` method.
+        let decode_closure =
+            |buffer: &[u8]| -> Result<Self::Output, io::Error> { Self::decode_response(buffer) };
 
-        // Buffer the response
-        let mut success_buf = Vec::new();
-        let mut err: Option<RpcCallerError> = None;
-        while let Some(result) = stream.next().await {
-            match result {
-                Ok(chunk) => success_buf.extend_from_slice(&chunk),
-                Err(e) => {
-                    err = Some(e);
-                    break;
-                }
+        // 2. Call the generic helper with our custom closure.
+        let (_encoder, nested_result) = rpc_client
+            .call_rpc_buffered(request, decode_closure)
+            .await?;
+
+        // 3. Unpack the nested `Result` and apply this trait's specific error handling.
+        // The type of `nested_result` is: Result<Result<Self::Output, io::Error>, RpcCallerError>
+        match nested_result {
+            // The stream was successful, so now we check the result of our decode function.
+            Ok(decode_result) => {
+                // `decode_result` is the `Result<Self::Output, io::Error>` from our closure.
+                // We can just return it directly.
+                decode_result
             }
-        }
-
-        let inner_result = if let Some(e) = err {
-            Err(e)
-        } else {
-            // `Self::decode_response` returns a `Result`, which we will handle in the match below.
-            Ok(Self::decode_response(&success_buf))
-        };
-
-        match inner_result {
-            // The `output` variable here is the `Result` we want to return.
-            // We just pass it through directly without wrapping it in another `Ok()`.
-            Ok(output) => output,
+            // An error occurred during the stream itself (e.g., remote error).
             Err(rpc_error) => {
+                // Here, we apply the specialized error formatting required by this trait.
                 let error_message = match rpc_error {
                     RpcCallerError::RemoteError { payload } => {
                         format!(
