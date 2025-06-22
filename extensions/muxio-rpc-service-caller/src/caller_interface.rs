@@ -172,8 +172,17 @@ pub trait RpcServiceCallerInterface: Send + Sync {
         T: Send + 'static,
         F: Fn(&[u8]) -> T + Send + Sync + 'static,
     {
-        // Defaults to using the safer, bounded channel.
-        let (encoder, mut stream) = self.call_rpc_streaming(request, false).await?;
+        // This function defaults to using an UNBOUNDED channel via `call_rpc_streaming`.
+        // This is a deliberate design choice for a trusted, high-performance environment
+        // (e.g., ML training loops) where the 100% reliable completion of potentially
+        // very large messages is prioritized over the backpressure safety provided
+        // by a bounded channel.
+        //
+        // This accepts the risk of high client-side memory usage in exchange
+        // for preventing legitimate, large transfers from failing due to server-side
+        // timeouts caused by the client-side consumer being temporarily slower
+        // than the network producer.
+        let (encoder, mut stream) = self.call_rpc_streaming(request, true).await?;
 
         let mut success_buf = Vec::new();
         let mut err: Option<RpcCallerError> = None;
