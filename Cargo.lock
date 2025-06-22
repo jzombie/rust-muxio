@@ -891,6 +891,7 @@ dependencies = [
  "muxio-tokio-rpc-server",
  "tokio",
  "tokio-tungstenite 0.26.2",
+ "tracing",
 ]
 
 [[package]]

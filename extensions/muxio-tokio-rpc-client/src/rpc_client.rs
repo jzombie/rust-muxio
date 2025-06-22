@@ -28,7 +28,12 @@ impl RpcClient {
         tokio::spawn(async move {
             while let Some(msg) = receiver.next().await {
                 let done = msg.is_err();
-                let _ = recv_tx.send(Some(msg));
+                if let Err(e) = recv_tx.send(Some(msg)) {
+                    tracing::error!(
+                        "DROPPED WEBSOCKET CHUNK: Client channel is full and cannot keep up. Error: {}",
+                        e
+                    );
+                }
                 if done {
                     break;
                 }

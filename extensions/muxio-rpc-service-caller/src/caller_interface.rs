@@ -5,9 +5,7 @@ use muxio::rpc::{
     rpc_internals::{RpcStreamEncoder, RpcStreamEvent, rpc_trait::RpcEmit},
 };
 use muxio_rpc_service::RpcResultStatus;
-use muxio_rpc_service::constants::{
-    DEFAULT_RPC_STREAM_CHANNEL_BUFFER_SIZE, DEFAULT_SERVICE_MAX_CHUNK_SIZE,
-};
+use muxio_rpc_service::constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE;
 use std::io;
 use std::sync::{Arc, Mutex};
 
@@ -20,19 +18,19 @@ pub trait RpcServiceCallerInterface: Send + Sync {
     fn get_emit_fn(&self) -> Arc<dyn Fn(Vec<u8>) + Send + Sync>;
 
     /// Performs a streaming RPC call, yielding a stream of success payloads or a terminal error.
+
     async fn call_rpc_streaming(
         &self,
         request: RpcRequest,
     ) -> Result<
         (
             RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>,
-            mpsc::Receiver<Result<Vec<u8>, RpcCallerError>>,
+            mpsc::UnboundedReceiver<Result<Vec<u8>, RpcCallerError>>,
         ),
         io::Error,
     > {
-        let (tx, rx) = mpsc::channel::<Result<Vec<u8>, RpcCallerError>>(
-            DEFAULT_RPC_STREAM_CHANNEL_BUFFER_SIZE,
-        );
+        let (tx, rx) = mpsc::unbounded::<Result<Vec<u8>, RpcCallerError>>();
+
         let tx = Arc::new(Mutex::new(Some(tx)));
 
         let (ready_tx, ready_rx) = oneshot::channel::<Result<(), io::Error>>();
@@ -69,7 +67,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                         match *current_status {
                             Some(RpcResultStatus::Success) => {
                                 if let Some(sender) = tx_lock.as_mut() {
-                                    let _ = sender.try_send(Ok(bytes));
+                                    let _ = sender.unbounded_send(Ok(bytes));
                                 }
                             }
                             Some(_) => {
@@ -89,8 +87,10 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                         if let Some(sender) = tx_lock.as_mut() {
                             match final_status {
                                 Some(RpcResultStatus::Fail) => {
-                                    let _ = sender
-                                        .try_send(Err(RpcCallerError::RemoteError { payload }));
+                                    let _ =
+                                        sender.unbounded_send(Err(RpcCallerError::RemoteError {
+                                            payload,
+                                        }));
                                 }
                                 Some(status @ RpcResultStatus::SystemError)
                                 | Some(status @ RpcResultStatus::MethodNotFound) => {
@@ -100,7 +100,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                                     } else {
                                         msg
                                     };
-                                    let _ = sender.try_send(Err(
+                                    let _ = sender.unbounded_send(Err(
                                         RpcCallerError::RemoteSystemError(final_msg),
                                     ));
                                 }

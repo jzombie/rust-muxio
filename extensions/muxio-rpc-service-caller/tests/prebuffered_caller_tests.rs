@@ -16,7 +16,8 @@ use std::{
 
 // --- Test Setup: Mock Implementations ---
 
-type SharedResponseSender = Arc<Mutex<Option<mpsc::Sender<Result<Vec<u8>, RpcCallerError>>>>>;
+type SharedResponseSender =
+    Arc<Mutex<Option<mpsc::UnboundedSender<Result<Vec<u8>, RpcCallerError>>>>>;
 
 /// A mock client that allows us to inject specific stream responses for testing.
 #[derive(Clone)]
@@ -63,11 +64,11 @@ impl RpcServiceCallerInterface for MockRpcClient {
     ) -> Result<
         (
             RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>,
-            mpsc::Receiver<Result<Vec<u8>, RpcCallerError>>,
+            mpsc::UnboundedReceiver<Result<Vec<u8>, RpcCallerError>>,
         ),
         io::Error,
     > {
-        let (tx, rx) = mpsc::channel(8);
+        let (tx, rx) = mpsc::unbounded();
 
         let dummy_encoder = {
             let dummy_header = RpcHeader {
@@ -101,13 +102,13 @@ async fn test_buffered_call_success() {
     tokio::spawn({
         let echo_payload = echo_payload.clone();
         async move {
-            let mut sender = loop {
+            let sender = loop {
                 if let Some(s) = sender_provider.lock().unwrap().take() {
                     break s;
                 }
                 tokio::time::sleep(std::time::Duration::from_millis(1)).await;
             };
-            sender.try_send(Ok(echo_payload)).unwrap();
+            sender.unbounded_send(Ok(echo_payload)).unwrap();
         }
     });
 
@@ -142,7 +143,7 @@ async fn test_buffered_call_remote_error() {
         };
         let error_payload = b"item does not exist".to_vec();
         sender
-            .try_send(Err(RpcCallerError::RemoteError {
+            .unbounded_send(Err(RpcCallerError::RemoteError {
                 payload: error_payload,
             }))
             .unwrap();
@@ -184,7 +185,7 @@ async fn test_prebuffered_trait_converts_error() {
         };
         let error_message = "Method has panicked".to_string();
         sender
-            .try_send(Err(RpcCallerError::RemoteSystemError(error_message)))
+            .unbounded_send(Err(RpcCallerError::RemoteSystemError(error_message)))
             .unwrap();
     });
 
