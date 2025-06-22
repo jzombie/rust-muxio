@@ -49,6 +49,7 @@ where
             .await
     }
 
+    // TODO: Emit a status report for logging purposes
     /// Reads raw bytes from the transport, decodes them into RPC requests,
     /// invokes the appropriate handler, and sends back a response.
     async fn read_bytes<'a, E>(

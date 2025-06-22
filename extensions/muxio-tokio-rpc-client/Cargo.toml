@@ -18,6 +18,7 @@ muxio = { workspace = true }
 muxio-rpc-service = { workspace = true }
 muxio-rpc-service-caller = { workspace = true, features=["tokio_support"] }
 futures = "0.3.31"
+tracing = "0.1.41"
 
 [dev-dependencies]
 muxio-tokio-rpc-server = { workspace = true }

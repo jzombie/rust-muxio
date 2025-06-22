@@ -1,4 +1,8 @@
-use crate::{error::RpcCallerError, with_dispatcher_trait::WithDispatcher};
+use crate::{
+    dynamic_channel::{DynamicChannelType, DynamicReceiver, DynamicSender},
+    error::RpcCallerError,
+    with_dispatcher_trait::WithDispatcher,
+};
 use futures::{StreamExt, channel::mpsc, channel::oneshot};
 use muxio::rpc::{
     RpcRequest,
@@ -23,16 +27,33 @@ pub trait RpcServiceCallerInterface: Send + Sync {
     async fn call_rpc_streaming(
         &self,
         request: RpcRequest,
+        // The parameter is now the new, more expressive enum.
+        dynamic_channel_type: DynamicChannelType,
     ) -> Result<
         (
             RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>,
-            mpsc::Receiver<Result<Vec<u8>, RpcCallerError>>,
+            DynamicReceiver,
         ),
         io::Error,
     > {
-        let (tx, rx) = mpsc::channel::<Result<Vec<u8>, RpcCallerError>>(
-            DEFAULT_RPC_STREAM_CHANNEL_BUFFER_SIZE,
-        );
+        // The implementation now matches on the enum to create the correct channel.
+        let (tx, rx) = match dynamic_channel_type {
+            DynamicChannelType::Unbounded => {
+                let (sender, receiver) = mpsc::unbounded();
+                (
+                    DynamicSender::Unbounded(sender),
+                    DynamicReceiver::Unbounded(receiver),
+                )
+            }
+            DynamicChannelType::Bounded => {
+                let (sender, receiver) = mpsc::channel(DEFAULT_RPC_STREAM_CHANNEL_BUFFER_SIZE);
+                (
+                    DynamicSender::Bounded(sender),
+                    DynamicReceiver::Bounded(receiver),
+                )
+            }
+        };
+
         let tx = Arc::new(Mutex::new(Some(tx)));
 
         let (ready_tx, ready_rx) = oneshot::channel::<Result<(), io::Error>>();
@@ -69,7 +90,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                         match *current_status {
                             Some(RpcResultStatus::Success) => {
                                 if let Some(sender) = tx_lock.as_mut() {
-                                    let _ = sender.try_send(Ok(bytes));
+                                    sender.send_and_ignore(Ok(bytes));
                                 }
                             }
                             Some(_) => {
@@ -89,8 +110,9 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                         if let Some(sender) = tx_lock.as_mut() {
                             match final_status {
                                 Some(RpcResultStatus::Fail) => {
-                                    let _ = sender
-                                        .try_send(Err(RpcCallerError::RemoteError { payload }));
+                                    sender.send_and_ignore(Err(RpcCallerError::RemoteError {
+                                        payload,
+                                    }));
                                 }
                                 Some(status @ RpcResultStatus::SystemError)
                                 | Some(status @ RpcResultStatus::MethodNotFound) => {
@@ -100,9 +122,9 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                                     } else {
                                         msg
                                     };
-                                    let _ = sender.try_send(Err(
-                                        RpcCallerError::RemoteSystemError(final_msg),
-                                    ));
+                                    sender.send_and_ignore(Err(RpcCallerError::RemoteSystemError(
+                                        final_msg,
+                                    )));
                                 }
                                 _ => {}
                             }
@@ -114,12 +136,11 @@ pub trait RpcServiceCallerInterface: Send + Sync {
             })
         };
 
-        // Pass the `request` object directly to the dispatcher's `call` method.
         let encoder = self
             .get_dispatcher()
             .with_dispatcher(|d| {
                 d.call(
-                    request, // Use the provided request
+                    request,
                     DEFAULT_SERVICE_MAX_CHUNK_SIZE,
                     send_fn,
                     Some(recv_fn),
@@ -152,8 +173,19 @@ pub trait RpcServiceCallerInterface: Send + Sync {
         T: Send + 'static,
         F: Fn(&[u8]) -> T + Send + Sync + 'static,
     {
-        // Pass the request object to `call_rpc_streaming`.
-        let (encoder, mut stream) = self.call_rpc_streaming(request).await?;
+        // This function defaults to using an UNBOUNDED channel via `call_rpc_streaming`.
+        // This is a deliberate design choice for a trusted, high-performance environment
+        // (e.g., ML training loops) where the 100% reliable completion of potentially
+        // very large messages is prioritized over the backpressure safety provided
+        // by a bounded channel.
+        //
+        // This accepts the risk of high client-side memory usage in exchange
+        // for preventing legitimate, large transfers from failing due to server-side
+        // timeouts caused by the client-side consumer being temporarily slower
+        // than the network producer.
+        let (encoder, mut stream) = self
+            .call_rpc_streaming(request, DynamicChannelType::Unbounded)
+            .await?;
 
         let mut success_buf = Vec::new();
         let mut err: Option<RpcCallerError> = None;

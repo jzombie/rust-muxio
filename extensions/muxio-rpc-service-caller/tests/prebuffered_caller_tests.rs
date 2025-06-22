@@ -16,7 +16,13 @@ use std::{
 
 // --- Test Setup: Mock Implementations ---
 
-type SharedResponseSender = Arc<Mutex<Option<mpsc::Sender<Result<Vec<u8>, RpcCallerError>>>>>;
+// NOTE: This now needs to use the dynamic channel types from your new module.
+// Make sure your lib.rs exports `dynamic_channel`.
+use muxio_rpc_service_caller::dynamic_channel::{
+    DynamicChannelType, DynamicReceiver, DynamicSender,
+};
+
+type SharedResponseSender = Arc<Mutex<Option<DynamicSender>>>;
 
 /// A mock client that allows us to inject specific stream responses for testing.
 #[derive(Clone)]
@@ -60,14 +66,28 @@ impl RpcServiceCallerInterface for MockRpcClient {
     async fn call_rpc_streaming(
         &self,
         _request: RpcRequest,
+        dynamic_channel_type: DynamicChannelType,
     ) -> Result<
         (
             RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>,
-            mpsc::Receiver<Result<Vec<u8>, RpcCallerError>>,
+            DynamicReceiver,
         ),
         io::Error,
     > {
-        let (tx, rx) = mpsc::channel(8);
+        // The mock will now also respect the channel choice.
+        let (tx, rx) = if dynamic_channel_type == DynamicChannelType::Unbounded {
+            let (sender, receiver) = mpsc::unbounded();
+            (
+                DynamicSender::Unbounded(sender),
+                DynamicReceiver::Unbounded(receiver),
+            )
+        } else {
+            let (sender, receiver) = mpsc::channel(8);
+            (
+                DynamicSender::Bounded(sender),
+                DynamicReceiver::Bounded(receiver),
+            )
+        };
 
         let dummy_encoder = {
             let dummy_header = RpcHeader {
@@ -107,11 +127,10 @@ async fn test_buffered_call_success() {
                 }
                 tokio::time::sleep(std::time::Duration::from_millis(1)).await;
             };
-            sender.try_send(Ok(echo_payload)).unwrap();
+            sender.send_and_ignore(Ok(echo_payload));
         }
     });
 
-    // Construct an RpcRequest to pass to the mocked call.
     let request = RpcRequest {
         rpc_method_id: Echo::METHOD_ID,
         rpc_param_bytes: Some(echo_payload.clone()),
@@ -141,14 +160,11 @@ async fn test_buffered_call_remote_error() {
             tokio::time::sleep(std::time::Duration::from_millis(1)).await;
         };
         let error_payload = b"item does not exist".to_vec();
-        sender
-            .try_send(Err(RpcCallerError::RemoteError {
-                payload: error_payload,
-            }))
-            .unwrap();
+        sender.send_and_ignore(Err(RpcCallerError::RemoteError {
+            payload: error_payload,
+        }));
     });
 
-    // Construct an RpcRequest to pass to the mocked call.
     let request = RpcRequest {
         rpc_method_id: Echo::METHOD_ID,
         rpc_param_bytes: Some(vec![]),
@@ -166,8 +182,6 @@ async fn test_buffered_call_remote_error() {
     }
 }
 
-// NOTE: This test does not need to change because it calls the high-level
-// `Echo::call` which was already updated to handle RpcRequest construction internally.
 #[tokio::test]
 async fn test_prebuffered_trait_converts_error() {
     let sender_provider = Arc::new(Mutex::new(None));
@@ -183,9 +197,7 @@ async fn test_prebuffered_trait_converts_error() {
             tokio::time::sleep(std::time::Duration::from_millis(1)).await;
         };
         let error_message = "Method has panicked".to_string();
-        sender
-            .try_send(Err(RpcCallerError::RemoteSystemError(error_message)))
-            .unwrap();
+        sender.send_and_ignore(Err(RpcCallerError::RemoteSystemError(error_message)));
     });
 
     let result = Echo::call(&client, b"some input".to_vec()).await;

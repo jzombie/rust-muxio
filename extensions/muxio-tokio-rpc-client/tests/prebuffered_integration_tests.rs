@@ -1,5 +1,7 @@
 use example_muxio_rpc_service_definition::prebuffered::{Add, Echo, Mult};
-use muxio_rpc_service::prebuffered::RpcMethodPrebuffered;
+use muxio_rpc_service::{
+    constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE, prebuffered::RpcMethodPrebuffered,
+};
 use muxio_rpc_service_caller::prebuffered::RpcCallPrebuffered;
 use muxio_tokio_rpc_client::RpcClient;
 use muxio_tokio_rpc_server::{RpcServer, RpcServiceEndpointInterface};
@@ -118,4 +120,52 @@ async fn test_error_client_server_roundtrip() {
                 .contains("Remote system error: Addition failed")
         );
     }
+}
+
+#[tokio::test]
+async fn test_large_prebuffered_payload_roundtrip() {
+    // 1. --- SETUP: START A REAL RPC SERVER ---
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let server_url = format!("ws://{}/ws", addr);
+    let server = Arc::new(RpcServer::new());
+    let endpoint = server.endpoint();
+
+    // Register a simple "echo" handler on the server for our test to call.
+    endpoint
+        .register_prebuffered(Echo::METHOD_ID, |_, bytes: Vec<u8>| async move {
+            // The handler simply returns the bytes it received.
+            Ok(Echo::encode_response(bytes).unwrap())
+        })
+        .await
+        .unwrap();
+
+    // Spawn the server to run in the background.
+    tokio::spawn(async move {
+        let _ = server.serve_with_listener(listener).await;
+    });
+
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+    // 2. --- SETUP: CONNECT A REAL RPC CLIENT ---
+    let client = RpcClient::new(&server_url).await;
+
+    // 3. --- TEST: SEND AND RECEIVE A LARGE PAYLOAD ---
+
+    // Create a payload that is 200x the chunk size to ensure
+    // hundreds of chunks are streamed for both request and response.
+    // 200 * 64KB = 12.8 MB
+    let large_payload = vec![1u8; DEFAULT_SERVICE_MAX_CHUNK_SIZE * 200];
+
+    // Use the high-level `Echo::call` which uses the RpcCallPrebuffered trait.
+    // This is a full, end-to-end test of the prebuffered logic.
+    let result = Echo::call(&client, large_payload.clone()).await;
+
+    // 4. --- ASSERT ---
+    assert!(
+        result.is_ok(),
+        "The RPC call for a large payload failed: {:?}",
+        result.err()
+    );
+    assert_eq!(result.unwrap(), large_payload);
 }

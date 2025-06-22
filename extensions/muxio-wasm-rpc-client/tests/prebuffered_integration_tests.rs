@@ -20,7 +20,9 @@
 
 use example_muxio_rpc_service_definition::prebuffered::{Add, Echo, Mult};
 use futures_util::{SinkExt, StreamExt};
-use muxio_rpc_service::prebuffered::RpcMethodPrebuffered;
+use muxio_rpc_service::{
+    constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE, prebuffered::RpcMethodPrebuffered,
+};
 use muxio_rpc_service_caller::RpcServiceCallerInterface;
 use muxio_rpc_service_caller::prebuffered::RpcCallPrebuffered;
 use muxio_tokio_rpc_server::{RpcServer, RpcServiceEndpointInterface};
@@ -207,4 +209,86 @@ async fn test_error_client_server_roundtrip() {
         err.to_string()
             .contains("Remote system error: Addition failed")
     );
+}
+
+#[tokio::test]
+async fn test_large_prebuffered_payload_roundtrip_wasm() {
+    // 1. --- SETUP: START A REAL RPC SERVER ---
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let server_url = format!("ws://{}/ws", addr);
+    let server = Arc::new(RpcServer::new());
+    let endpoint = server.endpoint();
+
+    // Register a simple "echo" handler on the server for our test to call.
+    endpoint
+        .register_prebuffered(Echo::METHOD_ID, |_, bytes: Vec<u8>| async move {
+            // The handler simply returns the bytes it received.
+            let params = Echo::decode_request(&bytes)?;
+            Ok(Echo::encode_response(params)?)
+        })
+        .await
+        .unwrap();
+
+    // Spawn the server to run in the background.
+    tokio::spawn(async move {
+        let _ = server.serve_with_listener(listener).await;
+    });
+
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+    // 2. --- SETUP: CREATE WASM CLIENT AND BRIDGE ---
+    let (to_bridge_tx, mut to_bridge_rx) = tokio_mpsc::unbounded_channel::<Vec<u8>>();
+    let client = Arc::new(RpcWasmClient::new(move |bytes| {
+        to_bridge_tx.send(bytes).unwrap();
+    }));
+    let (ws_stream, _) = connect_async(&server_url)
+        .await
+        .expect("Failed to connect to server");
+    let (mut ws_sender, mut ws_receiver) = ws_stream.split();
+
+    // Bridge from WasmClient to real WebSocket
+    tokio::spawn(async move {
+        while let Some(bytes) = to_bridge_rx.recv().await {
+            if ws_sender
+                .send(WsMessage::Binary(bytes.into()))
+                .await
+                .is_err()
+            {
+                break;
+            }
+        }
+    });
+
+    // Bridge from real WebSocket to WasmClient
+    tokio::spawn({
+        let client = client.clone();
+        async move {
+            while let Some(Ok(WsMessage::Binary(bytes))) = ws_receiver.next().await {
+                let dispatcher = client.get_dispatcher();
+                task::spawn_blocking(move || dispatcher.lock().unwrap().read_bytes(&bytes))
+                    .await
+                    .unwrap()
+                    .unwrap();
+            }
+        }
+    });
+
+    // 3. --- TEST: SEND AND RECEIVE A LARGE PAYLOAD ---
+
+    // Create a payload that is 200x the chunk size to ensure
+    // hundreds of chunks are streamed for both request and response.
+    let large_payload = vec![42u8; DEFAULT_SERVICE_MAX_CHUNK_SIZE * 200];
+
+    // Use the high-level `Echo::call` which uses the RpcCallPrebuffered trait.
+    // This is a full, end-to-end test of the prebuffered logic through the WASM client.
+    let result = Echo::call(client.as_ref(), large_payload.clone()).await;
+
+    // 4. --- ASSERT ---
+    assert!(
+        result.is_ok(),
+        "The RPC call for a large payload failed: {:?}",
+        result.err()
+    );
+    assert_eq!(result.unwrap(), large_payload);
 }
