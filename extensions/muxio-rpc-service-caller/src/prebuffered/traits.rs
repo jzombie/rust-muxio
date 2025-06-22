@@ -5,10 +5,6 @@ use muxio_rpc_service::{
 };
 use std::io;
 
-// Add this use statement to bring `futures::StreamExt` into scope.
-// This is needed for the `.next().await` call in the response buffering loop.
-use futures::stream::StreamExt;
-
 #[async_trait::async_trait]
 pub trait RpcCallPrebuffered: RpcMethodPrebuffered + Sized + Send + Sync {
     /// Executes a pre-buffered RPC call.

@@ -1,22 +1,12 @@
-use crate::{error::RpcCallerError, with_dispatcher_trait::WithDispatcher};
+use crate::error::RpcCallerError;
 use futures::{
-    Stream, StreamExt,
-    channel::mpsc::{self, Receiver, Sender, TrySendError, UnboundedReceiver, UnboundedSender},
-    channel::oneshot,
+    Stream,
+    channel::mpsc::{Receiver, Sender, UnboundedReceiver, UnboundedSender},
     pin_mut,
     task::{Context, Poll},
 };
-use muxio::rpc::{
-    RpcRequest,
-    rpc_internals::{RpcStreamEncoder, RpcStreamEvent, rpc_trait::RpcEmit},
-};
-use muxio_rpc_service::RpcResultStatus;
-use muxio_rpc_service::constants::{
-    DEFAULT_RPC_STREAM_CHANNEL_BUFFER_SIZE, DEFAULT_SERVICE_MAX_CHUNK_SIZE,
-};
-use std::io;
+
 use std::pin::Pin;
-use std::sync::{Arc, Mutex};
 
 // --- START: New Enums and Implementations for Dynamic Channels ---
 
