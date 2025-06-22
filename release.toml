@@ -1,5 +1,4 @@
-# This key explicitly defines the order in which crates are published,
-# overriding the default dependency-based ordering.
+# This key explicitly defines the order in which crates should be published.
 publish-order = [
     "muxio",
     "example-muxio-rpc-service-definition",
