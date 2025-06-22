@@ -18,7 +18,9 @@ use std::{
 
 // NOTE: This now needs to use the dynamic channel types from your new module.
 // Make sure your lib.rs exports `dynamic_channel`.
-use muxio_rpc_service_caller::dynamic_channel::{DynamicReceiver, DynamicSender};
+use muxio_rpc_service_caller::dynamic_channel::{
+    DynamicChannelType, DynamicReceiver, DynamicSender,
+};
 
 type SharedResponseSender = Arc<Mutex<Option<DynamicSender>>>;
 
@@ -64,8 +66,7 @@ impl RpcServiceCallerInterface for MockRpcClient {
     async fn call_rpc_streaming(
         &self,
         _request: RpcRequest,
-        // CHANGE #1: Add the missing `use_unbounded_channel` parameter to match the trait.
-        use_unbounded_channel: bool,
+        dynamic_channel_type: DynamicChannelType,
     ) -> Result<
         (
             RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>,
@@ -74,7 +75,7 @@ impl RpcServiceCallerInterface for MockRpcClient {
         io::Error,
     > {
         // The mock will now also respect the channel choice.
-        let (tx, rx) = if use_unbounded_channel {
+        let (tx, rx) = if dynamic_channel_type == DynamicChannelType::Unbounded {
             let (sender, receiver) = mpsc::unbounded();
             (
                 DynamicSender::Unbounded(sender),

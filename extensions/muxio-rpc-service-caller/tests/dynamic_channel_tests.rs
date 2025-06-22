@@ -5,7 +5,7 @@ use muxio::rpc::{
 };
 use muxio_rpc_service_caller::{
     RpcServiceCallerInterface, WithDispatcher,
-    dynamic_channel::{DynamicReceiver, DynamicSender},
+    dynamic_channel::{DynamicChannelType, DynamicReceiver, DynamicSender},
 };
 use std::{
     io,
@@ -58,7 +58,7 @@ impl RpcServiceCallerInterface for MockRpcClient {
     async fn call_rpc_streaming(
         &self,
         _request: RpcRequest,
-        use_unbounded_channel: bool,
+        dynamic_channel_type: DynamicChannelType,
     ) -> Result<
         (
             RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>,
@@ -66,7 +66,7 @@ impl RpcServiceCallerInterface for MockRpcClient {
         ),
         io::Error,
     > {
-        let (tx, rx) = if use_unbounded_channel {
+        let (tx, rx) = if dynamic_channel_type == DynamicChannelType::Unbounded {
             let (sender, receiver) = mpsc::unbounded();
             (
                 DynamicSender::Unbounded(sender),
@@ -138,7 +138,7 @@ async fn test_dynamic_channel_bounded() {
 
     // Make the RPC call, specifically requesting the BOUNDED channel.
     let (_encoder, mut stream) = client
-        .call_rpc_streaming(create_test_request(), false) // `false` = use bounded
+        .call_rpc_streaming(create_test_request(), DynamicChannelType::Bounded)
         .await
         .unwrap();
 
@@ -174,7 +174,7 @@ async fn test_dynamic_channel_unbounded() {
 
     // Make the RPC call, specifically requesting the UNBOUNDED channel.
     let (_encoder, mut stream) = client
-        .call_rpc_streaming(create_test_request(), true) // `true` = use unbounded
+        .call_rpc_streaming(create_test_request(), DynamicChannelType::Unbounded)
         .await
         .unwrap();
 

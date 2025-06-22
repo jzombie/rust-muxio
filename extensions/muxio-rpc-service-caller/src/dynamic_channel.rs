@@ -8,6 +8,13 @@ use futures::{
 
 use std::pin::Pin;
 
+/// Defines the type of channel to be used for an RPC call's response stream.
+#[derive(PartialEq)]
+pub enum DynamicChannelType {
+    Bounded,
+    Unbounded,
+}
+
 // --- START: New Enums and Implementations for Dynamic Channels ---
 
 /// An enum to hold either a bounded or unbounded sender, unifying their interfaces.

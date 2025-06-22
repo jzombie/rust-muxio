@@ -5,3 +5,4 @@ mod with_dispatcher_trait;
 pub use with_dispatcher_trait::*;
 pub mod dynamic_channel;
 pub mod error;
+pub use dynamic_channel::*;
