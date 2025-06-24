@@ -440,7 +440,6 @@ dependencies = [
  "example-muxio-rpc-service-definition",
  "futures",
  "muxio",
- "muxio-rpc-service",
  "muxio-rpc-service-caller",
  "muxio-tokio-rpc-client",
  "muxio-tokio-rpc-server",
