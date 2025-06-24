@@ -13,7 +13,6 @@ muxio = { path = "../" }
 async-trait = "0.1.88"
 muxio-tokio-rpc-server = { workspace = true }
 muxio-tokio-rpc-client = { workspace = true }
-muxio-rpc-service = { workspace = true }
 muxio-rpc-service-caller = { workspace = true, features=["tokio_support"] }
 example-muxio-rpc-service-definition = { workspace = true }
 tracing = "0.1.41"

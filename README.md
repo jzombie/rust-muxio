@@ -67,10 +67,11 @@ Let's build a simple sample app which spins up a Tokio-based WebSocket server, a
 This example code was taken from the [`example-muxio-ws-rpc-app`](./example-muxio-ws-rpc-app/) crate.
 
 ```rust
-use example_muxio_rpc_service_definition::prebuffered::{Add, Echo, Mult};
-use muxio_rpc_service::prebuffered::RpcMethodPrebuffered;
-use muxio_rpc_service_caller::prebuffered::RpcCallPrebuffered;
-use muxio_tokio_rpc_client::RpcClient;
+use example_muxio_rpc_service_definition::{
+    RpcMethodPrebuffered,
+    prebuffered::{Add, Echo, Mult},
+};
+use muxio_tokio_rpc_client::{RpcCallPrebuffered, RpcClient};
 use muxio_tokio_rpc_server::{RpcServer, RpcServiceEndpointInterface};
 use std::sync::Arc;
 use tokio::join;
