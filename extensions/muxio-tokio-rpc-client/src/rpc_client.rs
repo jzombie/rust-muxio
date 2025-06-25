@@ -1,6 +1,6 @@
 use futures_util::{SinkExt, StreamExt};
 use muxio::rpc::RpcDispatcher;
-use muxio_rpc_service_caller::RpcServiceCallerInterface;
+use muxio_rpc_service_caller::{RpcServiceCallerInterface, TransportState};
 use std::sync::Arc;
 use tokio::sync::{Mutex, mpsc as tokio_mpsc};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message as WsMessage};
@@ -8,6 +8,7 @@ use tokio_tungstenite::{connect_async, tungstenite::protocol::Message as WsMessa
 pub struct RpcClient {
     dispatcher: Arc<Mutex<RpcDispatcher<'static>>>,
     tx: tokio_mpsc::UnboundedSender<WsMessage>,
+    state_change_handler: Arc<Mutex<Option<Box<dyn Fn(TransportState) + Send + Sync>>>>,
 }
 
 impl RpcClient {
