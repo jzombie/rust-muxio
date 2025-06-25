@@ -1,8 +1,8 @@
 use futures_util::{SinkExt, StreamExt};
 use muxio::rpc::RpcDispatcher;
 use muxio_rpc_service_caller::{RpcServiceCallerInterface, TransportState};
-use std::io;
 use std::sync::Arc;
+use std::{fmt, io};
 use tokio::sync::{Mutex, mpsc as tokio_mpsc};
 use tokio_tungstenite::tungstenite::Error as WsError;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message as WsMessage};
@@ -12,6 +12,27 @@ pub struct RpcClient {
     dispatcher: Arc<Mutex<RpcDispatcher<'static>>>,
     tx: tokio_mpsc::UnboundedSender<WsMessage>,
     state_change_handler: Arc<Mutex<Option<Box<dyn Fn(TransportState) + Send + Sync>>>>,
+}
+
+impl fmt::Debug for RpcClient {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RpcClient")
+            // We can't display the dispatcher internals, so use a placeholder.
+            .field("dispatcher", &"Arc<Mutex<RpcDispatcher>>")
+            // The sender channel has a Debug implementation.
+            .field("tx", &self.tx)
+            // For the callback, we can show whether it's been set or not.
+            .field(
+                "state_change_handler",
+                &self
+                    .state_change_handler
+                    .try_lock()
+                    .map_or("MutexLocked".to_string(), |guard| {
+                        if guard.is_some() { "Some" } else { "None" }.to_string()
+                    }),
+            )
+            .finish()
+    }
 }
 
 impl RpcClient {

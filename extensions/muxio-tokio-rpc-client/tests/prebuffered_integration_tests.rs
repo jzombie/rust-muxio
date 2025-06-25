@@ -9,9 +9,6 @@ use std::sync::Arc;
 use tokio::join;
 use tokio::net::TcpListener;
 
-// TODO: Add test to check that client errors if it cannot connect
-// TODO: Add tests for transport state change handling
-
 /// This integration test creates a full, in-memory client-server roundtrip,
 /// directly replicating the logic from the example application.
 #[tokio::test]
