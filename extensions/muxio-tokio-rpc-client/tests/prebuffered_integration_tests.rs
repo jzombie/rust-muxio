@@ -9,6 +9,9 @@ use std::sync::Arc;
 use tokio::join;
 use tokio::net::TcpListener;
 
+// TODO: Add test to check that client errors if it cannot connect
+// TODO: Add tests for transport state change handling
+
 /// This integration test creates a full, in-memory client-server roundtrip,
 /// directly replicating the logic from the example application.
 #[tokio::test]
@@ -59,7 +62,7 @@ async fn test_success_client_server_roundtrip() {
     // This block runs the client
     {
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-        let rpc_client = RpcClient::new(&format!("ws://{}/ws", addr)).await;
+        let rpc_client = RpcClient::new(&format!("ws://{}/ws", addr)).await.unwrap();
 
         let (res1, res2, res3, res4, res5, res6) = join!(
             Add::call(&rpc_client, vec![1.0, 2.0, 3.0]),
@@ -109,7 +112,7 @@ async fn test_error_client_server_roundtrip() {
     // This block runs the client
     {
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-        let rpc_client = RpcClient::new(&format!("ws://{}/ws", addr)).await;
+        let rpc_client = RpcClient::new(&format!("ws://{}/ws", addr)).await.unwrap();
         let res = Add::call(&rpc_client, vec![1.0, 2.0, 3.0]).await;
 
         assert!(res.is_err());
@@ -148,7 +151,7 @@ async fn test_large_prebuffered_payload_roundtrip() {
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
     // 2. --- SETUP: CONNECT A REAL RPC CLIENT ---
-    let client = RpcClient::new(&server_url).await;
+    let client = RpcClient::new(&server_url).await.unwrap();
 
     // 3. --- TEST: SEND AND RECEIVE A LARGE PAYLOAD ---
 

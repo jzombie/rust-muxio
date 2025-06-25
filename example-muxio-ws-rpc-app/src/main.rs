@@ -2,7 +2,9 @@ use example_muxio_rpc_service_definition::{
     RpcMethodPrebuffered,
     prebuffered::{Add, Echo, Mult},
 };
-use muxio_tokio_rpc_client::{RpcCallPrebuffered, RpcClient};
+use muxio_tokio_rpc_client::{
+    RpcCallPrebuffered, RpcClient, RpcServiceCallerInterface, TransportState,
+};
 use muxio_tokio_rpc_server::{RpcServer, RpcServiceEndpointInterface};
 use std::sync::Arc;
 use tokio::join;
@@ -62,17 +64,13 @@ async fn main() {
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
         // Use the actual bound address for the client
-        let rpc_client = RpcClient::new(&format!("ws://{}/ws", addr)).await;
+        let rpc_client = RpcClient::new(&format!("ws://{}/ws", addr)).await.unwrap();
 
         // TODO: Implement
-        // rpc_client.on_state_change(move |new_state| {
-        //     // This code will run every time the connection state changes.
-        //     println!("[Callback] Transport state changed to: {:?}", new_state);
-
-        //     // Update the shared state variable.
-        //     let mut state = state_clone.lock().unwrap();
-        //     *state = new_state;
-        // });
+        rpc_client.set_state_change_handler(move |new_state: TransportState| {
+            // This code will run every time the connection state changes.
+            tracing::info!("[Callback] Transport state changed to: {:?}", new_state);
+        });
 
         // `join!` will await all responses before proceeding
         let (res1, res2, res3, res4, res5, res6) = join!(
