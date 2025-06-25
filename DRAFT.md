@@ -42,7 +42,7 @@ dot -Tsvg mods.dot -o mods.svg
 ## Release
 
 ```sh
- cargo release --workspace 0.7.0-alpha --dry-run
+ cargo release --workspace 0.8.0-alpha --dry-run
 ```
 
 ## Runtime Model (Draft)
