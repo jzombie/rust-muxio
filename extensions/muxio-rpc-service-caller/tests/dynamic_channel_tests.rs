@@ -4,7 +4,7 @@ use muxio::rpc::{
     rpc_internals::{RpcHeader, RpcMessageType, RpcStreamEncoder, rpc_trait::RpcEmit},
 };
 use muxio_rpc_service_caller::{
-    RpcServiceCallerInterface, WithDispatcher,
+    RpcServiceCallerInterface, TransportState, WithDispatcher,
     dynamic_channel::{DynamicChannelType, DynamicReceiver, DynamicSender},
 };
 use std::{
@@ -96,6 +96,12 @@ impl RpcServiceCallerInterface for MockRpcClient {
         *self.response_sender_provider.lock().unwrap() = Some(tx);
 
         Ok((dummy_encoder, rx))
+    }
+
+    /// A no-op implementation for the state change handler.
+    /// This mock doesn't need to do anything with the handler, so the body is empty.
+    fn set_state_change_handler(&self, _handler: impl Fn(TransportState) + Send + Sync + 'static) {
+        // No operation needed for the mock.
     }
 }
 
