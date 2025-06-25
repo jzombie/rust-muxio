@@ -58,7 +58,10 @@ async fn test_transport_state_change_handler() {
     let final_states = received_states.lock().unwrap();
     assert_eq!(
         *final_states,
-        vec![RpcTransportState::Connected, RpcTransportState::Disconnected],
+        vec![
+            RpcTransportState::Connected,
+            RpcTransportState::Disconnected
+        ],
         "The state change handler should have been called for both connect and disconnect events."
     );
 }

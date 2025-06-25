@@ -1,5 +1,5 @@
 use super::static_muxio_write_bytes;
-use crate::{RpcWasmClient, RpcTransportState};
+use crate::{RpcTransportState, RpcWasmClient};
 use js_sys::Promise;
 use std::cell::RefCell;
 use std::sync::Arc;

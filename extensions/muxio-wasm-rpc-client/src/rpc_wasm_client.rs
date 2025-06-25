@@ -2,7 +2,8 @@ use muxio::rpc::RpcDispatcher;
 use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
 use std::sync::{Arc, Mutex};
 
-type RpcTransportStateChangeHandler = Arc<Mutex<Option<Box<dyn Fn(RpcTransportState) + Send + Sync>>>>;
+type RpcTransportStateChangeHandler =
+    Arc<Mutex<Option<Box<dyn Fn(RpcTransportState) + Send + Sync>>>>;
 
 /// A WASM-compatible RPC client.
 pub struct RpcWasmClient {
@@ -54,7 +55,10 @@ impl RpcServiceCallerInterface for RpcWasmClient {
     /// Since the WASM client is not aware of the connection itself, it is the
     /// responsibility of the JavaScript host to call an FFI function (like
     /// `notify_transport_state_change`) to trigger this handler.
-    fn set_state_change_handler(&self, handler: impl Fn(RpcTransportState) + Send + Sync + 'static) {
+    fn set_state_change_handler(
+        &self,
+        handler: impl Fn(RpcTransportState) + Send + Sync + 'static,
+    ) {
         let mut state_handler = self
             .state_change_handler
             .lock()
