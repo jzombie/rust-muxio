@@ -66,7 +66,6 @@ async fn main() {
         // Use the actual bound address for the client
         let rpc_client = RpcClient::new(&format!("ws://{}/ws", addr)).await.unwrap();
 
-        // TODO: Implement
         rpc_client.set_state_change_handler(move |new_state: TransportState| {
             // This code will run every time the connection state changes.
             tracing::info!("[Callback] Transport state changed to: {:?}", new_state);
