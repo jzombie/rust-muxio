@@ -92,10 +92,10 @@ async fn main() {
         // Create the server and immediately wrap it in an Arc for sharing
         let server = Arc::new(RpcServer::new());
 
-        //  Get a handle to the endpoint to register handlers.
+        //  Get a handle to the endpoint to register handlers
         let endpoint = server.endpoint();
 
-        // Register server methods on the endpoint.
+        // Register server methods on the endpoint
         let _ = join!(
             endpoint.register_prebuffered(Add::METHOD_ID, |_, bytes: Vec<u8>| async move {
                 let params = Add::decode_request(&bytes)?;
@@ -135,7 +135,7 @@ async fn main() {
         let rpc_client = RpcClient::new(&format!("ws://{}/ws", addr)).await.unwrap();
 
         rpc_client.set_state_change_handler(move |new_state: RpcTransportState| {
-            // This code will run every time the connection state changes.
+            // This code will run every time the connection state changes
             tracing::info!("[Callback] Transport state changed to: {:?}", new_state);
         });
 
