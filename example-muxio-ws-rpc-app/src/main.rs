@@ -29,7 +29,6 @@ async fn main() {
         // Register server methods on the endpoint.
         let _ = join!(
             endpoint.register_prebuffered(Add::METHOD_ID, |_, bytes: Vec<u8>| async move {
-                // The `?` operator works here because we map the error at the end
                 let params = Add::decode_request(&bytes)?;
                 let sum = params.iter().sum();
                 let response_bytes = Add::encode_response(sum)?;
