@@ -12,7 +12,8 @@ use tokio::task::JoinHandle;
 use tokio_tungstenite::tungstenite::Error as WsError;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message as WsMessage};
 
-type RpcTransportStateChangeHandler = Arc<Mutex<Option<Box<dyn Fn(RpcTransportState) + Send + Sync>>>>;
+type RpcTransportStateChangeHandler =
+    Arc<Mutex<Option<Box<dyn Fn(RpcTransportState) + Send + Sync>>>>;
 
 pub struct RpcClient {
     dispatcher: Arc<tokio::sync::Mutex<RpcDispatcher<'static>>>,
@@ -139,7 +140,10 @@ impl RpcServiceCallerInterface for RpcClient {
 
     /// Sets a callback that will be invoked with the current `RpcTransportState`
     /// whenever the WebSocket connection status changes.
-    fn set_state_change_handler(&self, handler: impl Fn(RpcTransportState) + Send + Sync + 'static) {
+    fn set_state_change_handler(
+        &self,
+        handler: impl Fn(RpcTransportState) + Send + Sync + 'static,
+    ) {
         let mut state_handler = self
             .state_change_handler
             .lock()
