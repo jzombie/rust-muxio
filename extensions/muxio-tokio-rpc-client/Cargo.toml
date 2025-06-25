@@ -23,3 +23,4 @@ tracing = "0.1.41"
 [dev-dependencies]
 muxio-tokio-rpc-server = { workspace = true }
 example-muxio-rpc-service-definition = { workspace = true }
+axum = "0.8.4"
