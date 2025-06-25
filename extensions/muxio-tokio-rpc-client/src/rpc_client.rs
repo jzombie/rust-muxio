@@ -12,10 +12,12 @@ use tokio::task::JoinHandle;
 use tokio_tungstenite::tungstenite::Error as WsError;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message as WsMessage};
 
+type TransportStateChangeHandler = Arc<Mutex<Option<Box<dyn Fn(TransportState) + Send + Sync>>>>;
+
 pub struct RpcClient {
     dispatcher: Arc<tokio::sync::Mutex<RpcDispatcher<'static>>>,
     tx: tokio_mpsc::UnboundedSender<WsMessage>,
-    state_change_handler: Arc<Mutex<Option<Box<dyn Fn(TransportState) + Send + Sync>>>>,
+    state_change_handler: TransportStateChangeHandler,
     is_connected: Arc<AtomicBool>,
     // This field holds the handles to the background tasks.
     // When RpcClient is dropped, these handles are also dropped, aborting the tasks.
@@ -62,8 +64,7 @@ impl RpcClient {
         let (ws_recv_tx, mut ws_recv_rx) =
             tokio_mpsc::unbounded_channel::<Option<Result<WsMessage, WsError>>>();
 
-        let state_change_handler: Arc<Mutex<Option<Box<dyn Fn(TransportState) + Send + Sync>>>> =
-            Arc::new(Mutex::new(None));
+        let state_change_handler: TransportStateChangeHandler = Arc::new(Mutex::new(None));
 
         let is_connected = Arc::new(AtomicBool::new(true));
         let dispatcher = Arc::new(tokio::sync::Mutex::new(RpcDispatcher::new()));
