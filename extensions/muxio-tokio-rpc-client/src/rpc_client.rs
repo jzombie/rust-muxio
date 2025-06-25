@@ -113,9 +113,10 @@ impl RpcClient {
                         // The main receive loop will handle the disconnect signal.
                         break;
                     }
-                    Err(_) => {
+                    Err(e) => {
                         // An error occurred on the WebSocket stream.
                         // The main receive loop will handle the disconnect signal.
+                        tracing::error!("WebSocket error: {}", e);
                         break;
                     }
                     // Ignore other message types like Pong from server, Text, etc.
