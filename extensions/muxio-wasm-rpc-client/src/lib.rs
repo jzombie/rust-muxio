@@ -5,5 +5,5 @@ pub mod static_lib;
 
 // Re-expose for simplicity
 pub use muxio_rpc_service_caller::{
-    RpcServiceCallerInterface, TransportState, prebuffered::RpcCallPrebuffered,
+    RpcServiceCallerInterface, RpcTransportState, prebuffered::RpcCallPrebuffered,
 };

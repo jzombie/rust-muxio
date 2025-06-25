@@ -1,5 +1,5 @@
 use crate::{
-    TransportState,
+    RpcTransportState,
     dynamic_channel::{DynamicChannelType, DynamicReceiver, DynamicSender},
     error::RpcCallerError,
     with_dispatcher_trait::WithDispatcher,
@@ -211,6 +211,6 @@ pub trait RpcServiceCallerInterface: Send + Sync {
     }
 
     /// Sets a callback to be invoked whenever the transport state changes.
-    /// The callback receives the new `TransportState` as its only argument.
-    fn set_state_change_handler(&self, handler: impl Fn(TransportState) + Send + Sync + 'static);
+    /// The callback receives the new `RpcTransportState` as its only argument.
+    fn set_state_change_handler(&self, handler: impl Fn(RpcTransportState) + Send + Sync + 'static);
 }

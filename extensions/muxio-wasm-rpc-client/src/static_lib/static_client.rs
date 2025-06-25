@@ -1,5 +1,5 @@
 use super::static_muxio_write_bytes;
-use crate::{RpcWasmClient, TransportState};
+use crate::{RpcWasmClient, RpcTransportState};
 use js_sys::Promise;
 use std::cell::RefCell;
 use std::sync::Arc;
@@ -80,9 +80,9 @@ where
 #[wasm_bindgen]
 pub fn notify_static_client_transport_state_change(state_code: u8) -> Result<(), JsValue> {
     let state = match state_code {
-        0 => TransportState::Connecting,
-        1 => TransportState::Connected,
-        2 => TransportState::Disconnected,
+        0 => RpcTransportState::Connecting,
+        1 => RpcTransportState::Connected,
+        2 => RpcTransportState::Disconnected,
         _ => return Err(JsValue::from_str("Invalid state code provided.")),
     };
 

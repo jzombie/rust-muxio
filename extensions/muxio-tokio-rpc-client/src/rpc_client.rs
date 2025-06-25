@@ -1,6 +1,6 @@
 use futures_util::{SinkExt, StreamExt};
 use muxio::rpc::RpcDispatcher;
-use muxio_rpc_service_caller::{RpcServiceCallerInterface, TransportState};
+use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
 use std::fmt;
 use std::io;
 use std::sync::{
@@ -12,12 +12,12 @@ use tokio::task::JoinHandle;
 use tokio_tungstenite::tungstenite::Error as WsError;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message as WsMessage};
 
-type TransportStateChangeHandler = Arc<Mutex<Option<Box<dyn Fn(TransportState) + Send + Sync>>>>;
+type RpcTransportStateChangeHandler = Arc<Mutex<Option<Box<dyn Fn(RpcTransportState) + Send + Sync>>>>;
 
 pub struct RpcClient {
     dispatcher: Arc<tokio::sync::Mutex<RpcDispatcher<'static>>>,
     tx: tokio_mpsc::UnboundedSender<WsMessage>,
-    state_change_handler: TransportStateChangeHandler,
+    state_change_handler: RpcTransportStateChangeHandler,
     is_connected: Arc<AtomicBool>,
     // This field holds the handles to the background tasks.
     // When RpcClient is dropped, these handles are also dropped, aborting the tasks.
@@ -46,7 +46,7 @@ impl Drop for RpcClient {
         if self.is_connected.swap(false, Ordering::SeqCst) {
             if let Ok(guard) = self.state_change_handler.lock() {
                 if let Some(handler) = guard.as_ref() {
-                    handler(TransportState::Disconnected);
+                    handler(RpcTransportState::Disconnected);
                 }
             }
         }
@@ -64,7 +64,7 @@ impl RpcClient {
         let (ws_recv_tx, mut ws_recv_rx) =
             tokio_mpsc::unbounded_channel::<Option<Result<WsMessage, WsError>>>();
 
-        let state_change_handler: TransportStateChangeHandler = Arc::new(Mutex::new(None));
+        let state_change_handler: RpcTransportStateChangeHandler = Arc::new(Mutex::new(None));
 
         let is_connected = Arc::new(AtomicBool::new(true));
         let dispatcher = Arc::new(tokio::sync::Mutex::new(RpcDispatcher::new()));
@@ -85,7 +85,7 @@ impl RpcClient {
             }
             if is_connected_recv.swap(false, Ordering::SeqCst) {
                 if let Some(handler) = state_handler_recv.lock().unwrap().as_ref() {
-                    handler(TransportState::Disconnected);
+                    handler(RpcTransportState::Disconnected);
                 }
             }
             let _ = ws_recv_tx.send(None);
@@ -137,9 +137,9 @@ impl RpcServiceCallerInterface for RpcClient {
         })
     }
 
-    /// Sets a callback that will be invoked with the current `TransportState`
+    /// Sets a callback that will be invoked with the current `RpcTransportState`
     /// whenever the WebSocket connection status changes.
-    fn set_state_change_handler(&self, handler: impl Fn(TransportState) + Send + Sync + 'static) {
+    fn set_state_change_handler(&self, handler: impl Fn(RpcTransportState) + Send + Sync + 'static) {
         let mut state_handler = self
             .state_change_handler
             .lock()
@@ -148,7 +148,7 @@ impl RpcServiceCallerInterface for RpcClient {
 
         if self.is_connected.load(Ordering::SeqCst) {
             if let Some(h) = state_handler.as_ref() {
-                h(TransportState::Connected);
+                h(RpcTransportState::Connected);
             }
         }
     }

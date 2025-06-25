@@ -72,7 +72,7 @@ use example_muxio_rpc_service_definition::{
     prebuffered::{Add, Echo, Mult},
 };
 use muxio_tokio_rpc_client::{
-    RpcCallPrebuffered, RpcClient, RpcServiceCallerInterface, TransportState,
+    RpcCallPrebuffered, RpcClient, RpcServiceCallerInterface, RpcTransportState,
 };
 use muxio_tokio_rpc_server::{RpcServer, RpcServiceEndpointInterface};
 use std::sync::Arc;
@@ -135,7 +135,7 @@ async fn main() {
         // Use the actual bound address for the client
         let rpc_client = RpcClient::new(&format!("ws://{}/ws", addr)).await.unwrap();
 
-        rpc_client.set_state_change_handler(move |new_state: TransportState| {
+        rpc_client.set_state_change_handler(move |new_state: RpcTransportState| {
             // This code will run every time the connection state changes.
             tracing::info!("[Callback] Transport state changed to: {:?}", new_state);
         });

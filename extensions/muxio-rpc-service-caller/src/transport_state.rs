@@ -1,5 +1,5 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TransportState {
+pub enum RpcTransportState {
     Connected,
     Disconnected,
     Connecting,

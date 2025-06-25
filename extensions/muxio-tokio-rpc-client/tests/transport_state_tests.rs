@@ -1,4 +1,4 @@
-use muxio_rpc_service_caller::{RpcServiceCallerInterface, TransportState};
+use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
 use muxio_tokio_rpc_client::RpcClient;
 use muxio_tokio_rpc_server::RpcServer;
 use std::sync::{Arc, Mutex};
@@ -58,7 +58,7 @@ async fn test_transport_state_change_handler() {
     let final_states = received_states.lock().unwrap();
     assert_eq!(
         *final_states,
-        vec![TransportState::Connected, TransportState::Disconnected],
+        vec![RpcTransportState::Connected, RpcTransportState::Disconnected],
         "The state change handler should have been called for both connect and disconnect events."
     );
 }

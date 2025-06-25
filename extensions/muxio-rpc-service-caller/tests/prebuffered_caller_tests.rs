@@ -6,7 +6,7 @@ use muxio::rpc::{
 };
 use muxio_rpc_service::prebuffered::RpcMethodPrebuffered;
 use muxio_rpc_service_caller::{
-    RpcServiceCallerInterface, TransportState, WithDispatcher, error::RpcCallerError,
+    RpcServiceCallerInterface, RpcTransportState, WithDispatcher, error::RpcCallerError,
     prebuffered::RpcCallPrebuffered,
 };
 use std::{
@@ -107,7 +107,7 @@ impl RpcServiceCallerInterface for MockRpcClient {
 
     /// A no-op implementation for the state change handler.
     /// This mock doesn't need to do anything with the handler, so the body is empty.
-    fn set_state_change_handler(&self, _handler: impl Fn(TransportState) + Send + Sync + 'static) {
+    fn set_state_change_handler(&self, _handler: impl Fn(RpcTransportState) + Send + Sync + 'static) {
         // No operation needed for the mock.
     }
 }
