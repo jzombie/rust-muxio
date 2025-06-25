@@ -1,9 +1,9 @@
 use axum::{
-    extract::ws::{Message, WebSocket, WebSocketUpgrade},
+    Router,
     extract::ConnectInfo,
+    extract::ws::{Message, WebSocket, WebSocketUpgrade},
     response::IntoResponse,
     routing::get,
-    Router,
 };
 use bytes::Bytes;
 use futures_util::stream::{SplitSink, SplitStream};
@@ -15,7 +15,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::{
     net::TcpListener,
-    sync::{mpsc, Mutex},
+    sync::{Mutex, mpsc},
     time::timeout,
 };
 
@@ -39,8 +39,8 @@ impl RpcServer {
         RpcServer {
             endpoint: Arc::new(RpcServiceEndpoint::new()),
         }
-
     }
+
     /// Returns an `Arc` clone of the underlying RPC service endpoint.
     /// This allows for registering handlers without tying the registration
     /// logic to the server implementation.
@@ -103,10 +103,7 @@ impl RpcServer {
     }
 
     /// Task to handle sending messages from the app to the WebSocket client.
-    async fn sender_task(
-        context: WsSenderContext,
-        mut rx: mpsc::UnboundedReceiver<Message>,
-    ) {
+    async fn sender_task(context: WsSenderContext, mut rx: mpsc::UnboundedReceiver<Message>) {
         while let Some(msg) = rx.recv().await {
             if context.lock().await.send(msg).await.is_err() {
                 break; // Exit if the client has disconnected.
