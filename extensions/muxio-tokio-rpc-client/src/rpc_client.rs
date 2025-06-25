@@ -1,118 +1,127 @@
 use futures_util::{SinkExt, StreamExt};
 use muxio::rpc::RpcDispatcher;
 use muxio_rpc_service_caller::{RpcServiceCallerInterface, TransportState};
-use std::sync::Arc;
-use std::{fmt, io};
-use tokio::sync::{Mutex, mpsc as tokio_mpsc};
+use std::fmt;
+use std::io;
+use std::sync::{
+    Arc, Mutex,
+    atomic::{AtomicBool, Ordering},
+};
+use tokio::sync::mpsc as tokio_mpsc;
+use tokio::task::JoinHandle;
 use tokio_tungstenite::tungstenite::Error as WsError;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message as WsMessage};
 
-// The struct now includes the state change handler.
 pub struct RpcClient {
-    dispatcher: Arc<Mutex<RpcDispatcher<'static>>>,
+    dispatcher: Arc<tokio::sync::Mutex<RpcDispatcher<'static>>>,
     tx: tokio_mpsc::UnboundedSender<WsMessage>,
     state_change_handler: Arc<Mutex<Option<Box<dyn Fn(TransportState) + Send + Sync>>>>,
+    is_connected: Arc<AtomicBool>,
+    // This field holds the handles to the background tasks.
+    // When RpcClient is dropped, these handles are also dropped, aborting the tasks.
+    _task_handles: Vec<JoinHandle<()>>,
 }
 
 impl fmt::Debug for RpcClient {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RpcClient")
-            // We can't display the dispatcher internals, so use a placeholder.
             .field("dispatcher", &"Arc<Mutex<RpcDispatcher>>")
-            // The sender channel has a Debug implementation.
             .field("tx", &self.tx)
-            // For the callback, we can show whether it's been set or not.
-            .field(
-                "state_change_handler",
-                &self
-                    .state_change_handler
-                    .try_lock()
-                    .map_or("MutexLocked".to_string(), |guard| {
-                        if guard.is_some() { "Some" } else { "None" }.to_string()
-                    }),
-            )
+            .field("state_change_handler", &"Arc<Mutex<...>>")
+            .field("is_connected", &self.is_connected.load(Ordering::Relaxed))
             .finish()
+    }
+}
+
+// Implement Drop to ensure tasks are cleaned up and state is updated.
+impl Drop for RpcClient {
+    fn drop(&mut self) {
+        // Abort all background tasks associated with this client.
+        for handle in &self._task_handles {
+            handle.abort();
+        }
+        // Atomically set the connection state to false and signal the change.
+        if self.is_connected.swap(false, Ordering::SeqCst) {
+            if let Ok(guard) = self.state_change_handler.lock() {
+                if let Some(handler) = guard.as_ref() {
+                    handler(TransportState::Disconnected);
+                }
+            }
+        }
     }
 }
 
 impl RpcClient {
     pub async fn new(websocket_address: &str) -> Result<RpcClient, io::Error> {
-        // Initialize shared state, including the new handler
-        let state_change_handler: Arc<Mutex<Option<Box<dyn Fn(TransportState) + Send + Sync>>>> =
-            Arc::new(Mutex::new(None));
-
-        // Attempt to connect
         let (ws_stream, _) = connect_async(websocket_address)
             .await
             .map_err(|e| io::Error::new(io::ErrorKind::ConnectionRefused, e))?;
 
-        let (mut sender, mut receiver) = ws_stream.split();
-        let (tx, mut rx) = tokio_mpsc::unbounded_channel::<WsMessage>();
-        let (recv_tx, mut recv_rx) =
+        let (mut ws_sender, mut ws_receiver) = ws_stream.split();
+        let (app_tx, mut app_rx) = tokio_mpsc::unbounded_channel::<WsMessage>();
+        let (ws_recv_tx, mut ws_recv_rx) =
             tokio_mpsc::unbounded_channel::<Option<Result<WsMessage, WsError>>>();
 
-        let dispatcher = Arc::new(Mutex::new(RpcDispatcher::new()));
+        let state_change_handler: Arc<Mutex<Option<Box<dyn Fn(TransportState) + Send + Sync>>>> =
+            Arc::new(Mutex::new(None));
 
-        // --- Spawn tasks to manage the connection lifecycle ---
+        let is_connected = Arc::new(AtomicBool::new(true));
+        let dispatcher = Arc::new(tokio::sync::Mutex::new(RpcDispatcher::new()));
 
-        // Clone Arcs for the new tasks.
-        let state_handler_clone_recv = state_change_handler.clone();
-        let state_handler_clone_send = state_change_handler.clone();
+        let mut task_handles = Vec::new();
 
-        // Receive loop: Detects disconnection from the server side.
-        tokio::spawn(async move {
-            while let Some(msg) = receiver.next().await {
-                let done = msg.is_err();
-                if let Err(e) = recv_tx.send(Some(msg)) {
-                    tracing::error!(
-                        "DROPPED WEBSOCKET CHUNK: Client channel is full. Error: {}",
-                        e
-                    );
-                }
-                if done {
-                    break;
-                }
-            }
-            // Signal disconnection when the receive stream ends
-            if let Some(handler) = state_handler_clone_recv.lock().await.as_ref() {
-                handler(TransportState::Disconnected);
-            }
-            let _ = recv_tx.send(None);
-        });
-
-        // Send loop: Detects disconnection if sends fail.
-        tokio::spawn(async move {
-            while let Some(msg) = rx.recv().await {
-                if sender.send(msg).await.is_err() {
-                    // Signal disconnection when a send fails
-                    if let Some(handler) = state_handler_clone_send.lock().await.as_ref() {
-                        handler(TransportState::Disconnected);
-                    }
-                    break;
-                }
-            }
-        });
-
-        // Handle incoming binary messages.
+        // Clones for tasks
+        let is_connected_recv = is_connected.clone();
+        let state_handler_recv = state_change_handler.clone();
         let dispatcher_handle = dispatcher.clone();
-        tokio::spawn(async move {
-            while let Some(Some(Ok(WsMessage::Binary(bytes)))) = recv_rx.recv().await {
+
+        // Receive loop: Forwards messages from WebSocket to the dispatcher task.
+        let recv_handle = tokio::spawn(async move {
+            while let Some(msg) = ws_receiver.next().await {
+                if ws_recv_tx.send(Some(msg)).is_err() {
+                    break;
+                }
+            }
+            if is_connected_recv.swap(false, Ordering::SeqCst) {
+                if let Some(handler) = state_handler_recv.lock().unwrap().as_ref() {
+                    handler(TransportState::Disconnected);
+                }
+            }
+            let _ = ws_recv_tx.send(None);
+        });
+        task_handles.push(recv_handle);
+
+        // Send loop: Forwards messages from the application to the WebSocket.
+        let send_handle = tokio::spawn(async move {
+            while let Some(msg) = app_rx.recv().await {
+                if ws_sender.send(msg).await.is_err() {
+                    break;
+                }
+            }
+        });
+        task_handles.push(send_handle);
+
+        // Dispatcher loop: Processes incoming messages from the receive loop.
+        let dispatch_handle = tokio::spawn(async move {
+            while let Some(Some(Ok(WsMessage::Binary(bytes)))) = ws_recv_rx.recv().await {
                 dispatcher_handle.lock().await.read_bytes(&bytes).ok();
             }
         });
+        task_handles.push(dispatch_handle);
 
-        // Return the fully constructed client
         Ok(RpcClient {
             dispatcher,
-            tx,
+            tx: app_tx,
             state_change_handler,
+            is_connected,
+            _task_handles: task_handles,
         })
     }
 }
 
 #[async_trait::async_trait]
 impl RpcServiceCallerInterface for RpcClient {
-    type DispatcherLock = Mutex<RpcDispatcher<'static>>;
+    type DispatcherLock = tokio::sync::Mutex<RpcDispatcher<'static>>;
 
     fn get_dispatcher(&self) -> Arc<Self::DispatcherLock> {
         self.dispatcher.clone()
@@ -127,19 +136,19 @@ impl RpcServiceCallerInterface for RpcClient {
         })
     }
 
-    // Implementation of the new handler registration method
     /// Sets a callback that will be invoked with the current `TransportState`
     /// whenever the WebSocket connection status changes.
     fn set_state_change_handler(&self, handler: impl Fn(TransportState) + Send + Sync + 'static) {
         let mut state_handler = self
             .state_change_handler
-            .try_lock()
-            .expect("Mutex should not be locked here");
+            .lock()
+            .expect("Mutex should not be poisoned");
         *state_handler = Some(Box::new(handler));
 
-        // Immediately invoke the handler with the current "Connected" state.
-        if let Some(h) = state_handler.as_ref() {
-            h(TransportState::Connected);
+        if self.is_connected.load(Ordering::SeqCst) {
+            if let Some(h) = state_handler.as_ref() {
+                h(TransportState::Connected);
+            }
         }
     }
 }

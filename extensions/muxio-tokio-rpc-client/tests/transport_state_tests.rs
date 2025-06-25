@@ -28,7 +28,7 @@ async fn test_transport_state_change_handler() {
     let server = Arc::new(RpcServer::new());
 
     // Spawn the server to run in the background.
-    let server_task = tokio::spawn(async move {
+    let _server_task = tokio::spawn(async move {
         let _ = server.serve_with_listener(listener).await;
     });
 
@@ -46,12 +46,13 @@ async fn test_transport_state_change_handler() {
     // Give a moment for the initial "Connected" state to be registered.
     sleep(Duration::from_millis(50)).await;
 
-    // 3. --- TEST: SIMULATE DISCONNECTION ---
-    // Aborting the server task will close the connection.
-    server_task.abort();
+    // 3. --- TEST: SIMULATE DISCONNECTION BY DROPPING THE CLIENT ---
+    // Dropping the client will run its Drop implementation, which aborts its
+    // background tasks and reliably signals the disconnection.
+    drop(client);
 
-    // Give the client's background tasks time to detect the disconnection.
-    sleep(Duration::from_millis(200)).await;
+    // Give the tasks a moment to clean up and call the disconnect handler.
+    sleep(Duration::from_millis(100)).await;
 
     // 4. --- ASSERT ---
     let final_states = received_states.lock().unwrap();
