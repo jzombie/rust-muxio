@@ -1,5 +1,5 @@
 use super::static_muxio_write_bytes;
-use crate::RpcWasmClient;
+use crate::{RpcTransportState, RpcWasmClient};
 use js_sys::Promise;
 use std::cell::RefCell;
 use std::sync::Arc;
@@ -66,5 +66,34 @@ where
         } else {
             Err(JsValue::from_str("RPC client not initialized"))
         }
+    })
+}
+
+/// Notifies the static Rust client of a transport state change.
+/// This should be called from the JavaScript host environment (e.g., in
+/// a WebSocket's `onopen` or `onclose` event listeners).
+///
+/// # JS-side State Mapping:
+/// - `0`: Connecting
+/// - `1`: Connected
+/// - `2`: Disconnected
+#[wasm_bindgen]
+pub fn notify_static_client_transport_state_change(state_code: u8) -> Result<(), JsValue> {
+    let state = match state_code {
+        0 => RpcTransportState::Connecting,
+        1 => RpcTransportState::Connected,
+        2 => RpcTransportState::Disconnected,
+        _ => return Err(JsValue::from_str("Invalid state code provided.")),
+    };
+
+    MUXIO_STATIC_RPC_CLIENT_REF.with(|cell| {
+        if let Some(client) = cell.borrow().as_ref() {
+            // Acquire the lock and invoke the handler if it's set.
+            if let Some(handler) = client.state_change_handler().lock().unwrap().as_ref() {
+                handler(state);
+            }
+        }
+        // It's not an error if the client isn't initialized or no handler is set.
+        Ok(())
     })
 }

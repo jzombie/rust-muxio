@@ -37,7 +37,7 @@ fn bench_roundtrip(c: &mut Criterion) {
 
         tokio::time::sleep(Duration::from_millis(100)).await;
 
-        let client = RpcClient::new(&format!("ws://{}/ws", addr)).await;
+        let client = RpcClient::new(&format!("ws://{}/ws", addr)).await.unwrap();
         (client, server_task)
     });
 
