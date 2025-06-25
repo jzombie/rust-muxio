@@ -16,11 +16,11 @@ pub struct RpcClient {
 
 impl RpcClient {
     pub async fn new(websocket_address: &str) -> Result<RpcClient, io::Error> {
-        // --- 1. Initialize shared state, including the new handler ---
+        // Initialize shared state, including the new handler
         let state_change_handler: Arc<Mutex<Option<Box<dyn Fn(TransportState) + Send + Sync>>>> =
             Arc::new(Mutex::new(None));
 
-        // --- 2. Attempt to connect ---
+        // Attempt to connect
         let (ws_stream, _) = connect_async(websocket_address)
             .await
             .map_err(|e| io::Error::new(io::ErrorKind::ConnectionRefused, e))?;
@@ -32,7 +32,7 @@ impl RpcClient {
 
         let dispatcher = Arc::new(Mutex::new(RpcDispatcher::new()));
 
-        // --- 3. Spawn tasks to manage the connection lifecycle ---
+        // --- Spawn tasks to manage the connection lifecycle ---
 
         // Clone Arcs for the new tasks.
         let state_handler_clone_recv = state_change_handler.clone();
@@ -52,7 +52,7 @@ impl RpcClient {
                     break;
                 }
             }
-            // --- 4. Signal disconnection when the receive stream ends ---
+            // Signal disconnection when the receive stream ends
             if let Some(handler) = state_handler_clone_recv.lock().await.as_ref() {
                 handler(TransportState::Disconnected);
             }
@@ -63,7 +63,7 @@ impl RpcClient {
         tokio::spawn(async move {
             while let Some(msg) = rx.recv().await {
                 if sender.send(msg).await.is_err() {
-                    // --- 5. Signal disconnection when a send fails ---
+                    // Signal disconnection when a send fails
                     if let Some(handler) = state_handler_clone_send.lock().await.as_ref() {
                         handler(TransportState::Disconnected);
                     }
@@ -80,7 +80,7 @@ impl RpcClient {
             }
         });
 
-        // --- 6. Return the fully constructed client ---
+        // Return the fully constructed client
         Ok(RpcClient {
             dispatcher,
             tx,
@@ -106,7 +106,7 @@ impl RpcServiceCallerInterface for RpcClient {
         })
     }
 
-    // --- 7. Implementation of the new handler registration method ---
+    // Implementation of the new handler registration method
     /// Sets a callback that will be invoked with the current `TransportState`
     /// whenever the WebSocket connection status changes.
     fn set_state_change_handler(&self, handler: impl Fn(TransportState) + Send + Sync + 'static) {
