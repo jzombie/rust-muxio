@@ -19,8 +19,8 @@ use tokio::{
     time::timeout,
 };
 
-const HEARTBEAT_INTERVAL: usize = 5
-const CLIENT_TIMEOUT: usize = 15;
+const HEARTBEAT_INTERVAL: u64 = 5;
+const CLIENT_TIMEOUT: u64 = 15;
 
 type WsSenderContext = Arc<Mutex<SplitSink<WebSocket, Message>>>;
 
