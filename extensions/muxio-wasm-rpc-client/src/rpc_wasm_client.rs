@@ -1,10 +1,13 @@
 use muxio::rpc::RpcDispatcher;
-use muxio_rpc_service_caller::RpcServiceCallerInterface;
+use muxio_rpc_service_caller::{RpcServiceCallerInterface, TransportState};
 use std::sync::{Arc, Mutex};
 
+/// A WASM-compatible RPC client.
 pub struct RpcWasmClient {
     dispatcher: Arc<Mutex<RpcDispatcher<'static>>>,
     emit_callback: Arc<dyn Fn(Vec<u8>) + Send + Sync>,
+    /// Stores the user-provided callback for state changes.
+    state_change_handler: Arc<Mutex<Option<Box<dyn Fn(TransportState) + Send + Sync>>>>,
 }
 
 impl RpcWasmClient {
@@ -12,33 +15,51 @@ impl RpcWasmClient {
         RpcWasmClient {
             dispatcher: Arc::new(Mutex::new(RpcDispatcher::new())),
             emit_callback: Arc::new(emit_callback),
+            // Initialize the handler as None.
+            state_change_handler: Arc::new(Mutex::new(None)),
         }
     }
 
-    // This helper fits the trait's requirement perfectly.
     fn dispatcher(&self) -> Arc<Mutex<RpcDispatcher<'static>>> {
         self.dispatcher.clone()
     }
 
-    // This helper also fits the trait's requirement perfectly.
     fn emit(&self) -> Arc<dyn Fn(Vec<u8>) + Send + Sync> {
         self.emit_callback.clone()
     }
+
+    /// Provides a public accessor to the state change handler so that it can be
+    /// invoked by the FFI bridge when JavaScript reports a state change.
+    pub fn state_change_handler(
+        &self,
+    ) -> Arc<Mutex<Option<Box<dyn Fn(TransportState) + Send + Sync>>>> {
+        self.state_change_handler.clone()
+    }
 }
 
-// The new implementation block is now trivial.
 #[async_trait::async_trait]
 impl RpcServiceCallerInterface for RpcWasmClient {
     type DispatcherLock = Mutex<RpcDispatcher<'static>>;
 
-    /// Provides the trait with access to this client's dispatcher.
     fn get_dispatcher(&self) -> Arc<Self::DispatcherLock> {
         self.dispatcher()
     }
 
-    /// Provides the trait with this client's specific callback for sending
-    /// bytes to the JavaScript host.
     fn get_emit_fn(&self) -> Arc<dyn Fn(Vec<u8>) + Send + Sync> {
         self.emit()
+    }
+
+    /// Sets a callback that will be invoked with the current `TransportState`
+    /// whenever the underlying transport's connection status changes.
+    ///
+    /// Since the WASM client is not aware of the connection itself, it is the
+    /// responsibility of the JavaScript host to call an FFI function (like
+    /// `notify_transport_state_change`) to trigger this handler.
+    fn set_state_change_handler(&self, handler: impl Fn(TransportState) + Send + Sync + 'static) {
+        let mut state_handler = self
+            .state_change_handler
+            .lock()
+            .expect("Mutex should not be poisoned");
+        *state_handler = Some(Box::new(handler));
     }
 }
