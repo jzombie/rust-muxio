@@ -2,12 +2,13 @@ use muxio::rpc::RpcDispatcher;
 use muxio_rpc_service_caller::{RpcServiceCallerInterface, TransportState};
 use std::sync::{Arc, Mutex};
 
+type TransportStateChangeHandler = Arc<Mutex<Option<Box<dyn Fn(TransportState) + Send + Sync>>>>;
+
 /// A WASM-compatible RPC client.
 pub struct RpcWasmClient {
     dispatcher: Arc<Mutex<RpcDispatcher<'static>>>,
     emit_callback: Arc<dyn Fn(Vec<u8>) + Send + Sync>,
-    /// Stores the user-provided callback for state changes.
-    state_change_handler: Arc<Mutex<Option<Box<dyn Fn(TransportState) + Send + Sync>>>>,
+    state_change_handler: TransportStateChangeHandler,
 }
 
 impl RpcWasmClient {
@@ -30,9 +31,7 @@ impl RpcWasmClient {
 
     /// Provides a public accessor to the state change handler so that it can be
     /// invoked by the FFI bridge when JavaScript reports a state change.
-    pub fn state_change_handler(
-        &self,
-    ) -> Arc<Mutex<Option<Box<dyn Fn(TransportState) + Send + Sync>>>> {
+    pub fn state_change_handler(&self) -> TransportStateChangeHandler {
         self.state_change_handler.clone()
     }
 }
