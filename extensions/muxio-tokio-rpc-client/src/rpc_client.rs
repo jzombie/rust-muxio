@@ -35,14 +35,14 @@ impl fmt::Debug for RpcClient {
     }
 }
 
-// Implement Drop to ensure tasks are cleaned up and state is updated.
+// Implement Drop to ensure tasks are cleaned up and state is updated
 impl Drop for RpcClient {
     fn drop(&mut self) {
-        // Abort all background tasks associated with this client.
+        // Abort all background tasks associated with this client
         for handle in &self._task_handles {
             handle.abort();
         }
-        // Atomically set the connection state to false and signal the change.
+        // Atomically set the connection state to false and signal the change
         if self.is_connected.swap(false, Ordering::SeqCst) {
             if let Ok(guard) = self.state_change_handler.lock() {
                 if let Some(handler) = guard.as_ref() {
@@ -76,7 +76,7 @@ impl RpcClient {
         let state_handler_recv = state_change_handler.clone();
         let dispatcher_handle = dispatcher.clone();
 
-        // Receive loop: Forwards messages from WebSocket to the dispatcher task.
+        // Receive loop: Forwards messages from WebSocket to the dispatcher task
         let recv_handle = tokio::spawn(async move {
             while let Some(msg) = ws_receiver.next().await {
                 if ws_recv_tx.send(Some(msg)).is_err() {
@@ -92,7 +92,7 @@ impl RpcClient {
         });
         task_handles.push(recv_handle);
 
-        // Send loop: Forwards messages from the application to the WebSocket.
+        // Send loop: Forwards messages from the application to the WebSocket
         let send_handle = tokio::spawn(async move {
             while let Some(msg) = app_rx.recv().await {
                 if ws_sender.send(msg).await.is_err() {
@@ -102,7 +102,7 @@ impl RpcClient {
         });
         task_handles.push(send_handle);
 
-        // Dispatcher loop: Processes incoming messages from the receive loop.
+        // Dispatcher loop: Processes incoming messages from the receive loop
         let dispatch_handle = tokio::spawn(async move {
             while let Some(Some(Ok(WsMessage::Binary(bytes)))) = ws_recv_rx.recv().await {
                 dispatcher_handle.lock().await.read_bytes(&bytes).ok();

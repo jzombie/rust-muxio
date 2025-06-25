@@ -16,7 +16,7 @@ impl RpcWasmClient {
         RpcWasmClient {
             dispatcher: Arc::new(Mutex::new(RpcDispatcher::new())),
             emit_callback: Arc::new(emit_callback),
-            // Initialize the handler as None.
+            // Initialize the handler as None
             state_change_handler: Arc::new(Mutex::new(None)),
         }
     }
