@@ -18,9 +18,9 @@ async fn main() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
 
-    // This block sets up and spawns the server.
+    // This block sets up and spawns the server
     {
-        // Create the server and immediately wrap it in an Arc for sharing.
+        // Create the server and immediately wrap it in an Arc for sharing
         let server = Arc::new(RpcServer::new());
 
         //  Get a handle to the endpoint to register handlers.
@@ -29,7 +29,7 @@ async fn main() {
         // Register server methods on the endpoint.
         let _ = join!(
             endpoint.register_prebuffered(Add::METHOD_ID, |_, bytes: Vec<u8>| async move {
-                // The `?` operator works here because we map the error at the end.
+                // The `?` operator works here because we map the error at the end
                 let params = Add::decode_request(&bytes)?;
                 let sum = params.iter().sum();
                 let response_bytes = Add::encode_response(sum)?;
@@ -50,7 +50,7 @@ async fn main() {
 
         // Spawn the server using the pre-bound listener
         let _server_task = tokio::spawn({
-            // Clone the Arc for the server task.
+            // Clone the Arc for the server task
             let server = Arc::clone(&server);
             async move {
                 let _ = server.serve_with_listener(listener).await;
@@ -58,7 +58,7 @@ async fn main() {
         });
     }
 
-    // This block runs the client against the server.
+    // This block runs the client against the server
     {
         // Wait briefly for server to start
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
