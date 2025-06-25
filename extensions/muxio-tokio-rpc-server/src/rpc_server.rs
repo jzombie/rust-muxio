@@ -19,6 +19,9 @@ use tokio::{
     time::timeout,
 };
 
+const HEARTBEAT_INTERVAL: usize = 5
+const CLIENT_TIMEOUT: usize = 15;
+
 type WsSenderContext = Arc<Mutex<SplitSink<WebSocket, Message>>>;
 
 pub struct RpcServer {
@@ -120,8 +123,8 @@ impl RpcServer {
         addr: SocketAddr,
     ) {
         let mut dispatcher = RpcDispatcher::new();
-        let heartbeat_interval = Duration::from_secs(5);
-        let client_timeout = Duration::from_secs(15);
+        let heartbeat_interval = Duration::from_secs(HEARTBEAT_INTERVAL);
+        let client_timeout = Duration::from_secs(CLIENT_TIMEOUT);
 
         loop {
             // Use tokio::select! to race the heartbeat timer against message reception.
