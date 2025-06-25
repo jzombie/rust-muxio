@@ -1,20 +1,22 @@
 use axum::{
-    Router,
-    extract::ConnectInfo,
     extract::ws::{Message, WebSocket, WebSocketUpgrade},
+    extract::ConnectInfo,
     response::IntoResponse,
     routing::get,
+    Router,
 };
 use bytes::Bytes;
-use futures_util::stream::SplitSink;
+use futures_util::stream::{SplitSink, SplitStream};
 use futures_util::{SinkExt, StreamExt};
 use muxio::rpc::RpcDispatcher;
 use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface};
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::{
     net::TcpListener,
-    sync::{Mutex, mpsc::unbounded_channel},
+    sync::{mpsc, Mutex},
+    time::timeout,
 };
 
 type WsSenderContext = Arc<Mutex<SplitSink<WebSocket, Message>>>;
@@ -34,15 +36,14 @@ impl RpcServer {
         RpcServer {
             endpoint: Arc::new(RpcServiceEndpoint::new()),
         }
-    }
 
-    /// Returns a clone of the underlying RPC service endpoint.
+    }
+    /// Returns an `Arc` clone of the underlying RPC service endpoint.
     /// This allows for registering handlers without tying the registration
     /// logic to the server implementation.
     pub fn endpoint(&self) -> Arc<RpcServiceEndpoint<WsSenderContext>> {
         self.endpoint.clone()
     }
-    // --------------------------------------------------
 
     pub async fn serve(self, address: &str) -> Result<SocketAddr, axum::BoxError> {
         let listener = TcpListener::bind(address).await?;
@@ -77,40 +78,106 @@ impl RpcServer {
         server: Arc<RpcServer>,
     ) -> impl IntoResponse {
         tracing::info!("Client connected: {}", addr);
-        ws.on_upgrade(move |socket| server.handle_socket(socket))
+        ws.on_upgrade(move |socket| server.handle_socket(socket, addr))
     }
 
-    async fn handle_socket(self: Arc<Self>, socket: WebSocket) {
-        let mut dispatcher = RpcDispatcher::new();
-        let (sender, mut receiver) = socket.split();
+    async fn handle_socket(self: Arc<Self>, socket: WebSocket, addr: SocketAddr) {
+        let (sender, receiver) = socket.split();
         let context = Arc::new(Mutex::new(sender));
-        let (tx, mut rx) = unbounded_channel::<Message>();
+        let (tx, rx) = mpsc::unbounded_channel::<Message>();
 
-        tokio::spawn({
-            let context = context.clone();
-            async move {
-                while let Some(msg) = rx.recv().await {
-                    if context.lock().await.send(msg).await.is_err() {
+        // Spawn a task to forward messages from the application to the WebSocket sender.
+        tokio::spawn(Self::sender_task(context.clone(), rx));
+
+        // Spawn the main task to handle incoming messages and heartbeats.
+        tokio::spawn(Self::receiver_task(
+            self.endpoint.clone(),
+            context,
+            receiver,
+            tx,
+            addr,
+        ));
+    }
+
+    /// Task to handle sending messages from the app to the WebSocket client.
+    async fn sender_task(
+        context: WsSenderContext,
+        mut rx: mpsc::UnboundedReceiver<Message>,
+    ) {
+        while let Some(msg) = rx.recv().await {
+            if context.lock().await.send(msg).await.is_err() {
+                break; // Exit if the client has disconnected.
+            }
+        }
+    }
+
+    /// Task to handle incoming messages, heartbeats, and timeouts.
+    async fn receiver_task(
+        endpoint: Arc<RpcServiceEndpoint<WsSenderContext>>,
+        context: WsSenderContext,
+        mut receiver: SplitStream<WebSocket>,
+        tx: mpsc::UnboundedSender<Message>,
+        addr: SocketAddr,
+    ) {
+        let mut dispatcher = RpcDispatcher::new();
+        let heartbeat_interval = Duration::from_secs(5);
+        let client_timeout = Duration::from_secs(15);
+
+        loop {
+            // Use tokio::select! to race the heartbeat timer against message reception.
+            tokio::select! {
+                // This branch fires every `heartbeat_interval`.
+                _ = tokio::time::sleep(heartbeat_interval) => {
+                    if tx.send(Message::Ping(vec![].into())).is_err() {
+                        // If sending a ping fails, the sender task has likely terminated,
+                        // meaning the client is gone.
+                        tracing::info!("Client {} disconnected (failed to send ping).", addr);
                         break;
                     }
                 }
-            }
-        });
 
-        while let Some(Ok(Message::Binary(bytes))) = receiver.next().await {
-            let tx_clone = tx.clone();
-            let on_emit = |chunk: &[u8]| {
-                let _ = tx_clone.send(Message::Binary(Bytes::copy_from_slice(chunk)));
-            };
-
-            if let Err(err) = self
-                .endpoint
-                .read_bytes(&mut dispatcher, context.clone(), &bytes, on_emit)
-                .await
-            {
-                tracing::error!("Caught err: {:?}", err);
+                // This branch fires when a message is received or the timeout is hit.
+                result = timeout(client_timeout, receiver.next()) => {
+                    match result {
+                        // Timeout occurred: No message received within `client_timeout`.
+                        Err(_) => {
+                            tracing::warn!("Client {} timed out. Closing connection.", addr);
+                            break;
+                        },
+                        // A message was received from the client.
+                        Ok(Some(Ok(msg))) => {
+                            match msg {
+                                Message::Binary(bytes) => {
+                                    let tx_clone = tx.clone();
+                                    let on_emit = |chunk: &[u8]| {
+                                        let _ = tx_clone.send(Message::Binary(Bytes::copy_from_slice(chunk)));
+                                    };
+                                    if let Err(err) = endpoint.read_bytes(&mut dispatcher, context.clone(), &bytes, on_emit).await {
+                                        tracing::error!("Error processing bytes from {}: {:?}", addr, err);
+                                    }
+                                }
+                                // Client responded to our ping, it's still alive.
+                                Message::Pong(_) => {
+                                    tracing::trace!("Received pong from {}", addr);
+                                }
+                                // Client initiated a close.
+                                Message::Close(_) => {
+                                    tracing::info!("Client {} initiated close.", addr);
+                                    break;
+                                }
+                                _ => {} // Ignore other message types like Text or Ping.
+                            }
+                        }
+                        // The client's stream ended or produced an error.
+                        Ok(None) | Ok(Some(Err(_))) => {
+                            tracing::info!("Client {} disconnected.", addr);
+                            break;
+                        }
+                    }
+                }
             }
         }
-        tracing::info!("Client disconnected.");
+        // Loop has exited, the client is considered disconnected.
+        tracing::info!("Terminated connection for {}.", addr);
     }
 }
