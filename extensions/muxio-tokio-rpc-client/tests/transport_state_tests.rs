@@ -1,7 +1,7 @@
 use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
 use muxio_tokio_rpc_client::RpcClient;
 use muxio_tokio_rpc_server::RpcServer;
-use muxio_tokio_rpc_server::utils::tcp_listener_to_host_port;
+use muxio_tokio_rpc_server::utils::{bind_tcp_listener_on_random_port, tcp_listener_to_host_port};
 use std::sync::{Arc, Mutex};
 use tokio::{
     net::TcpListener,
@@ -10,13 +10,10 @@ use tokio::{
 
 #[tokio::test]
 async fn test_client_errors_on_connection_failure() {
+    let (_, unused_port) = bind_tcp_listener_on_random_port().await.unwrap();
+
     // Attempt to connect to an address that is not listening.
-    let result = RpcClient::new(
-        "127.0.0.1",
-        // Use a port that's almost certainly unused.
-        1,
-    )
-    .await;
+    let result = RpcClient::new("127.0.0.1", unused_port).await;
 
     // Assert that the connection attempt resulted in an error.
     assert!(result.is_err());
