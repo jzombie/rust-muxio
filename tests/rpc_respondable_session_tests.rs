@@ -89,7 +89,7 @@ fn rpc_respondable_session_stream_and_reply_roundtrip() {
                         payload_clone.lock().unwrap().extend(bytes);
                     }
                     RpcStreamEvent::End { .. } => {}
-                    other => panic!("unexpected client event: {:?}", other),
+                    other => panic!("unexpected client event: {other:?}"),
                 }),
                 is_prebuffering_response,
             )

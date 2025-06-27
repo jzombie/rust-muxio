@@ -88,8 +88,7 @@ fn rpc_dispatcher_call_and_echo_response() {
                             } => {
                                 assert_eq!(rpc_header.rpc_method_id, rpc_method_id);
                                 println!(
-                                    "Client received header: ID = {}, Header = {:?}",
-                                    rpc_request_id, rpc_header
+                                    "Client received header: ID = {rpc_request_id}, Header = {rpc_header:?}",
                                 );
                             }
                             RpcStreamEvent::PayloadChunk {
@@ -143,15 +142,15 @@ fn rpc_dispatcher_call_and_echo_response() {
                 let rpc_request = server_dispatcher.delete_rpc_request(rpc_request_id);
 
                 if let Some(rpc_request) = rpc_request {
-                    println!("Server received request header ID: {:?}", rpc_request_id);
-                    println!("\t{:?}: {:?}", rpc_request_id, rpc_request);
+                    println!("Server received request header ID: {rpc_request_id:?}");
+                    println!("\t{rpc_request_id:?}: {rpc_request:?}");
 
                     let rpc_response = match rpc_request.rpc_method_id {
                         rpc_method_id if rpc_method_id == ADD_METHOD_ID => {
                             let request_params: AddRequestParams =
                                 bitcode::decode(&rpc_request.rpc_param_bytes.unwrap()).unwrap();
 
-                            println!("Server received request params: {:?}", request_params);
+                            println!("Server received request params: {request_params:?}");
 
                             let response_bytes = bitcode::encode(&AddResponseParams {
                                 result: request_params.numbers.iter().sum(),
@@ -170,7 +169,7 @@ fn rpc_dispatcher_call_and_echo_response() {
                             let request_params: MultRequestParams =
                                 bitcode::decode(&rpc_request.rpc_param_bytes.unwrap()).unwrap();
 
-                            println!("Server received request params: {:?}", request_params);
+                            println!("Server received request params: {request_params:?}");
 
                             let response_bytes = bitcode::encode(&MultResponseParams {
                                 result: request_params.numbers.iter().fold(1.0, |acc, &x| acc * x),

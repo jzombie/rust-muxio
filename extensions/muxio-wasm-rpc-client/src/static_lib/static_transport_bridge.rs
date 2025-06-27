@@ -74,7 +74,7 @@ pub fn static_muxio_read_bytes_uint8(inbound_data: Uint8Array) -> Result<(), JsV
 
         dispatcher
             .read_bytes(&inbound_bytes)
-            .map_err(|e| JsValue::from_str(&format!("Read error: {:?}", e)))?;
+            .map_err(|e| JsValue::from_str(&format!("Read error: {e:?}")))?;
 
         Ok(())
     })

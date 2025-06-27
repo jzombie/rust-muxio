@@ -63,11 +63,11 @@ impl RpcClient {
             // It's a valid IP address literal.
             Ok(ip) => {
                 let socket_addr = SocketAddr::new(ip, port);
-                format!("ws://{}/ws", socket_addr)
+                format!("ws://{socket_addr}/ws")
             }
             // It's not an IP address, so assume it's a hostname.
             Err(_) => {
-                format!("ws://{}:{}/ws", host, port)
+                format!("ws://{host}:{port}/ws")
             }
         };
 

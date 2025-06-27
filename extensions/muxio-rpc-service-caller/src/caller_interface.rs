@@ -119,7 +119,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                                 | Some(status @ RpcResultStatus::MethodNotFound) => {
                                     let msg = String::from_utf8_lossy(&payload).to_string();
                                     let final_msg = if msg.is_empty() {
-                                        format!("RPC failed with status: {:?}", status)
+                                        format!("RPC failed with status: {status:?}")
                                     } else {
                                         msg
                                     };
@@ -149,7 +149,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                 )
             })
             .await
-            .map_err(|e| io::Error::other(format!("{:?}", e)))?;
+            .map_err(|e| io::Error::other(format!("{e:?}")))?;
 
         match ready_rx.await {
             Ok(Ok(())) => Ok((encoder, rx)),

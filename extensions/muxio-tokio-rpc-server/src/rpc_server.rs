@@ -78,7 +78,7 @@ impl RpcServer {
     /// address or a hostname.
     pub async fn serve_on(self, host: &str, port: u16) -> Result<SocketAddr, axum::BoxError> {
         // `ToSocketAddrs` can handle "host:port" strings directly, including hostnames.
-        let addr = format!("{}:{}", host, port);
+        let addr = format!("{host}:{port}");
         // Delegate to the existing generic `serve` function.
         self.serve(addr).await
     }
