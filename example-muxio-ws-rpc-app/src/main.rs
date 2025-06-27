@@ -16,7 +16,7 @@ use tokio::net::TcpListener;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt().with_env_filter("info").init();
 
-    // Bind to a random available port to avoid port conflicts.
+    // Bind to a random available port to avoid port conflicts
     let listener = TcpListener::bind("127.0.0.1:0").await?;
 
     let (server_host, server_port) = {
@@ -74,7 +74,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // synchronization mechanism might be used.
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
-        // 4. Use the dynamically created URL to connect the client.
+        // Connect to the server
         let rpc_client = RpcClient::new(&server_host.to_string(), server_port).await?;
 
         rpc_client.set_state_change_handler(move |new_state: RpcTransportState| {

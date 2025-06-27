@@ -48,12 +48,31 @@ impl RpcServer {
         self.endpoint.clone()
     }
 
+    /// Binds to an address and starts the RPC server.
+    ///
+    /// The address can be any type that implements `ToSocketAddrs`, such as
+    /// a string "127.0.0.1:8080" or a `SocketAddr`.
     pub async fn serve<A: ToSocketAddrs>(self, addr: A) -> Result<SocketAddr, axum::BoxError> {
         let listener = TcpListener::bind(addr).await?;
         let server = Arc::new(self);
         server.serve_with_listener(listener).await
     }
 
+    /// Starts the RPC server on a specific host and port.
+    ///
+    /// This is a convenience wrapper around `serve`. The host can be an IP
+    /// address or a hostname.
+    pub async fn serve_on(self, host: &str, port: u16) -> Result<SocketAddr, axum::BoxError> {
+        // `ToSocketAddrs` can handle "host:port" strings directly, including hostnames.
+        let addr = format!("{}:{}", host, port);
+        // Delegate to the existing generic `serve` function.
+        self.serve(addr).await
+    }
+
+    /// Starts the RPC server with a pre-bound `TcpListener`.
+    ///
+    /// This is useful for cases like binding to an ephemeral port (port 0) and
+    /// then retrieving the actual address.
     pub async fn serve_with_listener(
         self: Arc<Self>,
         listener: TcpListener,
