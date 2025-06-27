@@ -44,7 +44,6 @@ muxio-rpc-service-caller = { path = "extensions/muxio-rpc-service-caller", versi
 muxio-rpc-service-endpoint = { path = "extensions/muxio-rpc-service-endpoint", version = "0.8.0-alpha" }
 muxio-tokio-rpc-server = { path = "extensions/muxio-tokio-rpc-server", version = "0.8.0-alpha" }
 muxio-tokio-rpc-client = { path = "extensions/muxio-tokio-rpc-client", version = "0.8.0-alpha" }
-muxio-wasm-rpc-client = { path = "extensions/muxio-wasm-rpc-client", version = "0.8.0-alpha" }
 
 [dev-dependencies]
 bitcode = "0.6.6"

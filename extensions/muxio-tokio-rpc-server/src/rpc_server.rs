@@ -14,7 +14,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::{
-    net::TcpListener,
+    net::{TcpListener, ToSocketAddrs},
     sync::{Mutex, mpsc},
     time::timeout,
 };
@@ -48,8 +48,8 @@ impl RpcServer {
         self.endpoint.clone()
     }
 
-    pub async fn serve(self, address: &str) -> Result<SocketAddr, axum::BoxError> {
-        let listener = TcpListener::bind(address).await?;
+    pub async fn serve<A: ToSocketAddrs>(self, addr: A) -> Result<SocketAddr, axum::BoxError> {
+        let listener = TcpListener::bind(addr).await?;
         let server = Arc::new(self);
         server.serve_with_listener(listener).await
     }
@@ -58,7 +58,7 @@ impl RpcServer {
         self: Arc<Self>,
         listener: TcpListener,
     ) -> Result<SocketAddr, axum::BoxError> {
-        let addr = listener.local_addr()?;
+        let address = listener.local_addr()?;
         let app = Router::new().route(
             "/ws",
             get({
@@ -66,13 +66,13 @@ impl RpcServer {
                 move |ws, conn| Self::ws_handler(ws, conn, server)
             }),
         );
-        tracing::info!("Server running on {:?}", addr);
+        tracing::info!("Server running on {:?}", address);
         axum::serve(
             listener,
             app.into_make_service_with_connect_info::<SocketAddr>(),
         )
         .await?;
-        Ok(addr)
+        Ok(address)
     }
 
     async fn ws_handler(

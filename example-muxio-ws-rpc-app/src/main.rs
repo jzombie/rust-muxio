@@ -6,17 +6,26 @@ use muxio_tokio_rpc_client::{
     RpcCallPrebuffered, RpcClient, RpcServiceCallerInterface, RpcTransportState,
 };
 use muxio_tokio_rpc_server::{RpcServer, RpcServiceEndpointInterface};
+use std::net::IpAddr;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::join;
 use tokio::net::TcpListener;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt().with_env_filter("info").init();
 
-    // Bind to a random available port
-    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let addr = listener.local_addr().unwrap();
+    // Bind to a random available port to avoid port conflicts.
+    let listener = TcpListener::bind("127.0.0.1:0").await?;
+
+    let (server_host, server_port) = {
+        let remote_addr: SocketAddr = listener.local_addr()?;
+        let server_host: IpAddr = remote_addr.ip();
+        let server_port: u16 = remote_addr.port();
+
+        (server_host, server_port)
+    };
 
     // This block sets up and spawns the server
     {
@@ -48,22 +57,25 @@ async fn main() {
         );
 
         // Spawn the server using the pre-bound listener
-        let _server_task = tokio::spawn({
+        tokio::spawn({
             // Clone the Arc for the server task
             let server = Arc::clone(&server);
             async move {
-                let _ = server.serve_with_listener(listener).await;
+                if let Err(e) = server.serve_with_listener(listener).await {
+                    tracing::error!("Server error: {}", e);
+                }
             }
         });
     }
 
     // This block runs the client against the server
     {
-        // Wait briefly for server to start
-        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        // Wait briefly for server to start. In a real application, a more robust
+        // synchronization mechanism might be used.
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
-        // Use the actual bound address for the client
-        let rpc_client = RpcClient::new(&format!("ws://{}/ws", addr)).await.unwrap();
+        // 4. Use the dynamically created URL to connect the client.
+        let rpc_client = RpcClient::new(&server_host.to_string(), server_port).await?;
 
         rpc_client.set_state_change_handler(move |new_state: RpcTransportState| {
             // This code will run every time the connection state changes
@@ -93,4 +105,6 @@ async fn main() {
             String::from_utf8(res6.unwrap())
         );
     }
+
+    Ok(())
 }

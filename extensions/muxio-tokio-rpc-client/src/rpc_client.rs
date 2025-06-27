@@ -3,6 +3,7 @@ use muxio::rpc::RpcDispatcher;
 use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
 use std::fmt;
 use std::io;
+use std::net::{IpAddr, SocketAddr};
 use std::sync::{
     Arc, Mutex,
     atomic::{AtomicBool, Ordering},
@@ -50,8 +51,27 @@ impl Drop for RpcClient {
 }
 
 impl RpcClient {
-    pub async fn new(websocket_address: &str) -> Result<RpcClient, io::Error> {
-        let (ws_stream, _) = connect_async(websocket_address)
+    /// Creates a new RPC client and connects to a WebSocket server.
+    ///
+    /// The `host` can be either an IP address (v4 or v6) or a hostname that
+    /// will be resolved via DNS.
+    pub async fn new(host: &str, port: u16) -> Result<RpcClient, io::Error> {
+        // Construct the URL.
+        // This handles proper IPv6 bracket formatting `[::1]` for IP literals,
+        // while passing hostnames through for DNS resolution by the network stack.
+        let websocket_url = match host.parse::<IpAddr>() {
+            // It's a valid IP address literal.
+            Ok(ip) => {
+                let socket_addr = SocketAddr::new(ip, port);
+                format!("ws://{}/ws", socket_addr)
+            }
+            // It's not an IP address, so assume it's a hostname.
+            Err(_) => {
+                format!("ws://{}:{}/ws", host, port)
+            }
+        };
+
+        let (ws_stream, _) = connect_async(websocket_url.to_string())
             .await
             .map_err(|e| io::Error::new(io::ErrorKind::ConnectionRefused, e))?;
 
