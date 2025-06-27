@@ -67,6 +67,7 @@ Let's build a simple sample app which spins up a Tokio-based WebSocket server, a
 This example code was taken from the [`example-muxio-ws-rpc-app`](./example-muxio-ws-rpc-app/) crate.
 
 ```rust
+// TODO: Update with newer example
 use example_muxio_rpc_service_definition::{
     RpcMethodPrebuffered,
     prebuffered::{Add, Echo, Mult},
