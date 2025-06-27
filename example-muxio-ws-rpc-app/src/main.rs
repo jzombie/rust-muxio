@@ -5,9 +5,9 @@ use example_muxio_rpc_service_definition::{
 use muxio_tokio_rpc_client::{
     RpcCallPrebuffered, RpcClient, RpcServiceCallerInterface, RpcTransportState,
 };
-use muxio_tokio_rpc_server::{RpcServer, RpcServiceEndpointInterface};
-use std::net::IpAddr;
-use std::net::SocketAddr;
+use muxio_tokio_rpc_server::{
+    RpcServer, RpcServiceEndpointInterface, utils::tcp_listener_to_host_port,
+};
 use std::sync::Arc;
 use tokio::join;
 use tokio::net::TcpListener;
@@ -19,13 +19,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Bind to a random available port to avoid port conflicts
     let listener = TcpListener::bind("127.0.0.1:0").await?;
 
-    let (server_host, server_port) = {
-        let remote_addr: SocketAddr = listener.local_addr()?;
-        let server_host: IpAddr = remote_addr.ip();
-        let server_port: u16 = remote_addr.port();
-
-        (server_host, server_port)
-    };
+    let (server_host, server_port) = tcp_listener_to_host_port(&listener)?;
 
     // This block sets up and spawns the server
     {

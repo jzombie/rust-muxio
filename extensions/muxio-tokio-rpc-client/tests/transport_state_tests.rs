@@ -1,6 +1,7 @@
 use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
 use muxio_tokio_rpc_client::RpcClient;
 use muxio_tokio_rpc_server::RpcServer;
+use muxio_tokio_rpc_server::utils::tcp_listener_to_host_port;
 use std::sync::{Arc, Mutex};
 use tokio::{
     net::TcpListener,
@@ -10,8 +11,12 @@ use tokio::{
 #[tokio::test]
 async fn test_client_errors_on_connection_failure() {
     // Attempt to connect to an address that is not listening.
-    let invalid_address = "ws://127.0.0.1:1"; // Use a port that's almost certainly unused.
-    let result = RpcClient::new(invalid_address).await;
+    let result = RpcClient::new(
+        "127.0.0.1",
+        // Use a port that's almost certainly unused.
+        1,
+    )
+    .await;
 
     // Assert that the connection attempt resulted in an error.
     assert!(result.is_err());
@@ -23,9 +28,9 @@ async fn test_client_errors_on_connection_failure() {
 async fn test_transport_state_change_handler() {
     // 1. --- SETUP: START A REAL RPC SERVER ---
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let addr = listener.local_addr().unwrap();
-    let server_url = format!("ws://{}/ws", addr);
     let server = Arc::new(RpcServer::new());
+
+    let (server_host, server_port) = tcp_listener_to_host_port(&listener).unwrap();
 
     // Spawn the server to run in the background.
     let _server_task = tokio::spawn(async move {
@@ -36,7 +41,9 @@ async fn test_transport_state_change_handler() {
 
     // 2. --- SETUP: CONNECT CLIENT AND REGISTER HANDLER ---
     let received_states = Arc::new(Mutex::new(Vec::new()));
-    let client = RpcClient::new(&server_url).await.unwrap();
+    let client = RpcClient::new(&server_host.to_string(), server_port)
+        .await
+        .unwrap();
 
     let states_clone = received_states.clone();
     client.set_state_change_handler(move |state| {
