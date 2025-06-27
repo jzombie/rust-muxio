@@ -1,3 +1,10 @@
+//! Note: This `RpcServer` is a reference implementation and does not include
+//! authentication or authorization mechanisms. It is best suited for trusted,
+//! internal network communication or as a foundational example. Any struct that
+//! utilizes an [`RpcServiceEndpoint`] can function as a "server" for handling
+//! RPC requests; this implementation demonstrates one way to do so over WebSockets
+//! using the Axum web framework.
+
 use axum::{
     Router,
     extract::ConnectInfo,
@@ -19,11 +26,18 @@ use tokio::{
     time::timeout,
 };
 
+/// The interval at which the server sends Ping messages to the client.
 const HEARTBEAT_INTERVAL: u64 = 5;
+
+/// The maximum time to wait for a message from the client (including Pong)
+/// before considering the connection timed out.
 const CLIENT_TIMEOUT: u64 = 15;
 
+/// A type alias for the WebSocket sender part, wrapped for shared access.
+/// This allows multiple tasks to send messages to a single client.
 type WsSenderContext = Arc<Mutex<SplitSink<WebSocket, Message>>>;
 
+/// An RPC server that listens for WebSocket connections and handles RPC calls.
 pub struct RpcServer {
     endpoint: Arc<RpcServiceEndpoint<WsSenderContext>>,
 }
@@ -94,6 +108,11 @@ impl RpcServer {
         Ok(address)
     }
 
+    /// Manages a new, established WebSocket connection.
+    ///
+    /// This method is the entry point for a new client. It splits the WebSocket
+    /// into a sender and receiver and spawns the dedicated tasks responsible
+    /// for message handling and transport management.
     async fn ws_handler(
         ws: WebSocketUpgrade,
         ConnectInfo(addr): ConnectInfo<SocketAddr>,
@@ -121,7 +140,10 @@ impl RpcServer {
         ));
     }
 
-    /// Task to handle sending messages from the app to the WebSocket client.
+    /// Task responsible for sending outbound messages to the client.
+    ///
+    /// It listens on an MPSC channel for `Message`s (which can be RPC
+    /// responses or Pings) and sends them over the WebSocket connection.
     async fn sender_task(context: WsSenderContext, mut rx: mpsc::UnboundedReceiver<Message>) {
         while let Some(msg) = rx.recv().await {
             if context.lock().await.send(msg).await.is_err() {
@@ -130,7 +152,13 @@ impl RpcServer {
         }
     }
 
-    /// Task to handle incoming messages, heartbeats, and timeouts.
+    /// Task responsible for handling all inbound communication from a client.
+    ///
+    /// This is the core task for a client connection. It performs several duties:
+    /// - Periodically sends Ping messages to check for client liveness.
+    /// - Listens for incoming messages (Binary, Pong, Close).
+    /// - Enforces a timeout, disconnecting clients that don't respond.
+    /// - Dispatches incoming binary messages (RPC calls) to the `RpcServiceEndpoint`.
     async fn receiver_task(
         endpoint: Arc<RpcServiceEndpoint<WsSenderContext>>,
         context: WsSenderContext,
