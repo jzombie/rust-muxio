@@ -19,9 +19,7 @@ fn test_rpc_dispatcher_prebuffered_calls() {
         );
         assert!(
             (result - expected).abs() < 1e-10,
-            "Expected {}, got {}",
-            expected,
-            result
+            "Expected {expected}, got {result}",
         );
     }
 
@@ -35,9 +33,7 @@ fn test_rpc_dispatcher_prebuffered_calls() {
         );
         assert!(
             (result - expected).abs() < 1e-10,
-            "Expected {}, got {}",
-            expected,
-            result
+            "Expected {expected}, got {result}",
         );
     }
 
@@ -51,9 +47,7 @@ fn test_rpc_dispatcher_prebuffered_calls() {
         );
         assert!(
             (result - expected).abs() < 1e-10,
-            "Expected {}, got {}",
-            expected,
-            result
+            "Expected {expected}, got {result}",
         );
     }
 }

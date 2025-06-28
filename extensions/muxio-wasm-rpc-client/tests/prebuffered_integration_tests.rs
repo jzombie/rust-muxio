@@ -39,7 +39,7 @@ async fn test_success_client_server_roundtrip() {
     // 1. Start a real Tokio-based RPC Server
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
-    let server_url = format!("ws://{}/ws", addr);
+    let server_url = format!("ws://{addr}/ws");
 
     // Wrap server in an Arc immediately to manage ownership correctly.
     let server = Arc::new(RpcServer::new());
@@ -141,7 +141,7 @@ async fn test_error_client_server_roundtrip() {
     // 1. Start a real Tokio-based RPC Server.
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
-    let server_url = format!("ws://{}/ws", addr);
+    let server_url = format!("ws://{addr}/ws");
 
     // Use the same Arc/endpoint pattern for consistency.
     let server = Arc::new(RpcServer::new());
@@ -216,7 +216,7 @@ async fn test_large_prebuffered_payload_roundtrip_wasm() {
     // 1. --- SETUP: START A REAL RPC SERVER ---
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
-    let server_url = format!("ws://{}/ws", addr);
+    let server_url = format!("ws://{addr}/ws");
     let server = Arc::new(RpcServer::new());
     let endpoint = server.endpoint();
 

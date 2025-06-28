@@ -18,11 +18,11 @@ pub enum RpcCallerError {
 impl fmt::Display for RpcCallerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            RpcCallerError::Io(e) => write!(f, "I/O error: {}", e),
+            RpcCallerError::Io(e) => write!(f, "I/O error: {e}"),
             RpcCallerError::RemoteError { payload } => {
-                write!(f, "Remote handler failed with payload: {:?}", payload)
+                write!(f, "Remote handler failed with payload: {payload:?}")
             }
-            RpcCallerError::RemoteSystemError(msg) => write!(f, "Remote system error: {}", msg),
+            RpcCallerError::RemoteSystemError(msg) => write!(f, "Remote system error: {msg}"),
             RpcCallerError::Aborted => write!(f, "RPC call aborted"),
         }
     }

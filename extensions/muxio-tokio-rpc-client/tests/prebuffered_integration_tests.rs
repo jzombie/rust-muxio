@@ -4,7 +4,9 @@ use muxio_rpc_service::{
 };
 use muxio_rpc_service_caller::prebuffered::RpcCallPrebuffered;
 use muxio_tokio_rpc_client::RpcClient;
-use muxio_tokio_rpc_server::{RpcServer, RpcServiceEndpointInterface};
+use muxio_tokio_rpc_server::{
+    RpcServer, RpcServiceEndpointInterface, utils::tcp_listener_to_host_port,
+};
 use std::sync::Arc;
 use tokio::join;
 use tokio::net::TcpListener;
@@ -15,7 +17,8 @@ use tokio::net::TcpListener;
 async fn test_success_client_server_roundtrip() {
     // Bind to a random available port
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let addr = listener.local_addr().unwrap();
+
+    let (server_host, server_port) = tcp_listener_to_host_port(&listener).unwrap();
 
     // This block sets up and spawns the server
     {
@@ -59,7 +62,10 @@ async fn test_success_client_server_roundtrip() {
     // This block runs the client
     {
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-        let rpc_client = RpcClient::new(&format!("ws://{}/ws", addr)).await.unwrap();
+
+        let rpc_client = RpcClient::new(&server_host.to_string(), server_port)
+            .await
+            .unwrap();
 
         let (res1, res2, res3, res4, res5, res6) = join!(
             Add::call(&rpc_client, vec![1.0, 2.0, 3.0]),
@@ -82,7 +88,8 @@ async fn test_success_client_server_roundtrip() {
 #[tokio::test]
 async fn test_error_client_server_roundtrip() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let addr = listener.local_addr().unwrap();
+
+    let (server_host, server_port) = tcp_listener_to_host_port(&listener).unwrap();
 
     // This block sets up and spawns the server
     {
@@ -109,7 +116,9 @@ async fn test_error_client_server_roundtrip() {
     // This block runs the client
     {
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-        let rpc_client = RpcClient::new(&format!("ws://{}/ws", addr)).await.unwrap();
+        let rpc_client = RpcClient::new(&server_host.to_string(), server_port)
+            .await
+            .unwrap();
         let res = Add::call(&rpc_client, vec![1.0, 2.0, 3.0]).await;
 
         assert!(res.is_err());
@@ -126,8 +135,9 @@ async fn test_error_client_server_roundtrip() {
 async fn test_large_prebuffered_payload_roundtrip() {
     // 1. --- SETUP: START A REAL RPC SERVER ---
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let addr = listener.local_addr().unwrap();
-    let server_url = format!("ws://{}/ws", addr);
+
+    let (server_host, server_port) = tcp_listener_to_host_port(&listener).unwrap();
+
     let server = Arc::new(RpcServer::new());
     let endpoint = server.endpoint();
 
@@ -148,7 +158,9 @@ async fn test_large_prebuffered_payload_roundtrip() {
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
     // 2. --- SETUP: CONNECT A REAL RPC CLIENT ---
-    let client = RpcClient::new(&server_url).await.unwrap();
+    let client = RpcClient::new(&server_host.to_string(), server_port)
+        .await
+        .unwrap();
 
     // 3. --- TEST: SEND AND RECEIVE A LARGE PAYLOAD ---
 

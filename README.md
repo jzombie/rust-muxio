@@ -74,7 +74,7 @@ use example_muxio_rpc_service_definition::{
 use muxio_tokio_rpc_client::{
     RpcCallPrebuffered, RpcClient, RpcServiceCallerInterface, RpcTransportState,
 };
-use muxio_tokio_rpc_server::{RpcServer, RpcServiceEndpointInterface};
+use muxio_tokio_rpc_server::{RpcServer, RpcServiceEndpointInterface, utils::tcp_listener_to_host_port};
 use std::sync::Arc;
 use tokio::join;
 use tokio::net::TcpListener;
@@ -85,7 +85,8 @@ async fn main() {
 
     // Bind to a random available port
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let addr = listener.local_addr().unwrap();
+    
+    let (server_host, server_port) = tcp_listener_to_host_port(&listener).unwrap();
 
     // This block sets up and spawns the server
     {
@@ -131,8 +132,8 @@ async fn main() {
         // Wait briefly for server to start
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
-        // Use the actual bound address for the client
-        let rpc_client = RpcClient::new(&format!("ws://{}/ws", addr)).await.unwrap();
+        // Connect to the server
+        let rpc_client = RpcClient::new(&server_host.to_string(), server_port).await.unwrap();
 
         rpc_client.set_state_change_handler(move |new_state: RpcTransportState| {
             // This code will run every time the connection state changes

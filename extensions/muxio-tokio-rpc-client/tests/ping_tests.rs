@@ -4,6 +4,7 @@ use axum::{
     routing::get,
 };
 use muxio_tokio_rpc_client::RpcClient;
+use muxio_tokio_rpc_server::utils::tcp_listener_to_host_port;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use tokio::{
@@ -53,7 +54,8 @@ async fn test_client_responds_to_ping_with_pong() {
     );
 
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let addr = listener.local_addr().unwrap();
+    let (server_host, server_port) = tcp_listener_to_host_port(&listener).unwrap();
+
     let server_task = tokio::spawn(async move {
         axum::serve(
             listener,
@@ -66,7 +68,9 @@ async fn test_client_responds_to_ping_with_pong() {
     // 2. --- SETUP: CONNECT THE RPC CLIENT ---
     // We only need the client to establish a connection; its internal tasks
     // should handle the pong automatically.
-    let _client = RpcClient::new(&format!("ws://{}/ws", addr)).await.unwrap();
+    let _client = RpcClient::new(&server_host.to_string(), server_port)
+        .await
+        .unwrap();
 
     // 3. --- ASSERT ---
     // Wait for the server to confirm it received the correct pong.

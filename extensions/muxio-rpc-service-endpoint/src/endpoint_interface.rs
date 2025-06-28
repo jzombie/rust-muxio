@@ -31,10 +31,8 @@ where
         self.get_prebuffered_handlers()
             .with_handlers(|handlers| match handlers.entry(method_id) {
                 Entry::Occupied(_) => {
-                    let err_msg = format!(
-                        "a handler for method ID {} is already registered",
-                        method_id
-                    );
+                    let err_msg =
+                        format!("a handler for method ID {method_id} is already registered");
                     Err(RpcServiceEndpointError::Handler(err_msg.into()))
                 }
                 Entry::Vacant(entry) => {

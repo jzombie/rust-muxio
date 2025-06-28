@@ -1,3 +1,10 @@
+//! Note: This `RpcServer` is a reference implementation and does not include
+//! authentication or authorization mechanisms. It is best suited for trusted,
+//! internal network communication or as a foundational example. Any struct that
+//! utilizes an [`RpcServiceEndpoint`] can function as a "server" for handling
+//! RPC requests; this implementation demonstrates one way to do so over WebSockets
+//! using the Axum web framework.
+
 use axum::{
     Router,
     extract::ConnectInfo,
@@ -14,16 +21,23 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::{
-    net::TcpListener,
+    net::{TcpListener, ToSocketAddrs},
     sync::{Mutex, mpsc},
     time::timeout,
 };
 
+/// The interval at which the server sends Ping messages to the client.
 const HEARTBEAT_INTERVAL: u64 = 5;
+
+/// The maximum time to wait for a message from the client (including Pong)
+/// before considering the connection timed out.
 const CLIENT_TIMEOUT: u64 = 15;
 
+/// A type alias for the WebSocket sender part, wrapped for shared access.
+/// This allows multiple tasks to send messages to a single client.
 type WsSenderContext = Arc<Mutex<SplitSink<WebSocket, Message>>>;
 
+/// An RPC server that listens for WebSocket connections and handles RPC calls.
 pub struct RpcServer {
     endpoint: Arc<RpcServiceEndpoint<WsSenderContext>>,
 }
@@ -48,17 +62,36 @@ impl RpcServer {
         self.endpoint.clone()
     }
 
-    pub async fn serve(self, address: &str) -> Result<SocketAddr, axum::BoxError> {
-        let listener = TcpListener::bind(address).await?;
+    /// Binds to an address and starts the RPC server.
+    ///
+    /// The address can be any type that implements `ToSocketAddrs`, such as
+    /// a string "127.0.0.1:8080" or a `SocketAddr`.
+    pub async fn serve<A: ToSocketAddrs>(self, addr: A) -> Result<SocketAddr, axum::BoxError> {
+        let listener = TcpListener::bind(addr).await?;
         let server = Arc::new(self);
         server.serve_with_listener(listener).await
     }
 
+    /// Starts the RPC server on a specific host and port.
+    ///
+    /// This is a convenience wrapper around `serve`. The host can be an IP
+    /// address or a hostname.
+    pub async fn serve_on(self, host: &str, port: u16) -> Result<SocketAddr, axum::BoxError> {
+        // `ToSocketAddrs` can handle "host:port" strings directly, including hostnames.
+        let addr = format!("{host}:{port}");
+        // Delegate to the existing generic `serve` function.
+        self.serve(addr).await
+    }
+
+    /// Starts the RPC server with a pre-bound `TcpListener`.
+    ///
+    /// This is useful for cases like binding to an ephemeral port (port 0) and
+    /// then retrieving the actual address.
     pub async fn serve_with_listener(
         self: Arc<Self>,
         listener: TcpListener,
     ) -> Result<SocketAddr, axum::BoxError> {
-        let addr = listener.local_addr()?;
+        let address = listener.local_addr()?;
         let app = Router::new().route(
             "/ws",
             get({
@@ -66,15 +99,20 @@ impl RpcServer {
                 move |ws, conn| Self::ws_handler(ws, conn, server)
             }),
         );
-        tracing::info!("Server running on {:?}", addr);
+        tracing::info!("Server running on {:?}", address);
         axum::serve(
             listener,
             app.into_make_service_with_connect_info::<SocketAddr>(),
         )
         .await?;
-        Ok(addr)
+        Ok(address)
     }
 
+    /// Manages a new, established WebSocket connection.
+    ///
+    /// This method is the entry point for a new client. It splits the WebSocket
+    /// into a sender and receiver and spawns the dedicated tasks responsible
+    /// for message handling and transport management.
     async fn ws_handler(
         ws: WebSocketUpgrade,
         ConnectInfo(addr): ConnectInfo<SocketAddr>,
@@ -102,7 +140,10 @@ impl RpcServer {
         ));
     }
 
-    /// Task to handle sending messages from the app to the WebSocket client.
+    /// Task responsible for sending outbound messages to the client.
+    ///
+    /// It listens on an MPSC channel for `Message`s (which can be RPC
+    /// responses or Pings) and sends them over the WebSocket connection.
     async fn sender_task(context: WsSenderContext, mut rx: mpsc::UnboundedReceiver<Message>) {
         while let Some(msg) = rx.recv().await {
             if context.lock().await.send(msg).await.is_err() {
@@ -111,7 +152,13 @@ impl RpcServer {
         }
     }
 
-    /// Task to handle incoming messages, heartbeats, and timeouts.
+    /// Task responsible for handling all inbound communication from a client.
+    ///
+    /// This is the core task for a client connection. It performs several duties:
+    /// - Periodically sends Ping messages to check for client liveness.
+    /// - Listens for incoming messages (Binary, Pong, Close).
+    /// - Enforces a timeout, disconnecting clients that don't respond.
+    /// - Dispatches incoming binary messages (RPC calls) to the `RpcServiceEndpoint`.
     async fn receiver_task(
         endpoint: Arc<RpcServiceEndpoint<WsSenderContext>>,
         context: WsSenderContext,

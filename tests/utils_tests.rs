@@ -6,7 +6,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 fn test_now_monotonicity() {
     let t1 = now();
     let t2 = now();
-    assert!(t2 >= t1, "Timestamp is not monotonic: {} < {}", t2, t1);
+    assert!(t2 >= t1, "Timestamp is not monotonic: {t2} < {t1}");
 }
 
 #[test]
@@ -18,14 +18,10 @@ fn test_now_close_to_system_time() {
 
     let chrono_time = now();
 
-    let delta = if system_time > chrono_time {
-        system_time - chrono_time
-    } else {
-        chrono_time - system_time
-    };
+    let delta = system_time.abs_diff(chrono_time);
 
     // Acceptable skew threshold (e.g., 5 milliseconds)
-    assert!(delta < 5_000, "Timestamp delta too large: {} µs", delta);
+    assert!(delta < 5_000, "Timestamp delta too large: {delta} µs");
 }
 
 #[test]
@@ -34,6 +30,6 @@ fn test_increment_u32_id_uniqueness() {
 
     for _ in 0..10_000 {
         let id = increment_u32_id();
-        assert!(seen.insert(id), "Duplicate ID generated: {}", id);
+        assert!(seen.insert(id), "Duplicate ID generated: {id}");
     }
 }

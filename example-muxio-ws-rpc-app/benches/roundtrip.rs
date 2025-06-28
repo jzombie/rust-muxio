@@ -2,7 +2,9 @@ use criterion::{Criterion, criterion_group, criterion_main};
 use example_muxio_rpc_service_definition::{RpcMethodPrebuffered, prebuffered::Add};
 use futures::{StreamExt, stream::FuturesUnordered};
 use muxio_tokio_rpc_client::{RpcCallPrebuffered, RpcClient};
-use muxio_tokio_rpc_server::{RpcServer, RpcServiceEndpointInterface};
+use muxio_tokio_rpc_server::{
+    RpcServer, RpcServiceEndpointInterface, utils::tcp_listener_to_host_port,
+};
 use std::{hint::black_box, sync::Arc, time::Duration};
 use tokio::{net::TcpListener, runtime::Runtime};
 
@@ -12,7 +14,8 @@ fn bench_roundtrip(c: &mut Criterion) {
     // Set up server + client once
     let (client, _server_task) = rt.block_on(async {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
+
+        let (server_host, server_port) = tcp_listener_to_host_port(&listener).unwrap();
 
         let server = RpcServer::new();
 
@@ -37,7 +40,9 @@ fn bench_roundtrip(c: &mut Criterion) {
 
         tokio::time::sleep(Duration::from_millis(100)).await;
 
-        let client = RpcClient::new(&format!("ws://{}/ws", addr)).await.unwrap();
+        let client = RpcClient::new(&server_host.to_string(), server_port)
+            .await
+            .unwrap();
         (client, server_task)
     });
 
