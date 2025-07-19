@@ -69,6 +69,15 @@ where
     })
 }
 
+/// Returns the current static `RpcWasmClient`, if initialized.
+///
+/// # Returns
+/// - `Some(Arc<RpcWasmClient>)` if the client has been initialized
+/// - `None` otherwise
+pub fn get_static_client() -> Option<Arc<RpcWasmClient>> {
+    MUXIO_STATIC_RPC_CLIENT_REF.with(|cell| cell.borrow().clone())
+}
+
 /// Notifies the static Rust client of a transport state change.
 /// This should be called from the JavaScript host environment (e.g., in
 /// a WebSocket's `onopen` or `onclose` event listeners).
