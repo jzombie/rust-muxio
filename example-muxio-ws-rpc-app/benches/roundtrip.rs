@@ -17,7 +17,7 @@ fn bench_roundtrip(c: &mut Criterion) {
 
         let (server_host, server_port) = tcp_listener_to_host_port(&listener).unwrap();
 
-        let server = RpcServer::new();
+        let server = RpcServer::new(None);
 
         let endpoint = server.endpoint();
 
