@@ -116,6 +116,25 @@ impl RpcServer {
         ConnectInfo(addr): ConnectInfo<SocketAddr>,
         server: Arc<RpcServer>,
     ) -> impl IntoResponse {
+        // TODO: Implement custom authentication hook.
+        //
+        // 1. Define an `AuthHook` trait:
+        //    #[async_trait]
+        //    pub trait AuthHook: Send + Sync {
+        //        async fn authenticate(&self, req: &axum::http::Request<()>) -> Result<(), axum::http::StatusCode>;
+        //    }
+        //
+        // 2. Add `auth_hook: Option<Arc<dyn AuthHook>>` to the `RpcServer` struct.
+        //
+        // 3. Before upgrading the connection, check the hook:
+        //    if let Some(hook) = &server.auth_hook {
+        //        // This requires capturing the original request, which can be done
+        //        // by modifying the handler signature to include `axum::http::Request`.
+        //        if let Err(status_code) = hook.authenticate(&original_request).await {
+        //            return (status_code, status_code.to_string()).into_response();
+        //        }
+        //    }
+
         tracing::info!("Client connected: {}", addr);
         ws.on_upgrade(move |socket| server.handle_socket(socket, addr))
     }
