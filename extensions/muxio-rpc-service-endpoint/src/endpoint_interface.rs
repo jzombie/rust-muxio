@@ -52,6 +52,7 @@ where
                     Err(RpcServiceEndpointError::Handler(err_msg.into()))
                 }
                 Entry::Vacant(entry) => {
+                    // TODO: Move `ctx` to 2nd arg position for more idiomatic Rust
                     let wrapped = move |ctx: C, bytes: Vec<u8>| {
                         Box::pin(handler(ctx, bytes))
                             as std::pin::Pin<Box<dyn Future<Output = _> + Send>>
