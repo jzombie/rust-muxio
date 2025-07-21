@@ -91,7 +91,7 @@ async fn main() {
     // This block sets up and spawns the server
     {
         // Create the server and immediately wrap it in an Arc for sharing
-        let server = Arc::new(RpcServer::new());
+        let server = Arc::new(RpcServer::new(None));
 
         //  Get a handle to the endpoint to register handlers
         let endpoint = server.endpoint();
