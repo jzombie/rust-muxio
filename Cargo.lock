@@ -888,6 +888,7 @@ dependencies = [
  "muxio",
  "muxio-rpc-service",
  "muxio-rpc-service-caller",
+ "muxio-rpc-service-endpoint",
  "muxio-tokio-rpc-server",
  "tokio",
  "tokio-tungstenite 0.26.2",
