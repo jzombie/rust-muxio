@@ -37,9 +37,8 @@ const HEARTBEAT_INTERVAL: u64 = 5;
 const CLIENT_TIMEOUT: u64 = 15;
 
 /// Represents events that occur on the `RpcServer`.
-#[derive(Debug)]
 pub enum RpcServerEvent {
-    ClientConnected(SocketAddr),
+    ClientConnected(ConnectionContextHandle),
     ClientDisconnected(SocketAddr),
 }
 
@@ -149,10 +148,6 @@ impl RpcServer {
     async fn handle_socket(self: Arc<Self>, socket: WebSocket, addr: SocketAddr) {
         // Send a connected event if a channel is configured.
 
-        if let Some(tx) = &self.event_tx {
-            let _ = tx.send(RpcServerEvent::ClientConnected(addr));
-        }
-
         let (sender, receiver) = socket.split();
 
         let context = Arc::new(ConnectionContext {
@@ -160,6 +155,12 @@ impl RpcServer {
             addr,
             dispatcher: Arc::new(Mutex::new(RpcDispatcher::new())),
         });
+
+        if let Some(tx) = &self.event_tx {
+            let _ = tx.send(RpcServerEvent::ClientConnected(ConnectionContextHandle(
+                context.clone(),
+            )));
+        }
 
         // This MPSC channel is for sending messages *out* to the WebSocket.
         let (tx, rx) = mpsc::unbounded_channel::<Message>();
