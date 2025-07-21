@@ -1,5 +1,6 @@
 use muxio::rpc::RpcDispatcher;
 use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
+use muxio_rpc_service_endpoint::RpcServiceEndpoint;
 use std::sync::{Arc, Mutex};
 
 type RpcTransportStateChangeHandler =
@@ -8,6 +9,8 @@ type RpcTransportStateChangeHandler =
 /// A WASM-compatible RPC client.
 pub struct RpcWasmClient {
     dispatcher: Arc<Mutex<RpcDispatcher<'static>>>,
+    /// The endpoint for handling incoming RPC calls from the host.
+    endpoint: Arc<RpcServiceEndpoint<()>>,
     emit_callback: Arc<dyn Fn(Vec<u8>) + Send + Sync>,
     state_change_handler: RpcTransportStateChangeHandler,
 }
@@ -16,10 +19,15 @@ impl RpcWasmClient {
     pub fn new(emit_callback: impl Fn(Vec<u8>) + Send + Sync + 'static) -> RpcWasmClient {
         RpcWasmClient {
             dispatcher: Arc::new(Mutex::new(RpcDispatcher::new())),
+            endpoint: Arc::new(RpcServiceEndpoint::new()),
             emit_callback: Arc::new(emit_callback),
-            // Initialize the handler as None
             state_change_handler: Arc::new(Mutex::new(None)),
         }
+    }
+
+    // This is part of the struct's own implementation, not a trait.
+    pub fn get_endpoint(&self) -> Arc<RpcServiceEndpoint<()>> {
+        self.endpoint.clone()
     }
 
     fn dispatcher(&self) -> Arc<Mutex<RpcDispatcher<'static>>> {
@@ -30,14 +38,13 @@ impl RpcWasmClient {
         self.emit_callback.clone()
     }
 
-    /// Provides a public accessor to the state change handler so that it can be
-    /// invoked by the FFI bridge when JavaScript reports a state change.
+    /// Provides a public accessor to the state change handler.
     pub fn state_change_handler(&self) -> RpcTransportStateChangeHandler {
         self.state_change_handler.clone()
     }
 }
 
-#[async_trait::async_trait]
+#[async_trait::async_trait(?Send)]
 impl RpcServiceCallerInterface for RpcWasmClient {
     type DispatcherLock = Mutex<RpcDispatcher<'static>>;
 
@@ -49,12 +56,7 @@ impl RpcServiceCallerInterface for RpcWasmClient {
         self.emit()
     }
 
-    /// Sets a callback that will be invoked with the current `RpcTransportState`
-    /// whenever the underlying transport's connection status changes.
-    ///
-    /// Since the WASM client is not aware of the connection itself, it is the
-    /// responsibility of the JavaScript host to call an FFI function (like
-    /// `notify_transport_state_change`) to trigger this handler.
+    /// Sets a callback that will be invoked with the current `RpcTransportState`.
     fn set_state_change_handler(
         &self,
         handler: impl Fn(RpcTransportState) + Send + Sync + 'static,

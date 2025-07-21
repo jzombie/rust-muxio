@@ -15,6 +15,7 @@ futures-util = "0.3.31"
 tokio = { version = "1.45.1", features = ["full"] }
 tokio-tungstenite = "0.26.2"
 muxio = { workspace = true }
+muxio-rpc-service-caller = { workspace = true }
 muxio-rpc-service = { workspace = true }
 muxio-rpc-service-endpoint = { workspace = true, features=["tokio_support"] }
 async-trait = "0.1.88"

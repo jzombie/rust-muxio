@@ -16,12 +16,13 @@ wasm-bindgen = "0.2.100"
 muxio = { workspace = true }
 muxio-rpc-service = { workspace = true }
 muxio-rpc-service-caller = { workspace = true }
+muxio-rpc-service-endpoint = { workspace = true }
 wasm-bindgen-futures = "0.4.50"
+tracing = "0.1.41"
 
 [dev-dependencies]
 tokio = { version = "1.45.1", features = ["full"] }
 muxio-tokio-rpc-server = { workspace = true }
-muxio-rpc-service-endpoint = { workspace = true }
 example-muxio-rpc-service-definition = { workspace = true }
 futures-util = "0.3.31"
 tokio-tungstenite = "0.27.0"

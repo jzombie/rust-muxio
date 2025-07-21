@@ -888,6 +888,7 @@ dependencies = [
  "muxio",
  "muxio-rpc-service",
  "muxio-rpc-service-caller",
+ "muxio-rpc-service-endpoint",
  "muxio-tokio-rpc-server",
  "tokio",
  "tokio-tungstenite 0.26.2",
@@ -904,6 +905,7 @@ dependencies = [
  "futures-util",
  "muxio",
  "muxio-rpc-service",
+ "muxio-rpc-service-caller",
  "muxio-rpc-service-endpoint",
  "tokio",
  "tokio-tungstenite 0.26.2",
@@ -926,6 +928,7 @@ dependencies = [
  "muxio-tokio-rpc-server",
  "tokio",
  "tokio-tungstenite 0.27.0",
+ "tracing",
  "wasm-bindgen",
  "wasm-bindgen-futures",
 ]

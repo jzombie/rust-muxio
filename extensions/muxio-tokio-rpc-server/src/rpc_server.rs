@@ -18,6 +18,7 @@ use futures_util::{
     stream::{SplitSink, SplitStream},
 };
 use muxio::rpc::RpcDispatcher;
+use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
 use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface};
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -36,17 +37,22 @@ const HEARTBEAT_INTERVAL: u64 = 5;
 const CLIENT_TIMEOUT: u64 = 15;
 
 /// Represents events that occur on the `RpcServer`.
-#[derive(Debug)]
 pub enum RpcServerEvent {
-    ClientConnected(SocketAddr),
+    ClientConnected(ConnectionContextHandle),
     ClientDisconnected(SocketAddr),
 }
 
-#[derive(Debug)]
 pub struct ConnectionContext {
     pub sender: WsSenderContext,
     pub addr: SocketAddr,
+    // Each connection gets its own dispatcher for making server-to-client calls.
+    pub dispatcher: Arc<Mutex<RpcDispatcher<'static>>>,
 }
+
+/// A wrapper around `Arc<ConnectionContext>` to satisfy Rust's orphan rule.
+/// This local newtype allows us to implement the foreign `RpcServiceCallerInterface` trait.
+#[derive(Clone)]
+pub struct ConnectionContextHandle(pub Arc<ConnectionContext>);
 
 /// A type alias for the WebSocket sender part, wrapped for shared access.
 type WsSenderContext = Arc<Mutex<SplitSink<WebSocket, Message>>>;
@@ -140,20 +146,20 @@ impl RpcServer {
     }
 
     async fn handle_socket(self: Arc<Self>, socket: WebSocket, addr: SocketAddr) {
-        // Send a connected event if a channel is configured.
-
-        if let Some(tx) = &self.event_tx {
-            let _ = tx.send(RpcServerEvent::ClientConnected(addr));
-        }
-
         let (sender, receiver) = socket.split();
 
         let context = Arc::new(ConnectionContext {
             sender: Arc::new(Mutex::new(sender)),
             addr,
+            dispatcher: Arc::new(Mutex::new(RpcDispatcher::new())),
         });
 
-        // This MPSC channel is for sending messages *out* to the WebSocket.
+        if let Some(tx) = &self.event_tx {
+            let _ = tx.send(RpcServerEvent::ClientConnected(ConnectionContextHandle(
+                context.clone(),
+            )));
+        }
+
         let (tx, rx) = mpsc::unbounded_channel::<Message>();
 
         tokio::spawn(Self::sender_task(context.clone(), rx));
@@ -170,20 +176,17 @@ impl RpcServer {
         ));
     }
 
-    /// Task responsible for sending outbound messages to the client.
     async fn sender_task(
         context: Arc<ConnectionContext>,
         mut rx: mpsc::UnboundedReceiver<Message>,
     ) {
         while let Some(msg) = rx.recv().await {
-            // Access the sender inside the context
             if context.sender.lock().await.send(msg).await.is_err() {
                 break;
             }
         }
     }
 
-    /// Task responsible for handling all inbound communication from a client.
     async fn receiver_task(
         endpoint: Arc<RpcServiceEndpoint<Arc<ConnectionContext>>>,
         context: Arc<ConnectionContext>,
@@ -192,7 +195,6 @@ impl RpcServer {
         addr: SocketAddr,
         event_tx: Option<mpsc::UnboundedSender<RpcServerEvent>>,
     ) {
-        let mut dispatcher = RpcDispatcher::new();
         let heartbeat_interval = Duration::from_secs(HEARTBEAT_INTERVAL);
         let client_timeout = Duration::from_secs(CLIENT_TIMEOUT);
 
@@ -213,6 +215,7 @@ impl RpcServer {
                         Ok(Some(Ok(msg))) => {
                             match msg {
                                 Message::Binary(bytes) => {
+                                    let mut dispatcher = context.dispatcher.lock().await;
                                     let tx_clone = tx.clone();
                                     let on_emit = move |chunk: &[u8]| {
                                         let _ = tx_clone.send(Message::Binary(Bytes::copy_from_slice(chunk)));
@@ -240,10 +243,58 @@ impl RpcServer {
             }
         }
 
-        // After the loop breaks, send a disconnected event if a channel is configured.
-        tracing::info!("Terminated connection for {}.", addr);
         if let Some(tx) = event_tx {
             let _ = tx.send(RpcServerEvent::ClientDisconnected(addr));
         }
+    }
+}
+
+/// Implements the `RpcServiceCallerInterface` to enable server-initiated RPC calls.
+///
+/// This implementation allows the server to act as a "client" by using a specific
+/// connection handle (`ConnectionContextHandle`) to send new, unsolicited RPC requests
+/// to that connected client. This is distinct from simply replying to a client's
+/// initial request and is the foundation for fully bidirectional communication,
+/// such as server-push notifications or commands.
+#[async_trait::async_trait]
+impl RpcServiceCallerInterface for ConnectionContextHandle {
+    // The dispatcher is protected by a Tokio Mutex.
+    type DispatcherLock = Mutex<RpcDispatcher<'static>>;
+
+    fn get_dispatcher(&self) -> Arc<Self::DispatcherLock> {
+        // Return the dispatcher associated with this specific connection.
+        self.0.dispatcher.clone()
+    }
+
+    fn get_emit_fn(&self) -> Arc<dyn Fn(Vec<u8>) + Send + Sync> {
+        // Returns a thread-safe function that sends a raw byte payload
+        // over the WebSocket connection associated with this specific client.
+        // This is the lowest-level transport function used by the RPC caller.
+        Arc::new({
+            let sender = self.0.sender.clone();
+            move |chunk: Vec<u8>| {
+                let sender = sender.clone();
+                tokio::spawn(async move {
+                    let _ = sender
+                        .lock()
+                        .await
+                        .send(Message::Binary(chunk.into()))
+                        .await;
+                });
+            }
+        })
+    }
+
+    /// This is a client-side concept, so it's a no-op on the server.
+    /// The server manages the connection state directly.
+    fn set_state_change_handler(
+        &self,
+        _handler: impl Fn(RpcTransportState) + Send + Sync + 'static,
+    ) {
+        // It doesn't make sense for the server to set a state change handler
+        // on a connection it owns, so we do nothing.
+        tracing::warn!(
+            "set_state_change_handler called on server-side connection context; this is a no-op."
+        );
     }
 }

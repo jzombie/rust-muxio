@@ -1,6 +1,7 @@
 use futures_util::{SinkExt, StreamExt};
 use muxio::rpc::RpcDispatcher;
 use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
+use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface};
 use std::fmt;
 use std::io;
 use std::net::{IpAddr, SocketAddr};
@@ -8,7 +9,7 @@ use std::sync::{
     Arc, Mutex,
     atomic::{AtomicBool, Ordering},
 };
-use tokio::sync::mpsc as tokio_mpsc;
+use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tokio_tungstenite::tungstenite::Error as WsError;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message as WsMessage};
@@ -18,7 +19,9 @@ type RpcTransportStateChangeHandler =
 
 pub struct RpcClient {
     dispatcher: Arc<tokio::sync::Mutex<RpcDispatcher<'static>>>,
-    tx: tokio_mpsc::UnboundedSender<WsMessage>,
+    /// The endpoint for handling incoming RPC calls from the server.
+    endpoint: Arc<RpcServiceEndpoint<()>>,
+    tx: mpsc::UnboundedSender<WsMessage>,
     state_change_handler: RpcTransportStateChangeHandler,
     is_connected: Arc<AtomicBool>,
     _task_handles: Vec<JoinHandle<()>>,
@@ -28,6 +31,7 @@ impl fmt::Debug for RpcClient {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RpcClient")
             .field("dispatcher", &"Arc<Mutex<RpcDispatcher>>")
+            .field("endpoint", &"Arc<RpcServiceEndpoint<()>>")
             .field("tx", &self.tx)
             .field("state_change_handler", &"Arc<Mutex<...>>")
             .field("is_connected", &self.is_connected.load(Ordering::Relaxed))
@@ -60,15 +64,12 @@ impl RpcClient {
         // This handles proper IPv6 bracket formatting `[::1]` for IP literals,
         // while passing hostnames through for DNS resolution by the network stack.
         let websocket_url = match host.parse::<IpAddr>() {
-            // It's a valid IP address literal.
             Ok(ip) => {
                 let socket_addr = SocketAddr::new(ip, port);
                 format!("ws://{socket_addr}/ws")
             }
             // It's not an IP address, so assume it's a hostname.
-            Err(_) => {
-                format!("ws://{host}:{port}/ws")
-            }
+            Err(_) => format!("ws://{host}:{port}/ws"),
         };
 
         let (ws_stream, _) = connect_async(websocket_url.to_string())
@@ -76,17 +77,19 @@ impl RpcClient {
             .map_err(|e| io::Error::new(io::ErrorKind::ConnectionRefused, e))?;
 
         let (mut ws_sender, mut ws_receiver) = ws_stream.split();
-        let (app_tx, mut app_rx) = tokio_mpsc::unbounded_channel::<WsMessage>();
+        let (app_tx, mut app_rx) = mpsc::unbounded_channel::<WsMessage>();
         let (ws_recv_tx, mut ws_recv_rx) =
-            tokio_mpsc::unbounded_channel::<Option<Result<WsMessage, WsError>>>();
+            mpsc::unbounded_channel::<Option<Result<WsMessage, WsError>>>();
 
         let state_change_handler: RpcTransportStateChangeHandler = Arc::new(Mutex::new(None));
         let is_connected = Arc::new(AtomicBool::new(true));
         let dispatcher = Arc::new(tokio::sync::Mutex::new(RpcDispatcher::new()));
+        let endpoint = Arc::new(RpcServiceEndpoint::new());
 
         let mut task_handles = Vec::new();
         let is_connected_recv = is_connected.clone();
         let state_handler_recv = state_change_handler.clone();
+        let endpoint_handle = endpoint.clone();
         let dispatcher_handle = dispatcher.clone();
         let tx_for_handler = app_tx.clone();
 
@@ -121,25 +124,22 @@ impl RpcClient {
             while let Some(Some(msg_result)) = ws_recv_rx.recv().await {
                 match msg_result {
                     Ok(WsMessage::Binary(bytes)) => {
-                        // Forward binary data to the RPC dispatcher.
-                        dispatcher_handle.lock().await.read_bytes(&bytes).ok();
+                        let mut dispatcher = dispatcher_handle.lock().await;
+                        let on_emit = |chunk: &[u8]| {
+                            let _ = tx_for_handler.send(WsMessage::Binary(chunk.to_vec().into()));
+                        };
+                        let _ = endpoint_handle
+                            .read_bytes(&mut dispatcher, (), &bytes, on_emit)
+                            .await;
                     }
                     Ok(WsMessage::Ping(data)) => {
-                        // Received a Ping from the server, respond with a Pong.
                         let _ = tx_for_handler.send(WsMessage::Pong(data));
                     }
-                    Ok(WsMessage::Close(_)) => {
-                        // The connection is closing, break the loop.
-                        // The main receive loop will handle the disconnect signal.
-                        break;
-                    }
+                    Ok(WsMessage::Close(_)) => break,
                     Err(e) => {
-                        // An error occurred on the WebSocket stream.
-                        // The main receive loop will handle the disconnect signal.
                         tracing::error!("WebSocket error: {}", e);
                         break;
                     }
-                    // Ignore other message types like Pong from server, Text, etc.
                     _ => {}
                 }
             }
@@ -148,11 +148,16 @@ impl RpcClient {
 
         Ok(RpcClient {
             dispatcher,
+            endpoint,
             tx: app_tx,
             state_change_handler,
             is_connected,
             _task_handles: task_handles,
         })
+    }
+
+    pub fn get_endpoint(&self) -> Arc<RpcServiceEndpoint<()>> {
+        self.endpoint.clone()
     }
 }
 
