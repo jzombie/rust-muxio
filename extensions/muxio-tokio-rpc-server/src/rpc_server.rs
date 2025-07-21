@@ -20,7 +20,6 @@ use futures_util::{
 use muxio::rpc::RpcDispatcher;
 use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
 use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface};
-use std::fmt::Debug;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
