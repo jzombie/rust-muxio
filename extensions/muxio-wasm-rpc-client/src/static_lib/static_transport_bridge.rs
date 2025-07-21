@@ -1,15 +1,13 @@
-// File: /home/jeremy/Projects/rust-muxio/extensions/muxio-wasm-rpc-client/src/static_lib/static_transport_bridge.rs
-
 use super::MUXIO_STATIC_RPC_CLIENT_REF;
-use futures::future::join_all; // For concurrently awaiting multiple handler futures
+use futures::future::join_all;
 use js_sys::Uint8Array;
-use muxio::rpc::RpcRequest; // Needed for RpcRequest/RpcResponse types
-use muxio_rpc_service::constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE; // For chunking responses
+use muxio::rpc::RpcRequest;
+use muxio_rpc_service::constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE;
 use muxio_rpc_service_caller::RpcServiceCallerInterface;
 use muxio_rpc_service_endpoint::RpcServiceEndpointInterface;
 use muxio_rpc_service_endpoint::process_single_prebuffered_request;
 use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::spawn_local; // For running async tasks on the WASM event loop // For Box<dyn Error + Send + Sync> in handler results
+use wasm_bindgen_futures::spawn_local;
 
 #[wasm_bindgen]
 extern "C" {
