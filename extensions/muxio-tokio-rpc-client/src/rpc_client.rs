@@ -1,7 +1,7 @@
 use futures_util::{SinkExt, StreamExt};
 use muxio::rpc::RpcDispatcher;
 use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
-use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface}; // Add RpcServiceEndpointInterface
+use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface};
 use std::fmt;
 use std::io;
 use std::net::{IpAddr, SocketAddr};
@@ -31,7 +31,6 @@ impl fmt::Debug for RpcClient {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RpcClient")
             .field("dispatcher", &"Arc<Mutex<RpcDispatcher>>")
-            // Print a placeholder since RpcServiceEndpoint isn't Debug.
             .field("endpoint", &"Arc<RpcServiceEndpoint<()>>")
             .field("tx", &self.tx)
             .field("state_change_handler", &"Arc<Mutex<...>>")
@@ -65,7 +64,6 @@ impl RpcClient {
         // This handles proper IPv6 bracket formatting `[::1]` for IP literals,
         // while passing hostnames through for DNS resolution by the network stack.
         let websocket_url = match host.parse::<IpAddr>() {
-            // It's a valid IP address literal.
             Ok(ip) => {
                 let socket_addr = SocketAddr::new(ip, port);
                 format!("ws://{socket_addr}/ws")
@@ -123,32 +121,25 @@ impl RpcClient {
 
         // Message handler loop: Processes all incoming messages.
         let dispatch_handle = tokio::spawn(async move {
-            let mut local_dispatcher = RpcDispatcher::new();
             while let Some(Some(msg_result)) = ws_recv_rx.recv().await {
                 match msg_result {
                     Ok(WsMessage::Binary(bytes)) => {
-                        dispatcher_handle.lock().await.read_bytes(&bytes).ok();
+                        let mut dispatcher = dispatcher_handle.lock().await;
                         let on_emit = |chunk: &[u8]| {
                             let _ = tx_for_handler.send(WsMessage::Binary(chunk.to_vec().into()));
                         };
                         let _ = endpoint_handle
-                            .read_bytes(&mut local_dispatcher, (), &bytes, on_emit)
+                            .read_bytes(&mut dispatcher, (), &bytes, on_emit)
                             .await;
                     }
                     Ok(WsMessage::Ping(data)) => {
-                        // Received a Ping from the server, respond with a Pong.
                         let _ = tx_for_handler.send(WsMessage::Pong(data));
                     }
-                    Ok(WsMessage::Close(_)) => {
-                        // The connection is closing, break the loop.
-                        // The main receive loop will handle the disconnect signal.
-                        break;
-                    }
+                    Ok(WsMessage::Close(_)) => break,
                     Err(e) => {
                         tracing::error!("WebSocket error: {}", e);
                         break;
                     }
-                    // Ignore other message types like Pong from server, Text, etc.
                     _ => {}
                 }
             }
