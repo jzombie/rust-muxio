@@ -23,7 +23,7 @@ async fn test_success_client_server_roundtrip() {
     // This block sets up and spawns the server
     {
         // Wrap the server in an Arc to manage ownership correctly.
-        let server = Arc::new(RpcServer::new());
+        let server = Arc::new(RpcServer::new(None));
 
         // Get a handle to the endpoint for registration.
         let endpoint = server.endpoint();
@@ -94,7 +94,7 @@ async fn test_error_client_server_roundtrip() {
     // This block sets up and spawns the server
     {
         // Use the same correct setup pattern.
-        let server = Arc::new(RpcServer::new());
+        let server = Arc::new(RpcServer::new(None));
         let endpoint = server.endpoint();
 
         // Note: The `join!` macro is not strictly necessary for a single future,
@@ -138,7 +138,7 @@ async fn test_large_prebuffered_payload_roundtrip() {
 
     let (server_host, server_port) = tcp_listener_to_host_port(&listener).unwrap();
 
-    let server = Arc::new(RpcServer::new());
+    let server = Arc::new(RpcServer::new(None));
     let endpoint = server.endpoint();
 
     // Register a simple "echo" handler on the server for our test to call.

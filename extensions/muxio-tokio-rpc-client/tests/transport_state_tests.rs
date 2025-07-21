@@ -25,7 +25,7 @@ async fn test_client_errors_on_connection_failure() {
 async fn test_transport_state_change_handler() {
     // 1. --- SETUP: START A REAL RPC SERVER ---
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let server = Arc::new(RpcServer::new());
+    let server = Arc::new(RpcServer::new(None));
 
     let (server_host, server_port) = tcp_listener_to_host_port(&listener).unwrap();
 
