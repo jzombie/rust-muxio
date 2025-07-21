@@ -101,7 +101,7 @@ async fn test_server_to_wasm_client_echo_roundtrip() {
                 // `spawn_blocking` is used because `dispatcher_arc.lock().unwrap()` is a blocking call.
                 // `block_on` inside `spawn_blocking` is used to execute the async endpoint.read_bytes
                 // without blocking the main Tokio runtime thread (which `spawn_blocking` handles for us).
-                task::spawn_blocking(move || {
+                let _ = task::spawn_blocking(move || {
                     let mut dispatcher_guard =
                         dispatcher_arc.lock().expect("Dispatcher mutex poisoned");
                     let result = tokio::runtime::Handle::current().block_on(async {
