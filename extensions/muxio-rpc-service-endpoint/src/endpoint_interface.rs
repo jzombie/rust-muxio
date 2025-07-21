@@ -1,10 +1,7 @@
-use super::{
-    error::{HandlerPayloadError, RpcServiceEndpointError},
-    with_handlers_trait::WithHandlers,
-};
+use super::endpoint_utils::process_single_prebuffered_request;
+use super::{error::RpcServiceEndpointError, with_handlers_trait::WithHandlers};
 use futures::future::join_all;
-use muxio::rpc::{RpcDispatcher, RpcResponse, rpc_internals::rpc_trait::RpcEmit};
-use muxio_rpc_service::RpcResultStatus;
+use muxio::rpc::{RpcDispatcher, rpc_internals::rpc_trait::RpcEmit};
 use muxio_rpc_service::constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE;
 use std::{collections::hash_map::Entry, future::Future, marker::Send, sync::Arc};
 
@@ -13,13 +10,13 @@ pub trait RpcServiceEndpointInterface<C>: Send + Sync
 where
     C: Send + Sync + Clone + 'static,
 {
-    type HandlersLock: WithHandlers<C>;
+    type HandlersLock: WithHandlers<C> + 'static;
 
     fn get_prebuffered_handlers(&self) -> Arc<Self::HandlersLock>;
 
     async fn register_prebuffered<F, Fut>(
         &self,
-        method_id: u64,
+        method_id: u64, // <--- CHANGE BACK TO U64 HERE
         handler: F,
     ) -> Result<(), RpcServiceEndpointError>
     where
@@ -30,6 +27,7 @@ where
     {
         self.get_prebuffered_handlers()
             .with_handlers(|handlers| match handlers.entry(method_id) {
+                // `method_id` is now u64, matches HashMap key
                 Entry::Occupied(_) => {
                     let err_msg =
                         format!("a handler for method ID {method_id} is already registered");
@@ -47,9 +45,6 @@ where
             .await
     }
 
-    // TODO: Emit a status report for logging purposes
-    /// Reads raw bytes from the transport, decodes them into RPC requests,
-    /// invokes the appropriate handler, and sends back a response.
     async fn read_bytes<'a, E>(
         &self,
         dispatcher: &mut RpcDispatcher<'a>,
@@ -60,13 +55,14 @@ where
     where
         E: RpcEmit + Send + Sync + Clone,
     {
-        // This logic is now fully generic and reusable.
+        // --- Stage 1 ---
+        // `dispatcher.read_bytes` returns Vec<u32>, so `id` is u32 here.
         let request_ids = dispatcher.read_bytes(bytes)?;
         let mut requests_to_process = Vec::new();
         for id in request_ids {
             if dispatcher.is_rpc_request_finalized(id).unwrap_or(false) {
                 if let Some(req) = dispatcher.delete_rpc_request(id) {
-                    requests_to_process.push((id, req));
+                    requests_to_process.push((id, req)); // `id` is u32, `req.rpc_method_id` should be u32
                 }
             }
         }
@@ -75,67 +71,28 @@ where
             return Ok(());
         }
 
-        // The rest of the logic remains the same, as it was already correct.
+        // --- Stage 2 ---
         let handlers_arc = self.get_prebuffered_handlers();
         let mut response_futures = Vec::new();
         for (request_id, request) in requests_to_process {
+            // `request_id` is u32 here
             let handlers_arc_clone = handlers_arc.clone();
             let context_clone = context.clone();
 
-            let future = async move {
-                let handler = handlers_arc_clone
-                    .with_handlers(|handlers| handlers.get(&request.rpc_method_id).cloned())
-                    .await;
-                if let Some(handler) = handler {
-                    let payload = request
-                        .rpc_prebuffered_payload_bytes
-                        .as_deref()
-                        .unwrap_or(&[]);
-                    let params = request.rpc_param_bytes.as_deref().unwrap_or(&[]);
-                    let args_for_handler = if !payload.is_empty() { payload } else { params };
-
-                    match handler(context_clone, args_for_handler.to_vec()).await {
-                        Ok(encoded) => RpcResponse {
-                            rpc_request_id: request_id,
-                            rpc_method_id: request.rpc_method_id,
-                            rpc_result_status: Some(RpcResultStatus::Success.into()),
-                            rpc_prebuffered_payload_bytes: Some(encoded),
-                            is_finalized: true,
-                        },
-                        Err(e) => {
-                            if let Some(payload_error) = e.downcast_ref::<HandlerPayloadError>() {
-                                RpcResponse {
-                                    rpc_request_id: request_id,
-                                    rpc_method_id: request.rpc_method_id,
-                                    rpc_result_status: Some(RpcResultStatus::Fail.into()),
-                                    rpc_prebuffered_payload_bytes: Some(payload_error.0.clone()),
-                                    is_finalized: true,
-                                }
-                            } else {
-                                RpcResponse {
-                                    rpc_request_id: request_id,
-                                    rpc_method_id: request.rpc_method_id,
-                                    rpc_result_status: Some(RpcResultStatus::SystemError.into()),
-                                    rpc_prebuffered_payload_bytes: Some(e.to_string().into_bytes()),
-                                    is_finalized: true,
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    RpcResponse {
-                        rpc_request_id: request_id,
-                        rpc_method_id: request.rpc_method_id,
-                        rpc_result_status: Some(RpcResultStatus::MethodNotFound.into()),
-                        rpc_prebuffered_payload_bytes: None,
-                        is_finalized: true,
-                    }
-                }
-            };
+            // Call to utility function.
+            // Ensure process_single_prebuffered_request expects u32 for request_id.
+            let future = process_single_prebuffered_request(
+                handlers_arc_clone,
+                context_clone,
+                request_id, // This is u32
+                request,
+            );
             response_futures.push(future);
         }
 
         let responses = join_all(response_futures).await;
+
+        // --- Stage 3 ---
         for response in responses {
             let _ = dispatcher.respond(response, DEFAULT_SERVICE_MAX_CHUNK_SIZE, on_emit.clone());
         }

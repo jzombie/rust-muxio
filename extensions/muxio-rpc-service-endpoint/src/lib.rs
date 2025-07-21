@@ -11,3 +11,6 @@ pub mod error;
 
 mod with_handlers_trait;
 pub use with_handlers_trait::*;
+
+mod endpoint_utils;
+pub use endpoint_utils::*;
