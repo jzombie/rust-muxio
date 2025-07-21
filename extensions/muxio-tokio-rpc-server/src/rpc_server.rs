@@ -42,12 +42,18 @@ pub enum RpcServerEvent {
     ClientDisconnected(SocketAddr),
 }
 
+#[derive(Debug)]
+pub struct ConnectionContext {
+    pub sender: WsSenderContext,
+    pub addr: SocketAddr,
+}
+
 /// A type alias for the WebSocket sender part, wrapped for shared access.
 type WsSenderContext = Arc<Mutex<SplitSink<WebSocket, Message>>>;
 
 /// An RPC server that listens for WebSocket connections and handles RPC calls.
 pub struct RpcServer {
-    endpoint: Arc<RpcServiceEndpoint<WsSenderContext>>,
+    endpoint: Arc<RpcServiceEndpoint<Arc<ConnectionContext>>>,
     event_tx: Option<mpsc::UnboundedSender<RpcServerEvent>>,
 }
 
@@ -65,7 +71,7 @@ impl RpcServer {
     }
 
     /// Returns an `Arc` clone of the underlying RPC service endpoint.
-    pub fn endpoint(&self) -> Arc<RpcServiceEndpoint<WsSenderContext>> {
+    pub fn endpoint(&self) -> Arc<RpcServiceEndpoint<Arc<ConnectionContext>>> {
         self.endpoint.clone()
     }
 
@@ -116,12 +122,19 @@ impl RpcServer {
 
     async fn handle_socket(self: Arc<Self>, socket: WebSocket, addr: SocketAddr) {
         // Send a connected event if a channel is configured.
+
         if let Some(tx) = &self.event_tx {
             let _ = tx.send(RpcServerEvent::ClientConnected(addr));
         }
 
         let (sender, receiver) = socket.split();
-        let context = Arc::new(Mutex::new(sender));
+
+        let context = Arc::new(ConnectionContext {
+            sender: Arc::new(Mutex::new(sender)),
+            addr,
+        });
+
+        // This MPSC channel is for sending messages *out* to the WebSocket.
         let (tx, rx) = mpsc::unbounded_channel::<Message>();
 
         tokio::spawn(Self::sender_task(context.clone(), rx));
@@ -139,9 +152,13 @@ impl RpcServer {
     }
 
     /// Task responsible for sending outbound messages to the client.
-    async fn sender_task(context: WsSenderContext, mut rx: mpsc::UnboundedReceiver<Message>) {
+    async fn sender_task(
+        context: Arc<ConnectionContext>,
+        mut rx: mpsc::UnboundedReceiver<Message>,
+    ) {
         while let Some(msg) = rx.recv().await {
-            if context.lock().await.send(msg).await.is_err() {
+            // Access the sender inside the context
+            if context.sender.lock().await.send(msg).await.is_err() {
                 break;
             }
         }
@@ -149,8 +166,8 @@ impl RpcServer {
 
     /// Task responsible for handling all inbound communication from a client.
     async fn receiver_task(
-        endpoint: Arc<RpcServiceEndpoint<WsSenderContext>>,
-        context: WsSenderContext,
+        endpoint: Arc<RpcServiceEndpoint<Arc<ConnectionContext>>>,
+        context: Arc<ConnectionContext>,
         mut receiver: SplitStream<WebSocket>,
         tx: mpsc::UnboundedSender<Message>,
         addr: SocketAddr,
@@ -178,7 +195,7 @@ impl RpcServer {
                             match msg {
                                 Message::Binary(bytes) => {
                                     let tx_clone = tx.clone();
-                                    let on_emit = |chunk: &[u8]| {
+                                    let on_emit = move |chunk: &[u8]| {
                                         let _ = tx_clone.send(Message::Binary(Bytes::copy_from_slice(chunk)));
                                     };
                                     if let Err(err) = endpoint.read_bytes(&mut dispatcher, context.clone(), &bytes, on_emit).await {
