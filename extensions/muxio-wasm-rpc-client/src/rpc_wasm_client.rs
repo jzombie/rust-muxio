@@ -1,6 +1,6 @@
 use muxio::rpc::RpcDispatcher;
 use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
-use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface};
+use muxio_rpc_service_endpoint::RpcServiceEndpoint;
 use std::sync::{Arc, Mutex};
 
 type RpcTransportStateChangeHandler =
@@ -23,30 +23,6 @@ impl RpcWasmClient {
             emit_callback: Arc::new(emit_callback),
             state_change_handler: Arc::new(Mutex::new(None)),
         }
-    }
-
-    /// This method should be exposed via FFI and called by the JavaScript
-    /// host whenever a binary message is received from the WebSocket.
-    pub fn read_bytes(&self, bytes: &[u8]) {
-        // 1. Process as a potential response to an outgoing call.
-        self.dispatcher.lock().unwrap().read_bytes(bytes).ok();
-
-        // 2. Process as a potential new incoming call from the host.
-        let emit_clone = self.emit_callback.clone();
-        let on_emit = move |chunk: &[u8]| {
-            (emit_clone)(chunk.to_vec());
-        };
-
-        let mut local_dispatcher = RpcDispatcher::new();
-        let endpoint = self.endpoint.clone();
-        let bytes_owned = bytes.to_vec();
-
-        // Use wasm_bindgen_futures to run the async block in a WASM environment.
-        wasm_bindgen_futures::spawn_local(async move {
-            let _ = endpoint
-                .read_bytes(&mut local_dispatcher, (), &bytes_owned, on_emit)
-                .await;
-        });
     }
 
     // This is part of the struct's own implementation, not a trait.

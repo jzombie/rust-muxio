@@ -1,6 +1,8 @@
 use js_sys::Uint8Array;
 use muxio_rpc_service_caller::RpcServiceCallerInterface;
+use muxio_rpc_service_endpoint::RpcServiceEndpointInterface;
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::spawn_local;
 
 use super::MUXIO_STATIC_RPC_CLIENT_REF;
 
@@ -52,7 +54,7 @@ pub(crate) fn static_muxio_write_bytes(bytes: &[u8]) {
 /// # Usage (JavaScript)
 /// ```js
 /// socket.onmessage = (e) => {
-///   static_muxio_read_bytes_uint8(new Uint8Array(e.data));
+///    static_muxio_read_bytes_uint8(new Uint8Array(e.data));
 /// };
 /// ```
 #[wasm_bindgen]
@@ -60,22 +62,42 @@ pub fn static_muxio_read_bytes_uint8(inbound_data: Uint8Array) -> Result<(), JsV
     // Convert Uint8Array to Vec<u8>
     let inbound_bytes = inbound_data.to_vec();
 
-    MUXIO_STATIC_RPC_CLIENT_REF.with(|cell| {
-        let mut opt_client = cell.borrow_mut();
-        let client = opt_client
-            .as_mut()
-            .ok_or_else(|| JsValue::from_str("Dispatcher not initialized"))?;
+    // Get a clone of the Arc<RpcWasmClient> to move into the async block
+    let client_arc = MUXIO_STATIC_RPC_CLIENT_REF
+        .with(|cell| cell.borrow().clone())
+        .ok_or_else(|| JsValue::from_str("RPC client not initialized"))?;
 
-        let dispatcher_binding = client.clone().get_dispatcher();
+    // Spawn an async task to process the bytes
+    spawn_local(async move {
+        let dispatcher_arc = client_arc.get_dispatcher();
+        let endpoint_arc = client_arc.get_endpoint();
+        let emit_fn = client_arc.get_emit_fn(); // Get the client's emit function for responses
 
-        let mut dispatcher = dispatcher_binding
-            .lock()
-            .map_err(|_| JsValue::from_str("Failed to lock dispatcher"))?;
+        // Lock the dispatcher once for this async operation
+        let mut dispatcher_guard = dispatcher_arc.lock().expect("Dispatcher mutex poisoned");
 
-        dispatcher
-            .read_bytes(&inbound_bytes)
-            .map_err(|e| JsValue::from_str(&format!("Read error: {e:?}")))?;
+        // The endpoint's read_bytes method will process incoming requests
+        // AND use the dispatcher for responses if the handler calls respond().
+        // It also uses the provided on_emit for sending those responses.
+        if let Err(e) = endpoint_arc
+            .read_bytes(
+                &mut dispatcher_guard,
+                (), // No context needed for the endpoint in this case
+                &inbound_bytes,
+                // The on_emit callback for the endpoint should use the client's emit_fn
+                // to send response chunks back over the WebSocket.
+                move |chunk: &[u8]| {
+                    emit_fn(chunk.to_vec());
+                },
+            )
+            .await
+        {
+            tracing::error!(
+                "WASM static_read_bytes: Error processing inbound RPC bytes: {:?}",
+                e
+            );
+        }
+    });
 
-        Ok(())
-    })
+    Ok(())
 }

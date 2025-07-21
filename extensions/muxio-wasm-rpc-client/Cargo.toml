@@ -18,6 +18,7 @@ muxio-rpc-service = { workspace = true }
 muxio-rpc-service-caller = { workspace = true }
 muxio-rpc-service-endpoint = { workspace = true }
 wasm-bindgen-futures = "0.4.50"
+tracing = "0.1.41"
 
 [dev-dependencies]
 tokio = { version = "1.45.1", features = ["full"] }
