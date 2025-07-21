@@ -64,7 +64,7 @@ This provides the low-level functionality, but [Muxio extensions](./extensions/)
 
 Let's build a simple sample app which spins up a Tokio-based WebSocket server, adds some routes, then spins up a client, performs some requests, then shuts everything down.
 
-This example code was taken from the [`example-muxio-ws-rpc-app`](./example-muxio-ws-rpc-app/) crate.
+This example code was taken from the [`example-muxio-ws-rpc-app`](./examples/example-muxio-ws-rpc-app/) crate.
 
 ```rust
 use example_muxio_rpc_service_definition::{

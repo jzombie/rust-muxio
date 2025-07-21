@@ -19,14 +19,14 @@ publish.workspace = true # Inherit from workspace
 [workspace]
 members = [
     ".",
-    "example-muxio-ws-rpc-app",
-    "example-muxio-rpc-service-definition",
     "extensions/muxio-rpc-service",
     "extensions/muxio-rpc-service-caller",
     "extensions/muxio-rpc-service-endpoint",
     "extensions/muxio-tokio-rpc-server",
     "extensions/muxio-tokio-rpc-client",
     "extensions/muxio-wasm-rpc-client",
+    "examples/example-muxio-ws-rpc-app",
+    "examples/example-muxio-rpc-service-definition",
 ]
 resolver = "2"
 
@@ -38,7 +38,7 @@ tracing = "0.1.41"
 [workspace.dependencies]
 # Intra-workspace crates
 muxio = { path = ".", version = "0.10.0-alpha" }
-example-muxio-rpc-service-definition = { path = "example-muxio-rpc-service-definition", version = "0.10.0-alpha" }
+example-muxio-rpc-service-definition = { path = "examples/example-muxio-rpc-service-definition", version = "0.10.0-alpha" }
 muxio-rpc-service = { path = "extensions/muxio-rpc-service", version = "0.10.0-alpha" }
 muxio-rpc-service-caller = { path = "extensions/muxio-rpc-service-caller", version = "0.10.0-alpha" }
 muxio-rpc-service-endpoint = { path = "extensions/muxio-rpc-service-endpoint", version = "0.10.0-alpha" }

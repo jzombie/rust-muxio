@@ -9,8 +9,8 @@ publish = false # Explcitly false
 
 [dependencies]
 tokio = { version = "1.45.1", features = ["full"] }
-muxio = { path = "../" }
 async-trait = "0.1.88"
+muxio = { workspace = true }
 muxio-tokio-rpc-server = { workspace = true }
 muxio-tokio-rpc-client = { workspace = true }
 muxio-rpc-service-caller = { workspace = true, features=["tokio_support"] }
