@@ -18,6 +18,7 @@ use futures_util::{
     stream::{SplitSink, SplitStream},
 };
 use muxio::rpc::RpcDispatcher;
+use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
 use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface};
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -42,11 +43,17 @@ pub enum RpcServerEvent {
     ClientDisconnected(SocketAddr),
 }
 
-#[derive(Debug)]
 pub struct ConnectionContext {
     pub sender: WsSenderContext,
     pub addr: SocketAddr,
+    // Each connection gets its own dispatcher for making server-to-client calls.
+    pub dispatcher: Arc<Mutex<RpcDispatcher<'static>>>,
 }
+
+/// A wrapper around `Arc<ConnectionContext>` to satisfy Rust's orphan rule.
+/// This local newtype allows us to implement the foreign `RpcServiceCallerInterface` trait.
+#[derive(Clone)]
+pub struct ConnectionContextHandle(pub Arc<ConnectionContext>);
 
 /// A type alias for the WebSocket sender part, wrapped for shared access.
 type WsSenderContext = Arc<Mutex<SplitSink<WebSocket, Message>>>;
@@ -151,6 +158,7 @@ impl RpcServer {
         let context = Arc::new(ConnectionContext {
             sender: Arc::new(Mutex::new(sender)),
             addr,
+            dispatcher: Arc::new(Mutex::new(RpcDispatcher::new())),
         });
 
         // This MPSC channel is for sending messages *out* to the WebSocket.
@@ -217,6 +225,8 @@ impl RpcServer {
                                     let on_emit = move |chunk: &[u8]| {
                                         let _ = tx_clone.send(Message::Binary(Bytes::copy_from_slice(chunk)));
                                     };
+                                    // Also forward the bytes to the connection's own dispatcher for server-to-client calls.
+                                    context.dispatcher.lock().await.read_bytes(&bytes).ok();
                                     if let Err(err) = endpoint.read_bytes(&mut dispatcher, context.clone(), &bytes, on_emit).await {
                                         tracing::error!("Error processing bytes from {}: {:?}", addr, err);
                                     }
@@ -245,5 +255,51 @@ impl RpcServer {
         if let Some(tx) = event_tx {
             let _ = tx.send(RpcServerEvent::ClientDisconnected(addr));
         }
+    }
+}
+
+/// Implements the `RpcServiceCallerInterface` to enable server-initiated RPC calls.
+///
+/// This implementation allows the server to invoke commands on a client by using a specific
+/// connection handle (`ConnectionContextHandle`) to send new, unsolicited RPC requests
+/// to that connected client.
+#[async_trait::async_trait]
+impl RpcServiceCallerInterface for ConnectionContextHandle {
+    // The dispatcher is protected by a Tokio Mutex.
+    type DispatcherLock = Mutex<RpcDispatcher<'static>>;
+
+    fn get_dispatcher(&self) -> Arc<Self::DispatcherLock> {
+        // Return the dispatcher associated with this specific connection.
+        self.0.dispatcher.clone()
+    }
+
+    fn get_emit_fn(&self) -> Arc<dyn Fn(Vec<u8>) + Send + Sync> {
+        // The emit function sends the raw bytes down this specific client's WebSocket.
+        Arc::new({
+            let sender = self.0.sender.clone();
+            move |chunk: Vec<u8>| {
+                let sender = sender.clone();
+                tokio::spawn(async move {
+                    let _ = sender
+                        .lock()
+                        .await
+                        .send(Message::Binary(chunk.into()))
+                        .await;
+                });
+            }
+        })
+    }
+
+    /// This is a client-side concept, so it's a no-op on the server.
+    /// The server manages the connection state directly.
+    fn set_state_change_handler(
+        &self,
+        _handler: impl Fn(RpcTransportState) + Send + Sync + 'static,
+    ) {
+        // It doesn't make sense for the server to set a state change handler
+        // on a connection it owns, so we do nothing.
+        tracing::warn!(
+            "set_state_change_handler called on server-side connection context; this is a no-op."
+        );
     }
 }

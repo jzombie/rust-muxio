@@ -905,6 +905,7 @@ dependencies = [
  "futures-util",
  "muxio",
  "muxio-rpc-service",
+ "muxio-rpc-service-caller",
  "muxio-rpc-service-endpoint",
  "tokio",
  "tokio-tungstenite 0.26.2",
