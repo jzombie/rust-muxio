@@ -14,6 +14,7 @@ futures = "0.3.31"
 muxio = { workspace = true }
 muxio-rpc-service = { workspace = true }
 muxio-rpc-service-caller = { workspace = true }
+serde_json = "1.0.141" # TODO: Replace with `bitcode`
 
 # Optional dependencies
 tokio = { version = "1.45.1", features = ["sync"], optional = true }

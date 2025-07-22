@@ -1,6 +1,6 @@
-use super::{error::HandlerPayloadError, with_handlers_trait::WithHandlers};
+use super::{error::HandlerError, with_handlers_trait::WithHandlers};
 use muxio::rpc::{RpcRequest, RpcResponse};
-use muxio_rpc_service::RpcResultStatus;
+use muxio_rpc_service::{RpcResultStatus, error::RpcServiceErrorCode};
 use std::sync::Arc;
 
 /// Processes a single finalized RPC request, executes its handler, and returns the response.
@@ -41,15 +41,49 @@ where
                 is_finalized: true,
             },
             Err(e) => {
-                if let Some(payload_error) = e.downcast_ref::<HandlerPayloadError>() {
+                // TODO: Clean up
+                // if let Some(payload_error) = e.downcast_ref::<HandlerPayloadError>() {
+                //     RpcResponse {
+                //         rpc_request_id: request_id,
+                //         rpc_method_id: request.rpc_method_id,
+                //         rpc_result_status: Some(RpcResultStatus::Fail.into()),
+                //         rpc_prebuffered_payload_bytes: Some(payload_error.0.clone()),
+                //         is_finalized: true,
+                //     }
+                // } else {
+                //     RpcResponse {
+                //         rpc_request_id: request_id,
+                //         rpc_method_id: request.rpc_method_id,
+                //         rpc_result_status: Some(RpcResultStatus::SystemError.into()),
+                //         rpc_prebuffered_payload_bytes: Some(e.to_string().into_bytes()),
+                //         is_finalized: true,
+                //     }
+                // }
+
+                // Check if the error is our special, structured HandlerError.
+                if let Some(handler_error) = e.downcast_ref::<HandlerError>() {
+                    let payload = &handler_error.0;
+
+                    // Map the error code to the wire-protocol status.
+                    let status = match payload.code {
+                        RpcServiceErrorCode::Fail => RpcResultStatus::Fail,
+                        RpcServiceErrorCode::System => RpcResultStatus::SystemError,
+                        RpcServiceErrorCode::NotFound => RpcResultStatus::MethodNotFound,
+                    };
+
+                    // TODO: Replace `serde_json` with `bitcode`
+                    // Serialize the structured payload to send to the caller.
+                    let payload_bytes = serde_json::to_vec(payload).ok();
+
                     RpcResponse {
                         rpc_request_id: request_id,
                         rpc_method_id: request.rpc_method_id,
-                        rpc_result_status: Some(RpcResultStatus::Fail.into()),
-                        rpc_prebuffered_payload_bytes: Some(payload_error.0.clone()),
+                        rpc_result_status: Some(status.into()),
+                        rpc_prebuffered_payload_bytes: payload_bytes,
                         is_finalized: true,
                     }
                 } else {
+                    // Fallback for any other error type (e.g., panics, io::Error).
                     RpcResponse {
                         rpc_request_id: request_id,
                         rpc_method_id: request.rpc_method_id,
