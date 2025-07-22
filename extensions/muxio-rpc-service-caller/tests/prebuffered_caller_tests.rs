@@ -6,13 +6,11 @@ use muxio::rpc::{
 };
 use muxio_rpc_service::prebuffered::RpcMethodPrebuffered;
 use muxio_rpc_service_caller::{
-    RpcServiceCallerInterface, RpcTransportState, WithDispatcher, error::RpcCallerError,
+    RpcServiceCallerInterface, RpcTransportState, WithDispatcher,
+    error::{RpcCallerError, RpcErrorCode, RpcErrorPayload},
     prebuffered::RpcCallPrebuffered,
 };
-use std::{
-    io,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
 // --- Test Setup: Mock Implementations ---
 
@@ -168,10 +166,17 @@ async fn test_buffered_call_remote_error() {
             }
             tokio::time::sleep(std::time::Duration::from_millis(1)).await;
         };
-        let error_payload = b"item does not exist".to_vec();
-        sender.send_and_ignore(Err(RpcCallerError::RemoteError {
-            payload: error_payload,
-        }));
+
+        // TODO: Clean up
+        // let error_payload = b"item does not exist".to_vec();
+        // sender.send_and_ignore(Err(RpcCallerError::RemoteError {
+        //     payload: error_payload,
+        // }));
+
+        sender.send_and_ignore(Err(RpcCallerError::Rpc(RpcErrorPayload {
+            code: RpcErrorCode::Fail,
+            message: "item does not exist".into(),
+        })));
     });
 
     let request = RpcRequest {
@@ -184,8 +189,13 @@ async fn test_buffered_call_remote_error() {
     let (_, result) = client.call_rpc_buffered(request, decode_fn).await.unwrap();
 
     match result {
-        Err(RpcCallerError::RemoteError { payload }) => {
-            assert_eq!(payload, b"item does not exist");
+        // TODO: Clean up
+        // Err(RpcCallerError::RemoteError { payload }) => {
+        //     assert_eq!(payload, b"item does not exist");
+        // }
+        Err(RpcCallerError::Rpc(err)) => {
+            assert_eq!(err.code, RpcErrorCode::Fail);
+            assert_eq!(err.message, "item does not exist");
         }
         _ => panic!("Expected a RemoteError, but got something else."),
     }
@@ -205,13 +215,19 @@ async fn test_prebuffered_trait_converts_error() {
             }
             tokio::time::sleep(std::time::Duration::from_millis(1)).await;
         };
-        let error_message = "Method has panicked".to_string();
-        sender.send_and_ignore(Err(RpcCallerError::RemoteSystemError(error_message)));
+
+        // TODO: Clean up
+        //let error_message = "Method has panicked".to_string();
+        // sender.send_and_ignore(Err(RpcCallerError::RemoteSystemError(error_message)));
+        sender.send_and_ignore(Err(RpcCallerError::Rpc(RpcErrorPayload {
+            code: RpcErrorCode::System,
+            message: "Method has panicked".into(),
+        })));
     });
 
     let result = Echo::call(&client, b"some input".to_vec()).await;
 
-    // TODO: Handle
+    // TODO: Clean up
     // assert!(result.is_err());
     // let io_error = result.unwrap_err();
     // assert_eq!(io_error.kind(), io::ErrorKind::Other);
@@ -220,4 +236,12 @@ async fn test_prebuffered_trait_converts_error() {
     //         .to_string()
     //         .contains("Remote system error: Method has panicked")
     // );
+
+    assert!(result.is_err());
+    if let Err(RpcCallerError::Rpc(err)) = result {
+        assert_eq!(err.code, RpcErrorCode::System);
+        assert_eq!(err.message, "Method has panicked");
+    } else {
+        panic!("Expected Rpc error");
+    }
 }
