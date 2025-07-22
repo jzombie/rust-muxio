@@ -15,7 +15,7 @@ pub trait RpcCallPrebuffered: RpcMethodPrebuffered + Sized + Send + Sync {
     async fn call<C: RpcServiceCallerInterface + Send + Sync>(
         rpc_client: &C,
         input: Self::Input,
-    ) -> Result<Self::Output, io::Error>;
+    ) -> Result<Self::Output, RpcCallerError>;
 }
 
 #[async_trait::async_trait]
@@ -28,7 +28,7 @@ where
     async fn call<C: RpcServiceCallerInterface + Send + Sync>(
         rpc_client: &C,
         input: Self::Input,
-    ) -> Result<Self::Output, io::Error> {
+    ) -> Result<Self::Output, RpcCallerError> {
         let encoded_args = Self::encode_request(input)?;
 
         // ### Large Argument Handling
@@ -80,7 +80,7 @@ where
             Ok(decode_result) => {
                 // `decode_result` is the `Result<Self::Output, io::Error>` from our closure.
                 // We can just return it directly.
-                decode_result
+                decode_result.map_err(RpcCallerError::Io)
             }
             // An error occurred during the stream itself (e.g., remote error).
             Err(rpc_error) => {
@@ -94,7 +94,7 @@ where
                     }
                     _ => rpc_error.to_string(),
                 };
-                Err(io::Error::other(error_message))
+                Err(RpcCallerError::RemoteSystemError(error_message))
             }
         }
     }

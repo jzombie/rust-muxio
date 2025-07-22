@@ -35,7 +35,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
             RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>,
             DynamicReceiver,
         ),
-        io::Error,
+        RpcCallerError,
     > {
         // The implementation now matches on the enum to create the correct channel.
         let (tx, rx) = match dynamic_channel_type {
@@ -163,8 +163,10 @@ pub trait RpcServiceCallerInterface: Send + Sync {
 
         match ready_rx.await {
             Ok(Ok(())) => Ok((encoder, rx)),
-            Ok(Err(err)) => Err(err),
-            Err(_) => Err(io::Error::other("RPC setup channel closed prematurely")),
+            Ok(Err(err)) => Err(crate::error::RpcCallerError::Io(err)),
+            Err(_) => Err(crate::error::RpcCallerError::Io(io::Error::other(
+                "RPC setup channel closed prematurely",
+            ))),
         }
     }
 
@@ -178,7 +180,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
             RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>,
             Result<T, RpcCallerError>,
         ),
-        io::Error,
+        RpcCallerError,
     >
     where
         T: Send + 'static,
