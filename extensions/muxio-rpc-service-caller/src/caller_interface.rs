@@ -126,7 +126,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                                         payload,
                                     }));
                                 }
-                                Some(status @ RpcResultStatus::SystemError) => {
+                                Some(RpcResultStatus::SystemError) => {
                                     let msg = String::from_utf8_lossy(&payload).to_string();
                                     let final_msg = if msg.is_empty() {
                                         format!("RPC failed with status: {status:?}")
