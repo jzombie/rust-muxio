@@ -858,6 +858,7 @@ dependencies = [
  "futures",
  "muxio",
  "muxio-rpc-service",
+ "serde",
  "tokio",
 ]
 

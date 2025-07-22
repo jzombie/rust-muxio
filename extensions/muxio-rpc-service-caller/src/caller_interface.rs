@@ -1,7 +1,7 @@
 use crate::{
     RpcTransportState,
     dynamic_channel::{DynamicChannelType, DynamicReceiver, DynamicSender},
-    error::RpcCallerError,
+    error::{RpcCallerError, RpcErrorCode, RpcErrorPayload},
     with_dispatcher_trait::WithDispatcher,
 };
 use futures::{StreamExt, channel::mpsc, channel::oneshot};
@@ -117,14 +117,21 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                                     } else {
                                         msg
                                     };
-                                    sender.send_and_ignore(Err(RpcCallerError::RemoteSystemError(
-                                        final_msg,
+
+                                    sender.send_and_ignore(Err(RpcCallerError::Rpc(
+                                        RpcErrorPayload {
+                                            code: RpcErrorCode::NotFound,
+                                            message: final_msg,
+                                        },
                                     )));
                                 }
                                 Some(RpcResultStatus::Fail) => {
-                                    sender.send_and_ignore(Err(RpcCallerError::RemoteError {
-                                        payload,
-                                    }));
+                                    sender.send_and_ignore(Err(RpcCallerError::Rpc(
+                                        RpcErrorPayload {
+                                            code: RpcErrorCode::Fail,
+                                            message: "".into(),
+                                        },
+                                    )));
                                 }
                                 Some(RpcResultStatus::SystemError) => {
                                     let msg = String::from_utf8_lossy(&payload).to_string();
@@ -133,8 +140,11 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                                     } else {
                                         msg
                                     };
-                                    sender.send_and_ignore(Err(RpcCallerError::RemoteSystemError(
-                                        final_msg,
+                                    sender.send_and_ignore(Err(RpcCallerError::Rpc(
+                                        RpcErrorPayload {
+                                            code: RpcErrorCode::System,
+                                            message: final_msg,
+                                        },
                                     )));
                                 }
                                 _ => {}
@@ -163,8 +173,8 @@ pub trait RpcServiceCallerInterface: Send + Sync {
 
         match ready_rx.await {
             Ok(Ok(())) => Ok((encoder, rx)),
-            Ok(Err(err)) => Err(crate::error::RpcCallerError::Io(err)),
-            Err(_) => Err(crate::error::RpcCallerError::Io(io::Error::other(
+            Ok(Err(err)) => Err(RpcCallerError::Transport(err)),
+            Err(_) => Err(crate::error::RpcCallerError::Transport(io::Error::other(
                 "RPC setup channel closed prematurely",
             ))),
         }
