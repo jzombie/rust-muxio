@@ -2,6 +2,7 @@ use example_muxio_rpc_service_definition::prebuffered::{Add, Echo, Mult};
 use muxio_rpc_service::{
     constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE, prebuffered::RpcMethodPrebuffered,
 };
+
 use muxio_rpc_service_caller::prebuffered::RpcCallPrebuffered;
 use muxio_tokio_rpc_client::RpcClient;
 use muxio_tokio_rpc_server::{
@@ -10,8 +11,6 @@ use muxio_tokio_rpc_server::{
 use std::sync::Arc;
 use tokio::join;
 use tokio::net::TcpListener;
-
-// TODO: Add method not found error test
 
 /// This integration test creates a full, in-memory client-server roundtrip,
 /// directly replicating the logic from the example application.
@@ -182,4 +181,40 @@ async fn test_large_prebuffered_payload_roundtrip() {
         result.err()
     );
     assert_eq!(result.unwrap(), large_payload);
+}
+
+#[tokio::test]
+async fn test_method_not_found_error() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let (server_host, server_port) = tcp_listener_to_host_port(&listener).unwrap();
+
+    {
+        let server = Arc::new(RpcServer::new(None));
+        let _ = tokio::spawn({
+            let server = Arc::clone(&server);
+            async move {
+                let _ = server.serve_with_listener(listener).await;
+            }
+        });
+    }
+
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+    let client = RpcClient::new(&server_host.to_string(), server_port)
+        .await
+        .unwrap();
+
+    let result = Add::call(&client, vec![1.0, 2.0, 3.0]).await;
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+
+    let msg = err.to_string();
+
+    // TODO: This needs to be improved from being string-based
+    assert!(
+        msg.contains("MethodNotFoundError") || msg.contains("method not found"),
+        "Expected method not found error, got: {}",
+        msg
+    );
 }
