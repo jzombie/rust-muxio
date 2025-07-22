@@ -1,6 +1,7 @@
 use muxio::frame::{FrameDecodeError, FrameEncodeError};
 use std::fmt;
 
+// TODO: Remove
 /// A special error type that wraps a byte payload for the client.
 ///
 /// When a handler returns this specific error, the endpoint will send its
@@ -17,6 +18,7 @@ impl fmt::Display for HandlerPayloadError {
 
 impl std::error::Error for HandlerPayloadError {}
 
+// TODO: Only public in crate
 /// Represents errors that can occur within the endpoint's own logic.
 #[derive(Debug)]
 pub enum RpcServiceEndpointError {
