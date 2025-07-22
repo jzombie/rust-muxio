@@ -11,6 +11,8 @@ use std::sync::Arc;
 use tokio::join;
 use tokio::net::TcpListener;
 
+// TODO: Add method not found error test
+
 /// This integration test creates a full, in-memory client-server roundtrip,
 /// directly replicating the logic from the example application.
 #[tokio::test]

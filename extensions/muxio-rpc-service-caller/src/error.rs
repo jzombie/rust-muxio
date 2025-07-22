@@ -6,10 +6,13 @@ use std::io;
 pub enum RpcCallerError {
     /// A transport-level or I/O error occurred during the call.
     Io(io::Error),
+    MethodNotFoundError(String),
     /// The remote handler executed but explicitly returned an application-level error.
     /// The payload contains the custom error data sent by the server.
-    RemoteError { payload: Vec<u8> },
-    /// The remote endpoint indicated a system-level failure (e.g., method not found, server panic).
+    RemoteError {
+        payload: Vec<u8>,
+    },
+    /// The remote endpoint indicated a system-level failure (e.g., server panic).
     RemoteSystemError(String),
     /// The operation was aborted before a result could be determined.
     Aborted,
@@ -19,6 +22,7 @@ impl fmt::Display for RpcCallerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             RpcCallerError::Io(e) => write!(f, "I/O error: {e}"),
+            RpcCallerError::MethodNotFoundError(msg) => write!(f, "Method not found error: {msg}"),
             RpcCallerError::RemoteError { payload } => {
                 write!(f, "Remote handler failed with payload: {payload:?}")
             }

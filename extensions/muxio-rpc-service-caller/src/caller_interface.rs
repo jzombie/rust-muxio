@@ -110,13 +110,23 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                         );
                         if let Some(sender) = tx_lock.as_mut() {
                             match final_status {
+                                Some(status @ RpcResultStatus::MethodNotFound) => {
+                                    let msg = String::from_utf8_lossy(&payload).to_string();
+                                    let final_msg = if msg.is_empty() {
+                                        format!("RPC method not found: {status:?}")
+                                    } else {
+                                        msg
+                                    };
+                                    sender.send_and_ignore(Err(RpcCallerError::RemoteSystemError(
+                                        final_msg,
+                                    )));
+                                }
                                 Some(RpcResultStatus::Fail) => {
                                     sender.send_and_ignore(Err(RpcCallerError::RemoteError {
                                         payload,
                                     }));
                                 }
-                                Some(status @ RpcResultStatus::SystemError)
-                                | Some(status @ RpcResultStatus::MethodNotFound) => {
+                                Some(status @ RpcResultStatus::SystemError) => {
                                     let msg = String::from_utf8_lossy(&payload).to_string();
                                     let final_msg = if msg.is_empty() {
                                         format!("RPC failed with status: {status:?}")
