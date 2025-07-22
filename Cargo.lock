@@ -846,6 +846,7 @@ dependencies = [
  "futures",
  "muxio",
  "num_enum",
+ "serde",
  "xxhash-rust",
 ]
 
@@ -858,7 +859,6 @@ dependencies = [
  "futures",
  "muxio",
  "muxio-rpc-service",
- "serde",
  "tokio",
 ]
 

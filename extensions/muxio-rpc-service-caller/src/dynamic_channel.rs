@@ -1,10 +1,10 @@
-use crate::error::RpcCallerError;
 use futures::{
     Stream,
     channel::mpsc::{Receiver, Sender, UnboundedReceiver, UnboundedSender},
     pin_mut,
     task::{Context, Poll},
 };
+use muxio_rpc_service::error::RpcServiceError;
 
 use std::pin::Pin;
 
@@ -19,15 +19,15 @@ pub enum DynamicChannelType {
 
 /// An enum to hold either a bounded or unbounded sender, unifying their interfaces.
 pub enum DynamicSender {
-    Bounded(Sender<Result<Vec<u8>, RpcCallerError>>),
-    Unbounded(UnboundedSender<Result<Vec<u8>, RpcCallerError>>),
+    Bounded(Sender<Result<Vec<u8>, RpcServiceError>>),
+    Unbounded(UnboundedSender<Result<Vec<u8>, RpcServiceError>>),
 }
 
 impl DynamicSender {
     /// A unified, non-blocking send method that preserves the original code's
     /// behavior of ignoring send errors (which typically only happen if the
     /// receiver has been dropped).
-    pub fn send_and_ignore(&mut self, item: Result<Vec<u8>, RpcCallerError>) {
+    pub fn send_and_ignore(&mut self, item: Result<Vec<u8>, RpcServiceError>) {
         match self {
             DynamicSender::Bounded(s) => {
                 // For a bounded channel, try_send can fail if full or disconnected.
@@ -43,14 +43,14 @@ impl DynamicSender {
 
 /// An enum to hold either a bounded or unbounded receiver.
 pub enum DynamicReceiver {
-    Bounded(Receiver<Result<Vec<u8>, RpcCallerError>>),
-    Unbounded(UnboundedReceiver<Result<Vec<u8>, RpcCallerError>>),
+    Bounded(Receiver<Result<Vec<u8>, RpcServiceError>>),
+    Unbounded(UnboundedReceiver<Result<Vec<u8>, RpcServiceError>>),
 }
 
 /// Implement the `Stream` trait so our enum can be seamlessly used by consumers
 /// like `while let Some(...) = stream.next().await`.
 impl Stream for DynamicReceiver {
-    type Item = Result<Vec<u8>, RpcCallerError>;
+    type Item = Result<Vec<u8>, RpcServiceError>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         match self.get_mut() {

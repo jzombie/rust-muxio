@@ -1,7 +1,6 @@
 use crate::{
     RpcTransportState,
     dynamic_channel::{DynamicChannelType, DynamicReceiver, DynamicSender},
-    error::{RpcCallerError, RpcCallerErrorCode, RpcCallerErrorPayload},
     with_dispatcher_trait::WithDispatcher,
 };
 use futures::{StreamExt, channel::mpsc, channel::oneshot};
@@ -9,9 +8,10 @@ use muxio::rpc::{
     RpcRequest,
     rpc_internals::{RpcStreamEncoder, RpcStreamEvent, rpc_trait::RpcEmit},
 };
-use muxio_rpc_service::RpcResultStatus;
-use muxio_rpc_service::constants::{
-    DEFAULT_RPC_STREAM_CHANNEL_BUFFER_SIZE, DEFAULT_SERVICE_MAX_CHUNK_SIZE,
+use muxio_rpc_service::{
+    RpcResultStatus,
+    constants::{DEFAULT_RPC_STREAM_CHANNEL_BUFFER_SIZE, DEFAULT_SERVICE_MAX_CHUNK_SIZE},
+    error::{RpcServiceError, RpcServiceErrorCode, RpcServiceErrorPayload},
 };
 use std::io;
 use std::sync::{Arc, Mutex};
@@ -35,7 +35,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
             RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>,
             DynamicReceiver,
         ),
-        RpcCallerError,
+        RpcServiceError,
     > {
         // The implementation now matches on the enum to create the correct channel.
         let (tx, rx) = match dynamic_channel_type {
@@ -118,17 +118,17 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                                         msg
                                     };
 
-                                    sender.send_and_ignore(Err(RpcCallerError::Rpc(
-                                        RpcCallerErrorPayload {
-                                            code: RpcCallerErrorCode::NotFound,
+                                    sender.send_and_ignore(Err(RpcServiceError::Rpc(
+                                        RpcServiceErrorPayload {
+                                            code: RpcServiceErrorCode::NotFound,
                                             message: final_msg,
                                         },
                                     )));
                                 }
                                 Some(RpcResultStatus::Fail) => {
-                                    sender.send_and_ignore(Err(RpcCallerError::Rpc(
-                                        RpcCallerErrorPayload {
-                                            code: RpcCallerErrorCode::Fail,
+                                    sender.send_and_ignore(Err(RpcServiceError::Rpc(
+                                        RpcServiceErrorPayload {
+                                            code: RpcServiceErrorCode::Fail,
                                             message: "".into(),
                                         },
                                     )));
@@ -140,9 +140,9 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                                     } else {
                                         msg
                                     };
-                                    sender.send_and_ignore(Err(RpcCallerError::Rpc(
-                                        RpcCallerErrorPayload {
-                                            code: RpcCallerErrorCode::System,
+                                    sender.send_and_ignore(Err(RpcServiceError::Rpc(
+                                        RpcServiceErrorPayload {
+                                            code: RpcServiceErrorCode::System,
                                             message: final_msg,
                                         },
                                     )));
@@ -173,8 +173,8 @@ pub trait RpcServiceCallerInterface: Send + Sync {
 
         match ready_rx.await {
             Ok(Ok(())) => Ok((encoder, rx)),
-            Ok(Err(err)) => Err(RpcCallerError::Transport(err)),
-            Err(_) => Err(crate::error::RpcCallerError::Transport(io::Error::other(
+            Ok(Err(err)) => Err(RpcServiceError::Transport(err)),
+            Err(_) => Err(RpcServiceError::Transport(io::Error::other(
                 "RPC setup channel closed prematurely",
             ))),
         }
@@ -188,9 +188,9 @@ pub trait RpcServiceCallerInterface: Send + Sync {
     ) -> Result<
         (
             RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>,
-            Result<T, RpcCallerError>,
+            Result<T, RpcServiceError>,
         ),
-        RpcCallerError,
+        RpcServiceError,
     >
     where
         T: Send + 'static,
@@ -211,7 +211,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
             .await?;
 
         let mut success_buf = Vec::new();
-        let mut err: Option<RpcCallerError> = None;
+        let mut err: Option<RpcServiceError> = None;
 
         while let Some(result) = stream.next().await {
             match result {

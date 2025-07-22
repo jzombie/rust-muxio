@@ -4,14 +4,14 @@ use std::io;
 
 /// The structured, minimal error payload sent over the wire.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RpcCallerErrorPayload {
-    pub code: RpcCallerErrorCode,
+pub struct RpcServiceErrorPayload {
+    pub code: RpcServiceErrorCode,
     pub message: String,
 }
 
 /// The three possible failure categories on the server side.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-pub enum RpcCallerErrorCode {
+pub enum RpcServiceErrorCode {
     Fail,     // User-level failure (e.g. invalid request)
     System,   // Crash, panic, or unexpected bug
     NotFound, // No handler registered for method_id
@@ -19,40 +19,40 @@ pub enum RpcCallerErrorCode {
 
 /// The complete error type from the RPC caller's perspective.
 #[derive(Debug)]
-pub enum RpcCallerError {
+pub enum RpcServiceError {
     /// Transport-level or protocol-level error.
     Transport(io::Error),
 
     /// Server responded with a structured application/system error.
-    Rpc(RpcCallerErrorPayload),
+    Rpc(RpcServiceErrorPayload),
 
     /// RPC was cancelled or interrupted locally.
     Aborted,
 }
 
-impl fmt::Display for RpcCallerError {
+impl fmt::Display for RpcServiceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            RpcCallerError::Transport(e) => write!(f, "Transport error: {e}"),
-            RpcCallerError::Rpc(payload) => {
+            RpcServiceError::Transport(e) => write!(f, "Transport error: {e}"),
+            RpcServiceError::Rpc(payload) => {
                 write!(f, "[{:?}] {}", payload.code, payload.message)
             }
-            RpcCallerError::Aborted => write!(f, "RPC was aborted"),
+            RpcServiceError::Aborted => write!(f, "RPC was aborted"),
         }
     }
 }
 
-impl std::error::Error for RpcCallerError {
+impl std::error::Error for RpcServiceError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            RpcCallerError::Transport(e) => Some(e),
+            RpcServiceError::Transport(e) => Some(e),
             _ => None,
         }
     }
 }
 
-impl From<io::Error> for RpcCallerError {
+impl From<io::Error> for RpcServiceError {
     fn from(e: io::Error) -> Self {
-        RpcCallerError::Transport(e)
+        RpcServiceError::Transport(e)
     }
 }

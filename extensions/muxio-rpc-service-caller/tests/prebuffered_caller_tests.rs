@@ -4,11 +4,12 @@ use muxio::rpc::{
     RpcRequest,
     rpc_internals::{RpcHeader, RpcMessageType, RpcStreamEncoder, rpc_trait::RpcEmit},
 };
-use muxio_rpc_service::prebuffered::RpcMethodPrebuffered;
+use muxio_rpc_service::{
+    error::{RpcServiceError, RpcServiceErrorCode, RpcServiceErrorPayload},
+    prebuffered::RpcMethodPrebuffered,
+};
 use muxio_rpc_service_caller::{
-    RpcServiceCallerInterface, RpcTransportState, WithDispatcher,
-    error::{RpcCallerError, RpcCallerErrorCode, RpcCallerErrorPayload},
-    prebuffered::RpcCallPrebuffered,
+    RpcServiceCallerInterface, RpcTransportState, WithDispatcher, prebuffered::RpcCallPrebuffered,
 };
 use std::sync::{Arc, Mutex};
 
@@ -70,7 +71,7 @@ impl RpcServiceCallerInterface for MockRpcClient {
             RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>,
             DynamicReceiver,
         ),
-        RpcCallerError,
+        RpcServiceError,
     > {
         // The mock will now also respect the channel choice.
         let (tx, rx) = if dynamic_channel_type == DynamicChannelType::Unbounded {
@@ -173,8 +174,8 @@ async fn test_buffered_call_remote_error() {
         //     payload: error_payload,
         // }));
 
-        sender.send_and_ignore(Err(RpcCallerError::Rpc(RpcCallerErrorPayload {
-            code: RpcCallerErrorCode::Fail,
+        sender.send_and_ignore(Err(RpcServiceError::Rpc(RpcServiceErrorPayload {
+            code: RpcServiceErrorCode::Fail,
             message: "item does not exist".into(),
         })));
     });
@@ -193,8 +194,8 @@ async fn test_buffered_call_remote_error() {
         // Err(RpcCallerError::RemoteError { payload }) => {
         //     assert_eq!(payload, b"item does not exist");
         // }
-        Err(RpcCallerError::Rpc(err)) => {
-            assert_eq!(err.code, RpcCallerErrorCode::Fail);
+        Err(RpcServiceError::Rpc(err)) => {
+            assert_eq!(err.code, RpcServiceErrorCode::Fail);
             assert_eq!(err.message, "item does not exist");
         }
         _ => panic!("Expected a RemoteError, but got something else."),
@@ -219,8 +220,8 @@ async fn test_prebuffered_trait_converts_error() {
         // TODO: Clean up
         //let error_message = "Method has panicked".to_string();
         // sender.send_and_ignore(Err(RpcCallerError::RemoteSystemError(error_message)));
-        sender.send_and_ignore(Err(RpcCallerError::Rpc(RpcCallerErrorPayload {
-            code: RpcCallerErrorCode::System,
+        sender.send_and_ignore(Err(RpcServiceError::Rpc(RpcServiceErrorPayload {
+            code: RpcServiceErrorCode::System,
             message: "Method has panicked".into(),
         })));
     });
@@ -238,8 +239,8 @@ async fn test_prebuffered_trait_converts_error() {
     // );
 
     assert!(result.is_err());
-    if let Err(RpcCallerError::Rpc(err)) = result {
-        assert_eq!(err.code, RpcCallerErrorCode::System);
+    if let Err(RpcServiceError::Rpc(err)) = result {
+        assert_eq!(err.code, RpcServiceErrorCode::System);
         assert_eq!(err.message, "Method has panicked");
     } else {
         panic!("Expected Rpc error");

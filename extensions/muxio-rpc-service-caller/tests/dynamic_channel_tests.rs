@@ -3,10 +3,10 @@ use muxio::rpc::{
     RpcRequest,
     rpc_internals::{RpcHeader, RpcMessageType, RpcStreamEncoder, rpc_trait::RpcEmit},
 };
+use muxio_rpc_service::error::RpcServiceError;
 use muxio_rpc_service_caller::{
     RpcServiceCallerInterface, RpcTransportState, WithDispatcher,
     dynamic_channel::{DynamicChannelType, DynamicReceiver, DynamicSender},
-    error::RpcCallerError,
 };
 use std::sync::{Arc, Mutex};
 
@@ -62,7 +62,7 @@ impl RpcServiceCallerInterface for MockRpcClient {
             RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>,
             DynamicReceiver,
         ),
-        RpcCallerError,
+        RpcServiceError,
     > {
         let (tx, rx) = if dynamic_channel_type == DynamicChannelType::Unbounded {
             let (sender, receiver) = mpsc::unbounded();

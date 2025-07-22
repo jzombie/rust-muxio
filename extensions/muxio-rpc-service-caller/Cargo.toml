@@ -13,7 +13,6 @@ async-trait = "0.1.88"
 futures = "0.3.31"
 muxio = { workspace = true }
 muxio-rpc-service = { workspace = true }
-serde = { version = "1.0.219", features = ["derive"] }
 
 # Optional dependencies
 tokio = { version = "1.45.1", features = ["sync"], optional = true }
