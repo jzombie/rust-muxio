@@ -1,7 +1,4 @@
-use crate::{
-    RpcServiceCallerInterface,
-    error::{RpcCallerError, RpcErrorCode, RpcErrorPayload},
-};
+use crate::{RpcServiceCallerInterface, error::RpcCallerError};
 use muxio::rpc::RpcRequest;
 use muxio_rpc_service::{
     constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE, prebuffered::RpcMethodPrebuffered,

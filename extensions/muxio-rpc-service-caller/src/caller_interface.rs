@@ -1,7 +1,7 @@
 use crate::{
     RpcTransportState,
     dynamic_channel::{DynamicChannelType, DynamicReceiver, DynamicSender},
-    error::{RpcCallerError, RpcErrorCode, RpcErrorPayload},
+    error::{RpcCallerError, RpcCallerErrorCode, RpcCallerErrorPayload},
     with_dispatcher_trait::WithDispatcher,
 };
 use futures::{StreamExt, channel::mpsc, channel::oneshot};
@@ -119,16 +119,16 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                                     };
 
                                     sender.send_and_ignore(Err(RpcCallerError::Rpc(
-                                        RpcErrorPayload {
-                                            code: RpcErrorCode::NotFound,
+                                        RpcCallerErrorPayload {
+                                            code: RpcCallerErrorCode::NotFound,
                                             message: final_msg,
                                         },
                                     )));
                                 }
                                 Some(RpcResultStatus::Fail) => {
                                     sender.send_and_ignore(Err(RpcCallerError::Rpc(
-                                        RpcErrorPayload {
-                                            code: RpcErrorCode::Fail,
+                                        RpcCallerErrorPayload {
+                                            code: RpcCallerErrorCode::Fail,
                                             message: "".into(),
                                         },
                                     )));
@@ -141,8 +141,8 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                                         msg
                                     };
                                     sender.send_and_ignore(Err(RpcCallerError::Rpc(
-                                        RpcErrorPayload {
-                                            code: RpcErrorCode::System,
+                                        RpcCallerErrorPayload {
+                                            code: RpcCallerErrorCode::System,
                                             message: final_msg,
                                         },
                                     )));

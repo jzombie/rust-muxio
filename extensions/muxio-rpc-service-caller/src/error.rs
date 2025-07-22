@@ -4,14 +4,14 @@ use std::io;
 
 /// The structured, minimal error payload sent over the wire.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RpcErrorPayload {
-    pub code: RpcErrorCode,
+pub struct RpcCallerErrorPayload {
+    pub code: RpcCallerErrorCode,
     pub message: String,
 }
 
 /// The three possible failure categories on the server side.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-pub enum RpcErrorCode {
+pub enum RpcCallerErrorCode {
     Fail,     // User-level failure (e.g. invalid request)
     System,   // Crash, panic, or unexpected bug
     NotFound, // No handler registered for method_id
@@ -24,7 +24,7 @@ pub enum RpcCallerError {
     Transport(io::Error),
 
     /// Server responded with a structured application/system error.
-    Rpc(RpcErrorPayload),
+    Rpc(RpcCallerErrorPayload),
 
     /// RPC was cancelled or interrupted locally.
     Aborted,

@@ -7,7 +7,7 @@ use muxio::rpc::{
 use muxio_rpc_service::prebuffered::RpcMethodPrebuffered;
 use muxio_rpc_service_caller::{
     RpcServiceCallerInterface, RpcTransportState, WithDispatcher,
-    error::{RpcCallerError, RpcErrorCode, RpcErrorPayload},
+    error::{RpcCallerError, RpcCallerErrorCode, RpcCallerErrorPayload},
     prebuffered::RpcCallPrebuffered,
 };
 use std::sync::{Arc, Mutex};
@@ -173,8 +173,8 @@ async fn test_buffered_call_remote_error() {
         //     payload: error_payload,
         // }));
 
-        sender.send_and_ignore(Err(RpcCallerError::Rpc(RpcErrorPayload {
-            code: RpcErrorCode::Fail,
+        sender.send_and_ignore(Err(RpcCallerError::Rpc(RpcCallerErrorPayload {
+            code: RpcCallerErrorCode::Fail,
             message: "item does not exist".into(),
         })));
     });
@@ -194,7 +194,7 @@ async fn test_buffered_call_remote_error() {
         //     assert_eq!(payload, b"item does not exist");
         // }
         Err(RpcCallerError::Rpc(err)) => {
-            assert_eq!(err.code, RpcErrorCode::Fail);
+            assert_eq!(err.code, RpcCallerErrorCode::Fail);
             assert_eq!(err.message, "item does not exist");
         }
         _ => panic!("Expected a RemoteError, but got something else."),
@@ -219,8 +219,8 @@ async fn test_prebuffered_trait_converts_error() {
         // TODO: Clean up
         //let error_message = "Method has panicked".to_string();
         // sender.send_and_ignore(Err(RpcCallerError::RemoteSystemError(error_message)));
-        sender.send_and_ignore(Err(RpcCallerError::Rpc(RpcErrorPayload {
-            code: RpcErrorCode::System,
+        sender.send_and_ignore(Err(RpcCallerError::Rpc(RpcCallerErrorPayload {
+            code: RpcCallerErrorCode::System,
             message: "Method has panicked".into(),
         })));
     });
@@ -239,7 +239,7 @@ async fn test_prebuffered_trait_converts_error() {
 
     assert!(result.is_err());
     if let Err(RpcCallerError::Rpc(err)) = result {
-        assert_eq!(err.code, RpcErrorCode::System);
+        assert_eq!(err.code, RpcCallerErrorCode::System);
         assert_eq!(err.message, "Method has panicked");
     } else {
         panic!("Expected Rpc error");
