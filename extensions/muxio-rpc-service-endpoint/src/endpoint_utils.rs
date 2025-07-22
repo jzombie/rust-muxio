@@ -73,13 +73,13 @@ where
 
                     // TODO: Replace `serde_json` with `bitcode`
                     // Serialize the structured payload to send to the caller.
-                    let payload_bytes = serde_json::to_vec(payload).ok();
+                    let payload_bytes = bitcode::encode(payload);
 
                     RpcResponse {
                         rpc_request_id: request_id,
                         rpc_method_id: request.rpc_method_id,
                         rpc_result_status: Some(status.into()),
-                        rpc_prebuffered_payload_bytes: payload_bytes,
+                        rpc_prebuffered_payload_bytes: Some(payload_bytes),
                         is_finalized: true,
                     }
                 } else {

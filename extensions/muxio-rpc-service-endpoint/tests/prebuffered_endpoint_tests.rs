@@ -221,7 +221,7 @@ async fn test_read_bytes_handler_structured_fail_error() {
     let response = perform_request_response_cycle(&endpoint, METHOD_ID, &[]).await;
 
     // 3. The response payload should now be the JSON-serialized version of your struct.
-    let expected_serialized_payload = serde_json::to_vec(&error_payload).unwrap();
+    let expected_serialized_payload = bitcode::encode(&error_payload);
 
     let status = RpcResultStatus::try_from(response.rpc_result_status.unwrap()).unwrap();
     assert_eq!(status, RpcResultStatus::Fail);

@@ -843,10 +843,10 @@ name = "muxio-rpc-service"
 version = "0.10.0-alpha"
 dependencies = [
  "async-trait",
+ "bitcode",
  "futures",
  "muxio",
  "num_enum",
- "serde",
  "xxhash-rust",
 ]
 
@@ -867,12 +867,12 @@ name = "muxio-rpc-service-endpoint"
 version = "0.10.0-alpha"
 dependencies = [
  "async-trait",
+ "bitcode",
  "example-muxio-rpc-service-definition",
  "futures",
  "muxio",
  "muxio-rpc-service",
  "muxio-rpc-service-caller",
- "serde_json",
  "tokio",
  "tracing",
 ]

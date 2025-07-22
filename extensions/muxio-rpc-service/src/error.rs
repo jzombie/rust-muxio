@@ -1,16 +1,16 @@
-use serde::{Deserialize, Serialize};
+use bitcode::{Decode, Encode};
 use std::fmt;
 use std::io;
 
 /// The structured, minimal error payload sent over the wire.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Encode, Decode)]
 pub struct RpcServiceErrorPayload {
     pub code: RpcServiceErrorCode,
     pub message: String,
 }
 
 /// The three possible failure categories on the server side.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Encode, Decode, PartialEq, Eq)]
 pub enum RpcServiceErrorCode {
     Fail,     // User-level failure (e.g. invalid request)
     System,   // Crash, panic, or unexpected bug
