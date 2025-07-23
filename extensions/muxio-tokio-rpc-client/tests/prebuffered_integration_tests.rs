@@ -1,8 +1,9 @@
 use example_muxio_rpc_service_definition::prebuffered::{Add, Echo, Mult};
 use muxio_rpc_service::{
-    constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE, prebuffered::RpcMethodPrebuffered,
+    constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE,
+    error::{RpcServiceError, RpcServiceErrorCode},
+    prebuffered::RpcMethodPrebuffered,
 };
-
 use muxio_rpc_service_caller::prebuffered::RpcCallPrebuffered;
 use muxio_tokio_rpc_client::RpcClient;
 use muxio_tokio_rpc_server::{
@@ -122,14 +123,23 @@ async fn test_error_client_server_roundtrip() {
             .unwrap();
         let res = Add::call(&rpc_client, vec![1.0, 2.0, 3.0]).await;
 
-        // TODO: Handle
-        // assert!(res.is_err());
-        // let err = res.unwrap_err();
-        // assert_eq!(err.kind(), std::io::ErrorKind::Other);
-        // assert!(
-        //     err.to_string()
-        //         .contains("Remote system error: Addition failed")
-        // );
+        // Assert that the error was propagated correctly.
+        assert!(res.is_err(), "Expected RPC call to fail but it succeeded");
+        let err = res.unwrap_err();
+
+        // Match on the specific error variant for a robust test.
+        match err {
+            RpcServiceError::Rpc(payload) => {
+                assert_eq!(payload.code, RpcServiceErrorCode::System);
+                assert_eq!(payload.message, "Addition failed");
+            }
+            other_error => {
+                panic!(
+                    "Expected a RpcServiceError::Rpc, but got a different error: {:?}",
+                    other_error
+                );
+            }
+        }
     }
 }
 
@@ -210,12 +220,16 @@ async fn test_method_not_found_error() {
     assert!(result.is_err());
     let err = result.unwrap_err();
 
-    let msg = err.to_string();
-
-    // TODO: This needs to be improved from being string-based
-    assert!(
-        msg.contains("MethodNotFoundError") || msg.contains("method not found"),
-        "Expected method not found error, got: {}",
-        msg
-    );
+    // Match on the payload code for a robust, non-string-based test.
+    match err {
+        RpcServiceError::Rpc(payload) => {
+            assert_eq!(payload.code, RpcServiceErrorCode::NotFound);
+        }
+        other_error => {
+            panic!(
+                "Expected an RPC error with NotFound code, but got: {:?}",
+                other_error
+            );
+        }
+    }
 }
