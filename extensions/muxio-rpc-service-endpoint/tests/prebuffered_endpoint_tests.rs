@@ -161,36 +161,6 @@ async fn test_read_bytes_handler_system_error() {
     );
 }
 
-// TODO: Clean up
-// #[tokio::test]
-// async fn test_read_bytes_handler_fail_payload() {
-//     let endpoint = Arc::new(RpcServiceEndpoint::<()>::new());
-//     const METHOD_ID: u64 = 304;
-//     let error_payload = b"INVALID_ARGUMENT".to_vec();
-
-//     endpoint
-//         .register_prebuffered(METHOD_ID, {
-//             let error_payload = error_payload.clone();
-//             move |_, _: Vec<u8>| {
-//                 let error_payload = error_payload.clone();
-//                 async move {
-//                     Err(Box::new(HandlerError(error_payload))
-//                         as Box<dyn std::error::Error + Send + Sync>)
-//                 }
-//             }
-//         })
-//         .await
-//         .unwrap();
-//     let response = perform_request_response_cycle(&endpoint, METHOD_ID, &[]).await;
-
-//     let status = RpcResultStatus::try_from(response.rpc_result_status.unwrap()).unwrap();
-//     assert_eq!(status, RpcResultStatus::Fail);
-//     assert_eq!(
-//         response.rpc_prebuffered_payload_bytes.as_deref(),
-//         Some(&error_payload[..])
-//     );
-// }
-
 #[tokio::test]
 async fn test_read_bytes_handler_structured_fail_error() {
     let endpoint = Arc::new(RpcServiceEndpoint::<()>::new());

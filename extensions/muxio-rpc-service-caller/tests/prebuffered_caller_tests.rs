@@ -168,12 +168,6 @@ async fn test_buffered_call_remote_error() {
             tokio::time::sleep(std::time::Duration::from_millis(1)).await;
         };
 
-        // TODO: Clean up
-        // let error_payload = b"item does not exist".to_vec();
-        // sender.send_and_ignore(Err(RpcCallerError::RemoteError {
-        //     payload: error_payload,
-        // }));
-
         sender.send_and_ignore(Err(RpcServiceError::Rpc(RpcServiceErrorPayload {
             code: RpcServiceErrorCode::Fail,
             message: "item does not exist".into(),
@@ -190,10 +184,6 @@ async fn test_buffered_call_remote_error() {
     let (_, result) = client.call_rpc_buffered(request, decode_fn).await.unwrap();
 
     match result {
-        // TODO: Clean up
-        // Err(RpcCallerError::RemoteError { payload }) => {
-        //     assert_eq!(payload, b"item does not exist");
-        // }
         Err(RpcServiceError::Rpc(err)) => {
             assert_eq!(err.code, RpcServiceErrorCode::Fail);
             assert_eq!(err.message, "item does not exist");
@@ -217,9 +207,6 @@ async fn test_prebuffered_trait_converts_error() {
             tokio::time::sleep(std::time::Duration::from_millis(1)).await;
         };
 
-        // TODO: Clean up
-        //let error_message = "Method has panicked".to_string();
-        // sender.send_and_ignore(Err(RpcCallerError::RemoteSystemError(error_message)));
         sender.send_and_ignore(Err(RpcServiceError::Rpc(RpcServiceErrorPayload {
             code: RpcServiceErrorCode::System,
             message: "Method has panicked".into(),
@@ -227,16 +214,6 @@ async fn test_prebuffered_trait_converts_error() {
     });
 
     let result = Echo::call(&client, b"some input".to_vec()).await;
-
-    // TODO: Clean up
-    // assert!(result.is_err());
-    // let io_error = result.unwrap_err();
-    // assert_eq!(io_error.kind(), io::ErrorKind::Other);
-    // assert!(
-    //     io_error
-    //         .to_string()
-    //         .contains("Remote system error: Method has panicked")
-    // );
 
     assert!(result.is_err());
     if let Err(RpcServiceError::Rpc(err)) = result {

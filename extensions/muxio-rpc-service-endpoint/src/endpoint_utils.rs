@@ -41,25 +41,6 @@ where
                 is_finalized: true,
             },
             Err(e) => {
-                // TODO: Clean up
-                // if let Some(payload_error) = e.downcast_ref::<HandlerPayloadError>() {
-                //     RpcResponse {
-                //         rpc_request_id: request_id,
-                //         rpc_method_id: request.rpc_method_id,
-                //         rpc_result_status: Some(RpcResultStatus::Fail.into()),
-                //         rpc_prebuffered_payload_bytes: Some(payload_error.0.clone()),
-                //         is_finalized: true,
-                //     }
-                // } else {
-                //     RpcResponse {
-                //         rpc_request_id: request_id,
-                //         rpc_method_id: request.rpc_method_id,
-                //         rpc_result_status: Some(RpcResultStatus::SystemError.into()),
-                //         rpc_prebuffered_payload_bytes: Some(e.to_string().into_bytes()),
-                //         is_finalized: true,
-                //     }
-                // }
-
                 // Check if the error is our special, structured `RpcServiceEndointHandlerError`.
                 if let Some(handler_error) = e.downcast_ref::<RpcServiceEndointHandlerError>() {
                     let payload = &handler_error.0;
@@ -71,7 +52,6 @@ where
                         RpcServiceErrorCode::NotFound => RpcResultStatus::MethodNotFound,
                     };
 
-                    // TODO: Replace `serde_json` with `bitcode`
                     // Serialize the structured payload to send to the caller.
                     let payload_bytes = bitcode::encode(payload);
 
