@@ -1,6 +1,8 @@
 use example_muxio_rpc_service_definition::prebuffered::{Add, Echo, Mult};
 use muxio_rpc_service::{
-    constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE, prebuffered::RpcMethodPrebuffered,
+    constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE,
+    error::{RpcServiceError, RpcServiceErrorCode},
+    prebuffered::RpcMethodPrebuffered,
 };
 use muxio_rpc_service_caller::prebuffered::RpcCallPrebuffered;
 use muxio_tokio_rpc_client::RpcClient;
@@ -121,13 +123,22 @@ async fn test_error_client_server_roundtrip() {
             .unwrap();
         let res = Add::call(&rpc_client, vec![1.0, 2.0, 3.0]).await;
 
-        assert!(res.is_err());
+        // Assert that the error was propagated correctly.
+        assert!(res.is_err(), "Expected RPC call to fail but it succeeded");
         let err = res.unwrap_err();
-        assert_eq!(err.kind(), std::io::ErrorKind::Other);
-        assert!(
-            err.to_string()
-                .contains("Remote system error: Addition failed")
-        );
+
+        // Match on the specific error variant for a robust test.
+        match err {
+            RpcServiceError::Rpc(payload) => {
+                assert_eq!(payload.code, RpcServiceErrorCode::System);
+                assert_eq!(payload.message, "Addition failed");
+            }
+            other_error => {
+                panic!(
+                    "Expected a RpcServiceError::Rpc, but got a different error: {other_error:?}",
+                );
+            }
+        }
     }
 }
 
@@ -180,4 +191,41 @@ async fn test_large_prebuffered_payload_roundtrip() {
         result.err()
     );
     assert_eq!(result.unwrap(), large_payload);
+}
+
+#[tokio::test]
+async fn test_method_not_found_error() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let (server_host, server_port) = tcp_listener_to_host_port(&listener).unwrap();
+
+    {
+        let server = Arc::new(RpcServer::new(None));
+        tokio::spawn({
+            let server = Arc::clone(&server);
+            async move {
+                let _ = server.serve_with_listener(listener).await;
+            }
+        });
+    }
+
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+    let client = RpcClient::new(&server_host.to_string(), server_port)
+        .await
+        .unwrap();
+
+    let result = Add::call(&client, vec![1.0, 2.0, 3.0]).await;
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+
+    // Match on the payload code for a robust, non-string-based test.
+    match err {
+        RpcServiceError::Rpc(payload) => {
+            assert_eq!(payload.code, RpcServiceErrorCode::NotFound);
+        }
+        other_error => {
+            panic!("Expected an RPC error with NotFound code, but got: {other_error:?}",);
+        }
+    }
 }

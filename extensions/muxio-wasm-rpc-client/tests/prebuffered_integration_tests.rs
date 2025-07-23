@@ -21,7 +21,9 @@
 use example_muxio_rpc_service_definition::prebuffered::{Add, Echo, Mult};
 use futures_util::{SinkExt, StreamExt};
 use muxio_rpc_service::{
-    constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE, prebuffered::RpcMethodPrebuffered,
+    constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE,
+    error::{RpcServiceError, RpcServiceErrorCode},
+    prebuffered::RpcMethodPrebuffered,
 };
 use muxio_rpc_service_caller::RpcServiceCallerInterface;
 use muxio_rpc_service_caller::prebuffered::RpcCallPrebuffered;
@@ -202,13 +204,20 @@ async fn test_error_client_server_roundtrip() {
     let res = Add::call(client.as_ref(), vec![1.0, 2.0, 3.0]).await;
 
     // 4. Assert that the error was propagated correctly.
-    assert!(res.is_err());
+    assert!(res.is_err(), "Expected RPC call to fail but it succeeded");
     let err = res.unwrap_err();
-    assert_eq!(err.kind(), std::io::ErrorKind::Other);
-    assert!(
-        err.to_string()
-            .contains("Remote system error: Addition failed")
-    );
+
+    // Match on the specific error variant for a robust test.
+    match err {
+        // Corrected: Use the 'Rpc' variant, not 'Remote'.
+        RpcServiceError::Rpc(payload) => {
+            assert_eq!(payload.code, RpcServiceErrorCode::System);
+            assert_eq!(payload.message, "Addition failed");
+        }
+        other_error => {
+            panic!("Expected a RpcServiceError::Rpc, but got a different error: {other_error:?}",);
+        }
+    }
 }
 
 #[tokio::test]

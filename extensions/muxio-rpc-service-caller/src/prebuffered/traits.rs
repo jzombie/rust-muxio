@@ -1,7 +1,8 @@
-use crate::{RpcServiceCallerInterface, error::RpcCallerError};
+use crate::RpcServiceCallerInterface;
 use muxio::rpc::RpcRequest;
 use muxio_rpc_service::{
-    constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE, prebuffered::RpcMethodPrebuffered,
+    constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE, error::RpcServiceError,
+    prebuffered::RpcMethodPrebuffered,
 };
 use std::io;
 
@@ -15,7 +16,7 @@ pub trait RpcCallPrebuffered: RpcMethodPrebuffered + Sized + Send + Sync {
     async fn call<C: RpcServiceCallerInterface + Send + Sync>(
         rpc_client: &C,
         input: Self::Input,
-    ) -> Result<Self::Output, io::Error>;
+    ) -> Result<Self::Output, RpcServiceError>;
 }
 
 #[async_trait::async_trait]
@@ -28,7 +29,7 @@ where
     async fn call<C: RpcServiceCallerInterface + Send + Sync>(
         rpc_client: &C,
         input: Self::Input,
-    ) -> Result<Self::Output, io::Error> {
+    ) -> Result<Self::Output, RpcServiceError> {
         let encoded_args = Self::encode_request(input)?;
 
         // ### Large Argument Handling
@@ -73,29 +74,10 @@ where
             .call_rpc_buffered(request, decode_closure)
             .await?;
 
-        // 3. Unpack the nested `Result` and apply this trait's specific error handling.
-        // The type of `nested_result` is: Result<Result<Self::Output, io::Error>, RpcCallerError>
+        // 3. Unpack the nested `Result`.
         match nested_result {
-            // The stream was successful, so now we check the result of our decode function.
-            Ok(decode_result) => {
-                // `decode_result` is the `Result<Self::Output, io::Error>` from our closure.
-                // We can just return it directly.
-                decode_result
-            }
-            // An error occurred during the stream itself (e.g., remote error).
-            Err(rpc_error) => {
-                // Here, we apply the specialized error formatting required by this trait.
-                let error_message = match rpc_error {
-                    RpcCallerError::RemoteError { payload } => {
-                        format!(
-                            "RPC call failed with remote error: {}",
-                            String::from_utf8_lossy(&payload)
-                        )
-                    }
-                    _ => rpc_error.to_string(),
-                };
-                Err(io::Error::other(error_message))
-            }
+            Ok(decode_result) => decode_result.map_err(RpcServiceError::Transport),
+            Err(e) => Err(e),
         }
     }
 }
