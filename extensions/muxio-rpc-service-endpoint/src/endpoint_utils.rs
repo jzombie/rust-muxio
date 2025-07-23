@@ -1,4 +1,4 @@
-use super::{error::HandlerError, with_handlers_trait::WithHandlers};
+use super::{error::RpcServiceEndointHandlerError, with_handlers_trait::WithHandlers};
 use muxio::rpc::{RpcRequest, RpcResponse};
 use muxio_rpc_service::{RpcResultStatus, error::RpcServiceErrorCode};
 use std::sync::Arc;
@@ -60,8 +60,8 @@ where
                 //     }
                 // }
 
-                // Check if the error is our special, structured HandlerError.
-                if let Some(handler_error) = e.downcast_ref::<HandlerError>() {
+                // Check if the error is our special, structured `RpcServiceEndointHandlerError`.
+                if let Some(handler_error) = e.downcast_ref::<RpcServiceEndointHandlerError>() {
                     let payload = &handler_error.0;
 
                     // Map the error code to the wire-protocol status.

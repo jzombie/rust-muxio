@@ -2,13 +2,12 @@ use muxio::frame::{FrameDecodeError, FrameEncodeError};
 use muxio_rpc_service::error::RpcServiceErrorPayload;
 use std::fmt;
 
-// TODO: Remove
 /// The special error type that a handler should return to send a
 /// structured error to the caller.
 #[derive(Debug)]
-pub struct HandlerError(pub RpcServiceErrorPayload);
+pub struct RpcServiceEndointHandlerError(pub RpcServiceErrorPayload);
 
-impl fmt::Display for HandlerError {
+impl fmt::Display for RpcServiceEndointHandlerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -18,9 +17,8 @@ impl fmt::Display for HandlerError {
     }
 }
 
-impl std::error::Error for HandlerError {}
+impl std::error::Error for RpcServiceEndointHandlerError {}
 
-// TODO: Only public in crate
 /// Represents errors that can occur within the endpoint's own logic.
 #[derive(Debug)]
 pub enum RpcServiceEndpointError {
