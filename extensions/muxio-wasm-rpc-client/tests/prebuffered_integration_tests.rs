@@ -215,10 +215,7 @@ async fn test_error_client_server_roundtrip() {
             assert_eq!(payload.message, "Addition failed");
         }
         other_error => {
-            panic!(
-                "Expected a RpcServiceError::Rpc, but got a different error: {:?}",
-                other_error
-            );
+            panic!("Expected a RpcServiceError::Rpc, but got a different error: {other_error:?}",);
         }
     }
 }

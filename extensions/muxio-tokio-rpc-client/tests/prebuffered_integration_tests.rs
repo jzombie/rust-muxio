@@ -135,8 +135,7 @@ async fn test_error_client_server_roundtrip() {
             }
             other_error => {
                 panic!(
-                    "Expected a RpcServiceError::Rpc, but got a different error: {:?}",
-                    other_error
+                    "Expected a RpcServiceError::Rpc, but got a different error: {other_error:?}",
                 );
             }
         }
@@ -201,7 +200,7 @@ async fn test_method_not_found_error() {
 
     {
         let server = Arc::new(RpcServer::new(None));
-        let _ = tokio::spawn({
+        tokio::spawn({
             let server = Arc::clone(&server);
             async move {
                 let _ = server.serve_with_listener(listener).await;
@@ -226,10 +225,7 @@ async fn test_method_not_found_error() {
             assert_eq!(payload.code, RpcServiceErrorCode::NotFound);
         }
         other_error => {
-            panic!(
-                "Expected an RPC error with NotFound code, but got: {:?}",
-                other_error
-            );
+            panic!("Expected an RPC error with NotFound code, but got: {other_error:?}",);
         }
     }
 }
