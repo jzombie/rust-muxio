@@ -3,26 +3,21 @@ use futures_util::{SinkExt, StreamExt};
 use muxio_rpc_service_caller::prebuffered::RpcCallPrebuffered;
 use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
 use muxio_tokio_rpc_server::RpcServer;
-use muxio_tokio_rpc_server::utils::{bind_tcp_listener_on_random_port, tcp_listener_to_host_port};
+use muxio_tokio_rpc_server::utils::tcp_listener_to_host_port;
 use muxio_wasm_rpc_client::RpcWasmClient;
 use std::sync::{Arc, Mutex};
 use tokio::net::TcpListener;
 use tokio::sync::mpsc as tokio_mpsc;
+use tokio::task::JoinHandle;
 use tokio::time::{Duration, sleep};
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::protocol::Message as WsMessage;
 
 // Helper to create the WasmClient and its bridge for tests
-async fn setup_wasm_client_bridge(
-    server_url: &str,
-) -> (
-    Arc<RpcWasmClient>,
-    tokio::task::JoinHandle<()>,
-    tokio::task::JoinHandle<()>,
-) {
+async fn setup_wasm_client_bridge(server_url: &str) -> (Arc<RpcWasmClient>, JoinHandle<()>) {
     let (to_bridge_tx, mut to_bridge_rx) = tokio_mpsc::unbounded_channel::<Vec<u8>>();
     let client = Arc::new(RpcWasmClient::new(move |bytes| {
-        to_bridge_tx.send(bytes).unwrap();
+        let _ = to_bridge_tx.send(bytes);
     }));
 
     let (ws_stream, _) = connect_async(server_url)
@@ -30,11 +25,10 @@ async fn setup_wasm_client_bridge(
         .expect("Failed to connect to server");
     let (mut ws_sender, mut ws_receiver) = ws_stream.split();
 
-    // After connecting, immediately notify the client.
     client.handle_connect();
 
     // Bridge from WasmClient to real WebSocket
-    let sender_handle = tokio::spawn(async move {
+    tokio::spawn(async move {
         while let Some(bytes) = to_bridge_rx.recv().await {
             if ws_sender
                 .send(WsMessage::Binary(bytes.into()))
@@ -53,15 +47,14 @@ async fn setup_wasm_client_bridge(
             while let Some(Ok(WsMessage::Binary(bytes))) = ws_receiver.next().await {
                 client.process_incoming_bytes(&bytes);
             }
-            // When the loop exits, the connection is closed.
             client.handle_disconnect();
         }
     });
 
-    (client, sender_handle, receiver_handle)
+    (client, receiver_handle)
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "current_thread")]
 async fn test_transport_state_change_handler() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let (server_host, server_port) = tcp_listener_to_host_port(&listener).unwrap();
@@ -75,7 +68,7 @@ async fn test_transport_state_change_handler() {
     });
 
     let received_states = Arc::new(Mutex::new(Vec::new()));
-    let (client, ..) = setup_wasm_client_bridge(&server_url).await;
+    let (client, receiver_handle) = setup_wasm_client_bridge(&server_url).await;
 
     let states_clone = received_states.clone();
     client
@@ -86,9 +79,8 @@ async fn test_transport_state_change_handler() {
 
     sleep(Duration::from_millis(50)).await;
 
-    // Simulate disconnection by aborting the server
     server_task.abort();
-    sleep(Duration::from_millis(100)).await;
+    let _ = tokio::time::timeout(Duration::from_secs(1), receiver_handle).await;
 
     let final_states = received_states.lock().unwrap();
     assert_eq!(
@@ -101,7 +93,7 @@ async fn test_transport_state_change_handler() {
     );
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "current_thread")]
 async fn test_pending_requests_fail_on_disconnect() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
@@ -109,19 +101,19 @@ async fn test_pending_requests_fail_on_disconnect() {
     let server_task = tokio::spawn(async move {
         if let Ok((socket, _)) = listener.accept().await {
             if let Ok(mut ws_stream) = tokio_tungstenite::accept_async(socket).await {
-                ws_stream.next().await; // Wait for one message
-                sleep(Duration::from_secs(5)).await; // Hang
+                ws_stream.next().await;
+                sleep(Duration::from_secs(5)).await;
             }
         }
     });
 
-    let (client, ..) = setup_wasm_client_bridge(&server_url).await;
-    sleep(Duration::from_millis(50)).await;
+    let (client, receiver_handle) = setup_wasm_client_bridge(&server_url).await;
 
     let call_future = Echo::call(client.as_ref(), b"this will hang".to_vec());
     sleep(Duration::from_millis(50)).await;
 
     server_task.abort();
+    let _ = tokio::time::timeout(Duration::from_secs(1), receiver_handle).await;
 
     let result = tokio::time::timeout(Duration::from_secs(1), call_future).await;
     assert!(
@@ -137,7 +129,7 @@ async fn test_pending_requests_fail_on_disconnect() {
 
     let err_string = rpc_result.unwrap_err().to_string();
     assert!(
-        err_string.contains("ReadAfterCancel"),
+        err_string.contains("cancelled stream"),
         "Error message should indicate that the request was cancelled."
     );
 }

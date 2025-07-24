@@ -88,21 +88,19 @@ pub fn get_static_client() -> Option<Arc<RpcWasmClient>> {
 /// - `2`: Disconnected
 #[wasm_bindgen]
 pub fn notify_static_client_transport_state_change(state_code: u8) -> Result<(), JsValue> {
-    let state = match state_code {
-        0 => RpcTransportState::Connecting,
-        1 => RpcTransportState::Connected,
-        2 => RpcTransportState::Disconnected,
-        _ => return Err(JsValue::from_str("Invalid state code provided.")),
-    };
-
     MUXIO_STATIC_RPC_CLIENT_REF.with(|cell| {
         if let Some(client) = cell.borrow().as_ref() {
-            // Acquire the lock and invoke the handler if it's set.
-            if let Some(handler) = client.state_change_handler.lock().unwrap().as_ref() {
-                handler(state);
+            match state_code {
+                0 => {} // 0 == Connecting
+                1 => {
+                    client.handle_connect();
+                } // 1 == Connected
+                2 => {
+                    client.handle_disconnect();
+                } // 2 == Disconnected
+                _ => return Err(JsValue::from_str("Invalid state code provided.")),
             }
         }
-        // It's not an error if the client isn't initialized or no handler is set.
         Ok(())
     })
 }
