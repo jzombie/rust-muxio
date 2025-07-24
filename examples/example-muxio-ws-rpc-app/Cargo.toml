@@ -13,7 +13,7 @@ async-trait = "0.1.88"
 muxio = { workspace = true }
 muxio-tokio-rpc-server = { workspace = true }
 muxio-tokio-rpc-client = { workspace = true }
-muxio-rpc-service-caller = { workspace = true, features=["tokio_support"] }
+muxio-rpc-service-caller = { workspace = true }
 example-muxio-rpc-service-definition = { workspace = true }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }

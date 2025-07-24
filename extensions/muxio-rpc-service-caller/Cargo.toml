@@ -13,14 +13,7 @@ async-trait = "0.1.88"
 futures = "0.3.31"
 muxio = { workspace = true }
 muxio-rpc-service = { workspace = true }
-
-# Optional dependencies
-tokio = { version = "1.45.1", features = ["sync"], optional = true }
-
-[features]
-default = []
-tokio_support = ["dep:tokio"]
+tokio = { version = "1.45.1", features = ["sync"] }
 
 [dev-dependencies]
-tokio = { version = "1.45.1", features = ["full"] }
 example-muxio-rpc-service-definition = { workspace = true }

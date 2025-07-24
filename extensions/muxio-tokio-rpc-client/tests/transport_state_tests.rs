@@ -173,23 +173,30 @@ async fn test_pending_requests_fail_on_disconnect() {
         server_host, server_port
     );
 
+    let server_close_notify = Arc::new(Notify::new());
+    let server_close_notify_clone = server_close_notify.clone();
+
     let server_task = tokio::spawn(async move {
         println!("[Server Task Pending] Waiting for client connection.");
         if let Ok((socket, _)) = listener.accept().await {
             println!("[Server Task Pending] Client connected. Attempting WebSocket handshake.");
             if let Ok(mut ws_stream) = tokio_tungstenite::accept_async(socket).await {
                 println!(
-                    "[Server Task Pending] WebSocket handshake complete. Waiting for first message."
+                    "[Server Task Pending] WebSocket handshake complete. Waiting for first message from client."
                 );
-                // Wait for at least one message from the client to ensure the RPC call is sent.
-                let msg_opt = ws_stream.next().await;
-                println!(
-                    "[Server Task Pending] Received message from client: {:?}",
-                    msg_opt
-                );
-                // Now, abruptly close the connection after a short delay
-                tokio::time::sleep(Duration::from_millis(100)).await;
-                println!("[Server Task Pending] Server closing connection.");
+                tokio::select! {
+                    msg_opt = ws_stream.next() => {
+                        println!("[Server Task Pending] Received message from client: {:?}", msg_opt);
+                        tokio::time::sleep(Duration::from_millis(10)).await; // Small pause if message received
+                    },
+                    _ = server_close_notify_clone.notified() => {
+                        println!("[Server Task Pending] Received early close signal from test (server was waiting for message).");
+                    }
+                }
+
+                println!("[Server Task Pending] Explicitly closing WebSocket stream.");
+                let _ = ws_stream.close(None).await;
+                println!("[Server Task Pending] WebSocket connection closed by server.");
             } else {
                 println!("[Server Task Pending] WebSocket handshake failed.");
             }
@@ -203,44 +210,62 @@ async fn test_pending_requests_fail_on_disconnect() {
     let client = RpcClient::new(&server_host.to_string(), server_port)
         .await
         .unwrap();
-    println!("[Test] RpcClient for pending requests test created.");
+    println!("[Test] RpcClient created successfully.");
     tokio::time::sleep(Duration::from_millis(50)).await; // Give client time to connect
     println!("[Test] Client connected sleep complete.");
 
-    println!("[Test] Making RPC call that should hang and then fail.");
+    // ### CRITICAL FIX: Initiate the RPC call *before* the disconnection. ###
+    println!("[Test] Initiating RPC call that should become pending.");
+    // Directly await the call future here, instead of spawning it.
+    // This removes the Send requirement for the future.
     let call_future = Echo::call(client.as_ref(), b"this will hang".to_vec());
-    tokio::time::sleep(Duration::from_millis(50)).await; // Give time for the request to be sent
-    println!("[Test] RPC call initiated, waiting for server to close.");
 
-    println!("[Test] Aborting server task (simulating disconnect).");
-    server_task.abort(); // Abort the server, simulating a disconnect.
+    // Give enough time for the RPC request to be fully registered with the dispatcher
+    // and potentially sent to the server.
+    tokio::time::sleep(Duration::from_millis(100)).await; // Increased sleep to ensure RPC is pending
+    tokio::task::yield_now().await; // Ensure scheduler runs tasks to process the RPC initiation
+    println!("[Test] RPC call initiated and should now be pending in dispatcher.");
 
-    // Allow some time for the client to process the disconnection
-    // and fail the pending requests.
-    tokio::time::sleep(Duration::from_millis(100)).await;
-    println!("[Test] Sleep after server abort for pending requests test complete.");
+    // Now, signal the server to close the connection.
+    println!("[Test] Signaling server to close connection.");
+    server_close_notify.notify_one();
 
-    println!("[Test] Waiting for RPC call future to resolve with timeout.");
-    let result = timeout(Duration::from_secs(1), call_future).await;
+    // Give the client's receive loop and shutdown_async task time to complete.
+    // This is where `fail_all_pending_requests` should now find the pending request.
+    tokio::time::sleep(Duration::from_millis(200)).await; // Allow time for client to detect close and run shutdown
+    tokio::task::yield_now().await; // Ensure scheduler runs dispatcher's cancellation
+    println!(
+        "[Test] Sleep after server close signal complete (client should have processed disconnect)."
+    );
+
+    println!("[Test] Waiting for RPC call future to resolve (should be cancelled).");
+    // Now, `timeout` wraps the `call_future` directly.
+    let result = timeout(Duration::from_secs(1), call_future).await; // 1 second should be plenty if cancellation works
     println!("[Test] RPC call future resolution result: {:?}", result);
 
     assert!(
         result.is_ok(),
-        "Test timed out, the future did not resolve."
+        "Test timed out, the future did not resolve. Result: {:?}",
+        result
     );
 
     let rpc_result = result.unwrap();
     assert!(
         rpc_result.is_err(),
-        "Expected the pending RPC call to fail, but it succeeded."
+        "Expected the pending RPC call to fail, but it succeeded. Result: {:?}",
+        rpc_result
     );
 
     let err_string = rpc_result.unwrap_err().to_string();
     println!("[Test] RPC error string: {}", err_string);
     assert!(
-        err_string.contains("cancelled stream"),
+        err_string.contains("cancelled stream"), // This is the error from FrameDecodeError::ReadAfterCancel
         "Error message should indicate that the request was cancelled due to a disconnect. Got: {}",
         err_string
     );
     println!("[Test] test_pending_requests_fail_on_disconnect PASSED");
+
+    // Clean up the server task at the end.
+    server_task.abort();
+    tokio::time::sleep(Duration::from_millis(10)).await;
 }

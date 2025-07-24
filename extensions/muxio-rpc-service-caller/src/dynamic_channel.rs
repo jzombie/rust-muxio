@@ -32,10 +32,12 @@ impl DynamicSender {
             DynamicSender::Bounded(s) => {
                 // For a bounded channel, try_send can fail if full or disconnected.
                 let _ = s.try_send(item);
+                // println!("[DynamicSender::send_and_ignore] Bounded send result: {:?}", _); // Too noisy, uncomment if needed
             }
             DynamicSender::Unbounded(s) => {
                 // For an unbounded channel, send can only fail if disconnected.
                 let _ = s.unbounded_send(item);
+                // println!("[DynamicSender::send_and_ignore] Unbounded send result: {:?}", _); // Too noisy, uncomment if needed
             }
         }
     }
@@ -53,7 +55,7 @@ impl Stream for DynamicReceiver {
     type Item = Result<Vec<u8>, RpcServiceError>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        match self.get_mut() {
+        let poll_result = match self.get_mut() {
             DynamicReceiver::Bounded(r) => {
                 let stream = r;
                 pin_mut!(stream);
@@ -64,6 +66,12 @@ impl Stream for DynamicReceiver {
                 pin_mut!(stream);
                 stream.poll_next(cx)
             }
-        }
+        };
+        // Add a debug print here to see when poll_next is called and what it returns
+        println!(
+            "[DynamicReceiver::poll_next] Poll result: {:?}",
+            poll_result
+        ); // UNCOMMENTED THIS
+        poll_result
     }
 }

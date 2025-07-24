@@ -5,7 +5,7 @@ use muxio::rpc::{
 };
 use muxio_rpc_service::error::RpcServiceError;
 use muxio_rpc_service_caller::{
-    RpcServiceCallerInterface, RpcTransportState, WithDispatcher,
+    RpcServiceCallerInterface, RpcTransportState,
     dynamic_channel::{DynamicChannelType, DynamicReceiver, DynamicSender},
 };
 use std::sync::{Arc, Mutex};
@@ -26,22 +26,20 @@ struct MockRpcClient {
 #[allow(dead_code)]
 struct MockDispatcherLock(Mutex<()>);
 
+// #[async_trait::async_trait]
+// impl WithDispatcher for MockDispatcherLock {
+//     async fn with_dispatcher<F, R>(&self, f: F) -> R
+//     where
+//         F: FnOnce(&mut muxio::rpc::RpcDispatcher<'static>) -> R + Send,
+//         R: Send,
+//     {
+//         let mut dummy_dispatcher = muxio::rpc::RpcDispatcher::new();
+//         f(&mut dummy_dispatcher)
+//     }
+// }
+
 #[async_trait::async_trait]
-impl WithDispatcher for MockDispatcherLock {
-    async fn with_dispatcher<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&mut muxio::rpc::RpcDispatcher<'static>) -> R + Send,
-        R: Send,
-    {
-        let mut dummy_dispatcher = muxio::rpc::RpcDispatcher::new();
-        f(&mut dummy_dispatcher)
-    }
-}
-
-#[async_trait::async_trait(?Send)]
 impl RpcServiceCallerInterface for MockRpcClient {
-    type DispatcherLock = MockDispatcherLock;
-
     fn get_dispatcher(&self) -> Arc<Self::DispatcherLock> {
         Arc::new(MockDispatcherLock(Mutex::new(())))
     }

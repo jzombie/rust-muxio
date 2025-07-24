@@ -25,7 +25,6 @@ tracing = "0.1.41"
 default = []
 tokio_support = [
     "dep:tokio", # Enables the optional tokio dependency in THIS crate.
-    "muxio-rpc-service-caller/tokio_support" # Enables the feature in the CALLER crate.
 ]
 
 [dev-dependencies]

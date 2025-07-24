@@ -137,6 +137,7 @@ impl<'a> RpcDispatcher<'a> {
                         };
 
                         queue.push_back((rpc_request_id, rpc_request));
+                        println!("[RpcDispatcher::catch_all_response_handler] Added request {} to queue.", rpc_request_id);
                     }
 
                     RpcStreamEvent::PayloadChunk {
@@ -153,6 +154,9 @@ impl<'a> RpcDispatcher<'a> {
                                 .rpc_prebuffered_payload_bytes
                                 .get_or_insert_with(Vec::new);
                             payload.extend_from_slice(&bytes);
+                            println!("[RpcDispatcher::catch_all_response_handler] Appended {} bytes to payload for request {}.", bytes.len(), rpc_request_id);
+                        } else {
+                            println!("[RpcDispatcher::catch_all_response_handler] Payload chunk for unknown request {}. Dropped.", rpc_request_id);
                         }
                     }
 
@@ -163,6 +167,9 @@ impl<'a> RpcDispatcher<'a> {
                         {
                             // Set the `is_finalized` flag to true when the stream ends
                             rpc_request.is_finalized = true;
+                            println!("[RpcDispatcher::catch_all_response_handler] Request {} finalized.", rpc_request_id);
+                        } else {
+                            println!("[RpcDispatcher::catch_all_response_handler] End event for unknown request {}. Dropped.", rpc_request_id);
                         }
                     }
 
@@ -172,7 +179,6 @@ impl<'a> RpcDispatcher<'a> {
                         rpc_method_id,
                         frame_decode_error,
                     } => {
-                        // TODO: Handle errors
                         tracing::error!(
                             "Error in stream. Method: {:?} {:?} {:?}: {:?}",
                             rpc_method_id,
@@ -180,6 +186,8 @@ impl<'a> RpcDispatcher<'a> {
                             rpc_request_id,
                             frame_decode_error
                         );
+                        println!("[RpcDispatcher::catch_all_response_handler] Received Error event for request {:?}. Error: {:?}", rpc_request_id, frame_decode_error);
+                        // TODO: Consider removing from queue or marking as errored
                     }
                 }
             }));
@@ -216,6 +224,10 @@ impl<'a> RpcDispatcher<'a> {
 
         let rpc_request_id: u32 = self.next_rpc_request_id;
         self.next_rpc_request_id = increment_u32_id();
+        println!(
+            "[RpcDispatcher::call] Initiating RPC call with request_id: {}, method_id: {}",
+            rpc_request_id, rpc_method_id
+        );
 
         // Convert parameter bytes to metadata
         let rpc_metadata_bytes = rpc_request.rpc_param_bytes.unwrap_or_default();
@@ -235,16 +247,28 @@ impl<'a> RpcDispatcher<'a> {
             on_response,
             prebuffer_response,
         )?;
+        println!(
+            "[RpcDispatcher::call] Encoder initialized for request_id: {}",
+            rpc_request_id
+        );
 
         // If the RPC request has a buffered payload, send it here
         if let Some(prebuffered_payload_bytes) = rpc_request.rpc_prebuffered_payload_bytes {
             encoder.write_bytes(&prebuffered_payload_bytes)?;
+            println!(
+                "[RpcDispatcher::call] Sent prebuffered payload for request_id: {}",
+                rpc_request_id
+            );
         }
 
         // If the RPC request is pre-finalized, close the stream
         if rpc_request.is_finalized {
             encoder.flush()?;
             encoder.end_stream()?;
+            println!(
+                "[RpcDispatcher::call] Request {} finalized and stream ended.",
+                rpc_request_id
+            );
         }
 
         Ok(encoder)
@@ -390,10 +414,28 @@ impl<'a> RpcDispatcher<'a> {
     /// transport-level connection is dropped. It ensures that any code awaiting
     /// a response is promptly notified of the failure.
     pub fn fail_all_pending_requests(&mut self, error: FrameDecodeError) {
+        println!(
+            "[RpcDispatcher::fail_all_pending_requests] Entered. Error: {:?}",
+            error
+        ); // ADD THIS
+        println!(
+            "[RpcDispatcher::fail_all_pending_requests] Number of handlers before take: {}",
+            self.rpc_respondable_session.response_handlers.len()
+        ); // ADD THIS
+
         // Take ownership of the handlers, leaving the map empty.
         let handlers = std::mem::take(&mut self.rpc_respondable_session.response_handlers);
 
+        println!(
+            "[RpcDispatcher::fail_all_pending_requests] Taken {} handlers.",
+            handlers.len()
+        ); // ADD THIS
+
         for (request_id, mut handler) in handlers {
+            println!(
+                "[RpcDispatcher::fail_all_pending_requests] DELETING HANDLER for request_id: {request_id:?}"
+            ); // MODIFIED THIS
+
             // Create a synthetic error event to signal the failure.
             let error_event = RpcStreamEvent::Error {
                 // We don't have the full header, but the request_id is essential.
@@ -404,6 +446,11 @@ impl<'a> RpcDispatcher<'a> {
             };
             // Call the handler with the error, waking up the waiting Future.
             handler(error_event);
+            println!(
+                "[RpcDispatcher::fail_all_pending_requests] Handler for request_id {} called with error.",
+                request_id
+            ); // ADD THIS
         }
+        println!("[RpcDispatcher::fail_all_pending_requests] Exited."); // ADD THIS
     }
 }

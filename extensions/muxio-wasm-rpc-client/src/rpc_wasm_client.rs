@@ -83,9 +83,9 @@ impl RpcWasmClient {
     }
 }
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl RpcServiceCallerInterface for RpcWasmClient {
-    type DispatcherLock = Mutex<RpcDispatcher<'static>>;
+    // type DispatcherLock = Mutex<RpcDispatcher<'static>>;
 
     fn get_dispatcher(&self) -> Arc<Self::DispatcherLock> {
         self.dispatcher()

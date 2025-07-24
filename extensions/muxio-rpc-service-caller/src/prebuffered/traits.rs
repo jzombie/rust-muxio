@@ -4,7 +4,8 @@ use muxio_rpc_service::{
     constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE, error::RpcServiceError,
     prebuffered::RpcMethodPrebuffered,
 };
-use std::io;
+use std::fmt::Debug;
+use std::io; // Import Debug trait
 
 #[async_trait::async_trait(?Send)]
 pub trait RpcCallPrebuffered: RpcMethodPrebuffered + Sized + Send + Sync {
@@ -24,36 +25,27 @@ impl<T> RpcCallPrebuffered for T
 where
     T: RpcMethodPrebuffered + Send + Sync + 'static,
     T::Input: Send + 'static,
-    T::Output: Send + 'static,
+    T::Output: Send + 'static + Debug, // Add Debug trait bound here
 {
     async fn call<C: RpcServiceCallerInterface + Send + Sync>(
         rpc_client: &C,
         input: Self::Input,
     ) -> Result<Self::Output, RpcServiceError> {
+        println!(
+            "[RpcCallPrebuffered::call] Starting for method ID: {}",
+            T::METHOD_ID
+        );
         let encoded_args = Self::encode_request(input)?;
+        println!(
+            "[RpcCallPrebuffered::call] Arguments encoded ({} bytes).",
+            encoded_args.len()
+        );
 
-        // ### Large Argument Handling
-        //
-        // Due to underlying network transport limitations, a single RPC header frame
-        // cannot exceed a certain size (typically ~64KB). To handle arguments of any
-        // size, this method implements a "smart" transport strategy:
-        //
-        // 1.  **If the encoded arguments are small** (smaller than `DEFAULT_SERVICE_MAX_CHUNK_SIZE`),
-        //     they are sent in the `rpc_param_bytes` field of the request, which is part of
-        //     the initial header frame.
-        //
-        // 2.  **If the encoded arguments are large**, they cannot be sent in the header. Instead,
-        //     they are placed into the `rpc_prebuffered_payload_bytes` field. The underlying
-        //     `RpcDispatcher` will then automatically chunk this data and stream it as a
-        //     payload after the header.
-        //
-        // This ensures that RPC calls with large argument sets do not fail due to transport
-        // limitations, while still using the most efficient method for small arguments. The
-        // server-side `RpcServiceEndpointInterface` is designed with corresponding logic to
-        //  find the arguments in either location.
         let (param_bytes, payload_bytes) = if encoded_args.len() >= DEFAULT_SERVICE_MAX_CHUNK_SIZE {
+            println!("[RpcCallPrebuffered::call] Arguments are large, using payload_bytes.");
             (None, Some(encoded_args))
         } else {
+            println!("[RpcCallPrebuffered::call] Arguments are small, using param_bytes.");
             (Some(encoded_args), None)
         };
 
@@ -63,21 +55,37 @@ where
             rpc_prebuffered_payload_bytes: payload_bytes,
             is_finalized: true, // IMPORTANT: All prebuffered requests should be considered finalized
         };
+        println!(
+            "[RpcCallPrebuffered::call] RpcRequest created: {:?}",
+            request
+        );
 
-        // 1. Define the specific decode closure to pass to the generic helper.
-        // Its job is to call our trait's `decode_response` method.
         let decode_closure =
             |buffer: &[u8]| -> Result<Self::Output, io::Error> { Self::decode_response(buffer) };
 
-        // 2. Call the generic helper with our custom closure.
+        println!("[RpcCallPrebuffered::call] Calling rpc_client.call_rpc_buffered.");
         let (_encoder, nested_result) = rpc_client
             .call_rpc_buffered(request, decode_closure)
             .await?;
+        println!(
+            "[RpcCallPrebuffered::call] rpc_client.call_rpc_buffered returned. Nested result: {:?}",
+            nested_result
+        );
 
-        // 3. Unpack the nested `Result`.
         match nested_result {
-            Ok(decode_result) => decode_result.map_err(RpcServiceError::Transport),
-            Err(e) => Err(e),
+            Ok(decode_result) => {
+                println!(
+                    "[RpcCallPrebuffered::call] Unpacking nested_result: Ok. Decoding response."
+                );
+                decode_result.map_err(RpcServiceError::Transport)
+            }
+            Err(e) => {
+                println!(
+                    "[RpcCallPrebuffered::call] Unpacking nested_result: Err. Returning error: {:?}",
+                    e
+                );
+                Err(e)
+            }
         }
     }
 }
