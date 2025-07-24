@@ -13,6 +13,7 @@ use muxio_rpc_service_caller::{
     dynamic_channel::{DynamicChannelType, DynamicReceiver, DynamicSender},
     prebuffered::RpcCallPrebuffered,
 };
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tokio::sync::Mutex as TokioMutex;
 
@@ -23,6 +24,7 @@ type SharedResponseSender = Arc<Mutex<Option<DynamicSender>>>;
 #[derive(Clone)]
 struct MockRpcClient {
     response_sender_provider: SharedResponseSender,
+    is_connected_atomic: Arc<AtomicBool>,
 }
 
 #[async_trait::async_trait]
@@ -33,6 +35,10 @@ impl RpcServiceCallerInterface for MockRpcClient {
 
     fn get_emit_fn(&self) -> Arc<dyn Fn(Vec<u8>) + Send + Sync> {
         Arc::new(|_| {})
+    }
+
+    fn is_connected(&self) -> bool {
+        self.is_connected_atomic.load(Ordering::SeqCst)
     }
 
     async fn call_rpc_streaming(
@@ -91,8 +97,11 @@ impl RpcServiceCallerInterface for MockRpcClient {
 #[tokio::test]
 async fn test_buffered_call_success() {
     let sender_provider = Arc::new(Mutex::new(None));
+    let is_connected_state = Arc::new(AtomicBool::new(true));
+
     let client = MockRpcClient {
         response_sender_provider: sender_provider.clone(),
+        is_connected_atomic: is_connected_state.clone(),
     };
 
     let echo_payload = b"hello world".to_vec();
@@ -126,8 +135,11 @@ async fn test_buffered_call_success() {
 #[tokio::test]
 async fn test_buffered_call_remote_error() {
     let sender_provider = Arc::new(Mutex::new(None));
+    let is_connected_state = Arc::new(AtomicBool::new(true));
+
     let client = MockRpcClient {
         response_sender_provider: sender_provider.clone(),
+        is_connected_atomic: is_connected_state,
     };
 
     let decode_fn = |bytes: &[u8]| -> Vec<u8> { bytes.to_vec() };
@@ -167,8 +179,11 @@ async fn test_buffered_call_remote_error() {
 #[tokio::test]
 async fn test_prebuffered_trait_converts_error() {
     let sender_provider = Arc::new(Mutex::new(None));
+    let is_connected_state = Arc::new(AtomicBool::new(true));
+
     let client = MockRpcClient {
         response_sender_provider: sender_provider.clone(),
+        is_connected_atomic: is_connected_state,
     };
 
     tokio::spawn(async move {

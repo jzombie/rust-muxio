@@ -8,6 +8,7 @@ use muxio_rpc_service_caller::{
     RpcServiceCallerInterface, RpcTransportState,
     dynamic_channel::{DynamicChannelType, DynamicReceiver, DynamicSender},
 };
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tokio::sync::Mutex as TokioMutex;
 
@@ -18,6 +19,7 @@ type SharedResponseSender = Arc<Mutex<Option<DynamicSender>>>;
 #[derive(Clone)]
 struct MockRpcClient {
     response_sender_provider: SharedResponseSender,
+    is_connected_atomic: Arc<AtomicBool>,
 }
 
 #[async_trait::async_trait]
@@ -28,6 +30,10 @@ impl RpcServiceCallerInterface for MockRpcClient {
 
     fn get_emit_fn(&self) -> Arc<dyn Fn(Vec<u8>) + Send + Sync> {
         Arc::new(|_| {})
+    }
+
+    fn is_connected(&self) -> bool {
+        self.is_connected_atomic.load(Ordering::SeqCst)
     }
 
     async fn call_rpc_streaming(
@@ -95,8 +101,11 @@ fn create_test_request() -> RpcRequest {
 #[tokio::test]
 async fn test_dynamic_channel_bounded() {
     let sender_provider = Arc::new(Mutex::new(None));
+    let is_connected_state = Arc::new(AtomicBool::new(true));
+
     let client = MockRpcClient {
         response_sender_provider: sender_provider.clone(),
+        is_connected_atomic: is_connected_state.clone(),
     };
 
     let expected_payload = b"data from bounded channel".to_vec();
@@ -126,8 +135,11 @@ async fn test_dynamic_channel_bounded() {
 #[tokio::test]
 async fn test_dynamic_channel_unbounded() {
     let sender_provider = Arc::new(Mutex::new(None));
+    let is_connected_state = Arc::new(AtomicBool::new(true));
+
     let client = MockRpcClient {
         response_sender_provider: sender_provider.clone(),
+        is_connected_atomic: is_connected_state,
     };
 
     let expected_payload = b"data from unbounded channel".to_vec();
