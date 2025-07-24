@@ -287,7 +287,7 @@ impl RpcServiceCallerInterface for ConnectionContextHandle {
 
     /// This is a client-side concept, so it's a no-op on the server.
     /// The server manages the connection state directly.
-    fn set_state_change_handler(
+    async fn set_state_change_handler(
         &self,
         _handler: impl Fn(RpcTransportState) + Send + Sync + 'static,
     ) {

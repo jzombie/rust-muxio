@@ -43,9 +43,11 @@ async fn test_transport_state_change_handler() {
         .unwrap();
 
     let states_clone = received_states.clone();
-    client.set_state_change_handler(move |state| {
-        states_clone.lock().unwrap().push(state);
-    });
+    client
+        .set_state_change_handler(move |state| {
+            states_clone.lock().unwrap().push(state);
+        })
+        .await;
 
     // Give a moment for the initial "Connected" state to be registered.
     sleep(Duration::from_millis(50)).await;

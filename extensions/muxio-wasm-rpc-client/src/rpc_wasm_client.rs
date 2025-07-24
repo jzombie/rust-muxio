@@ -57,7 +57,7 @@ impl RpcServiceCallerInterface for RpcWasmClient {
     }
 
     /// Sets a callback that will be invoked with the current `RpcTransportState`.
-    fn set_state_change_handler(
+    async fn set_state_change_handler(
         &self,
         handler: impl Fn(RpcTransportState) + Send + Sync + 'static,
     ) {

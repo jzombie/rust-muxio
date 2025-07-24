@@ -234,5 +234,8 @@ pub trait RpcServiceCallerInterface: Send + Sync {
 
     /// Sets a callback to be invoked whenever the transport state changes.
     /// The callback receives the new `RpcTransportState` as its only argument.
-    fn set_state_change_handler(&self, handler: impl Fn(RpcTransportState) + Send + Sync + 'static);
+    async fn set_state_change_handler(
+        &self,
+        handler: impl Fn(RpcTransportState) + Send + Sync + 'static,
+    );
 }

@@ -106,7 +106,7 @@ impl RpcServiceCallerInterface for MockRpcClient {
 
     /// A no-op implementation for the state change handler.
     /// This mock doesn't need to do anything with the handler, so the body is empty.
-    fn set_state_change_handler(
+    async fn set_state_change_handler(
         &self,
         _handler: impl Fn(RpcTransportState) + Send + Sync + 'static,
     ) {

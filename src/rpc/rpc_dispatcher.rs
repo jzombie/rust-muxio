@@ -383,4 +383,27 @@ impl<'a> RpcDispatcher<'a> {
             None
         }
     }
+
+    /// Invokes all pending response handlers with an error and clears them.
+    ///
+    /// This is a crucial cleanup mechanism to prevent hanging requests when a
+    /// transport-level connection is dropped. It ensures that any code awaiting
+    /// a response is promptly notified of the failure.
+    pub fn fail_all_pending_requests(&mut self, error: FrameDecodeError) {
+        // Take ownership of the handlers, leaving the map empty.
+        let handlers = std::mem::take(&mut self.rpc_respondable_session.response_handlers);
+
+        for (request_id, mut handler) in handlers {
+            // Create a synthetic error event to signal the failure.
+            let error_event = RpcStreamEvent::Error {
+                // We don't have the full header, but the request_id is essential.
+                rpc_header: None,
+                rpc_request_id: Some(request_id),
+                rpc_method_id: None, // Method ID isn't critical for cancellation
+                frame_decode_error: error.clone(),
+            };
+            // Call the handler with the error, waking up the waiting Future.
+            handler(error_event);
+        }
+    }
 }
