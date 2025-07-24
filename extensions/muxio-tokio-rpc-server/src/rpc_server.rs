@@ -256,7 +256,7 @@ impl RpcServer {
 /// to that connected client. This is distinct from simply replying to a client's
 /// initial request and is the foundation for fully bidirectional communication,
 /// such as server-push notifications or commands.
-#[async_trait::async_trait]
+#[async_trait::async_trait(?Send)]
 impl RpcServiceCallerInterface for ConnectionContextHandle {
     // The dispatcher is protected by a Tokio Mutex.
     type DispatcherLock = Mutex<RpcDispatcher<'static>>;

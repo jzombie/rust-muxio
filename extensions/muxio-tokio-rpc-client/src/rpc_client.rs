@@ -164,7 +164,7 @@ impl RpcClient {
     }
 }
 
-#[async_trait::async_trait]
+#[async_trait::async_trait(?Send)]
 impl RpcServiceCallerInterface for RpcClient {
     type DispatcherLock = tokio::sync::Mutex<RpcDispatcher<'static>>;
 

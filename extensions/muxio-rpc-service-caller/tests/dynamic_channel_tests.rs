@@ -38,7 +38,7 @@ impl WithDispatcher for MockDispatcherLock {
     }
 }
 
-#[async_trait::async_trait]
+#[async_trait::async_trait(?Send)]
 impl RpcServiceCallerInterface for MockRpcClient {
     type DispatcherLock = MockDispatcherLock;
 

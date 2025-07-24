@@ -1,4 +1,4 @@
-use muxio::rpc::RpcDispatcher;
+use muxio::{frame::FrameDecodeError, rpc::RpcDispatcher};
 use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
 use muxio_rpc_service_endpoint::RpcServiceEndpoint;
 use std::sync::{Arc, Mutex};
@@ -25,22 +25,39 @@ impl RpcWasmClient {
         }
     }
 
+    /// **NEW**: Call this from your JavaScript glue code when the WebSocket's `onclose` or `onerror` event fires.
+    pub fn handle_disconnect(&self) {
+        // 1. Notify listeners that the transport state has changed.
+        if let Ok(guard) = self.state_change_handler.lock() {
+            if let Some(handler) = guard.as_ref() {
+                handler(RpcTransportState::Disconnected);
+            }
+        }
+
+        // 2. Fail all pending requests to prevent hangs.
+        if let Ok(mut dispatcher) = self.dispatcher.lock() {
+            let error = FrameDecodeError::ReadAfterCancel; // Represents a closed connection
+            dispatcher.fail_all_pending_requests(error);
+        }
+    }
+
     // This is part of the struct's own implementation, not a trait.
     pub fn get_endpoint(&self) -> Arc<RpcServiceEndpoint<()>> {
         self.endpoint.clone()
     }
 
+    /// **NEW**: Provides public access to the state change handler `Arc<Mutex<...>>`.
+    pub fn state_change_handler(&self) -> RpcTransportStateChangeHandler {
+        self.state_change_handler.clone()
+    }
+
+    // Private accessors for the trait impl
     fn dispatcher(&self) -> Arc<Mutex<RpcDispatcher<'static>>> {
         self.dispatcher.clone()
     }
 
     fn emit(&self) -> Arc<dyn Fn(Vec<u8>) + Send + Sync> {
         self.emit_callback.clone()
-    }
-
-    /// Provides a public accessor to the state change handler.
-    pub fn state_change_handler(&self) -> RpcTransportStateChangeHandler {
-        self.state_change_handler.clone()
     }
 }
 
@@ -61,10 +78,8 @@ impl RpcServiceCallerInterface for RpcWasmClient {
         &self,
         handler: impl Fn(RpcTransportState) + Send + Sync + 'static,
     ) {
-        let mut state_handler = self
-            .state_change_handler
-            .lock()
-            .expect("Mutex should not be poisoned");
-        *state_handler = Some(Box::new(handler));
+        if let Ok(mut state_handler) = self.state_change_handler.lock() {
+            *state_handler = Some(Box::new(handler));
+        }
     }
 }

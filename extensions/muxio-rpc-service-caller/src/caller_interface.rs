@@ -17,7 +17,7 @@ use std::io;
 use std::sync::{Arc, Mutex};
 
 /// Defines a generic capability for making RPC calls.
-#[async_trait::async_trait]
+#[async_trait::async_trait(?Send)]
 pub trait RpcServiceCallerInterface: Send + Sync {
     type DispatcherLock: WithDispatcher;
 

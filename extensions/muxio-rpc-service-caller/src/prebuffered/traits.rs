@@ -6,7 +6,7 @@ use muxio_rpc_service::{
 };
 use std::io;
 
-#[async_trait::async_trait]
+#[async_trait::async_trait(?Send)]
 pub trait RpcCallPrebuffered: RpcMethodPrebuffered + Sized + Send + Sync {
     /// Executes a pre-buffered RPC call.
     ///
@@ -19,7 +19,7 @@ pub trait RpcCallPrebuffered: RpcMethodPrebuffered + Sized + Send + Sync {
     ) -> Result<Self::Output, RpcServiceError>;
 }
 
-#[async_trait::async_trait]
+#[async_trait::async_trait(?Send)]
 impl<T> RpcCallPrebuffered for T
 where
     T: RpcMethodPrebuffered + Send + Sync + 'static,
