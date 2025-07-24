@@ -1,7 +1,10 @@
 use muxio::{frame::FrameDecodeError, rpc::RpcDispatcher};
 use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
 use muxio_rpc_service_endpoint::RpcServiceEndpoint;
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    Arc, Mutex,
+    atomic::{AtomicBool, Ordering},
+};
 
 type RpcTransportStateChangeHandler =
     Arc<Mutex<Option<Box<dyn Fn(RpcTransportState) + Send + Sync>>>>;
@@ -12,7 +15,9 @@ pub struct RpcWasmClient {
     /// The endpoint for handling incoming RPC calls from the host.
     endpoint: Arc<RpcServiceEndpoint<()>>,
     emit_callback: Arc<dyn Fn(Vec<u8>) + Send + Sync>,
-    state_change_handler: RpcTransportStateChangeHandler,
+    pub(crate) state_change_handler: RpcTransportStateChangeHandler,
+    // NEW: Field to track connection state.
+    is_connected: Arc<AtomicBool>,
 }
 
 impl RpcWasmClient {
@@ -22,33 +27,47 @@ impl RpcWasmClient {
             endpoint: Arc::new(RpcServiceEndpoint::new()),
             emit_callback: Arc::new(emit_callback),
             state_change_handler: Arc::new(Mutex::new(None)),
+            is_connected: Arc::new(AtomicBool::new(false)),
         }
     }
 
-    /// **NEW**: Call this from your JavaScript glue code when the WebSocket's `onclose` or `onerror` event fires.
+    /// Call this from your JavaScript glue code when the WebSocket receives a message.
+    pub fn process_incoming_bytes(&self, bytes: &[u8]) {
+        if let Ok(mut dispatcher) = self.dispatcher.lock() {
+            let _ = dispatcher.read_bytes(bytes);
+        }
+    }
+
+    /// Call this from your JavaScript glue code when the WebSocket's `onclose` or `onerror` event fires.
     pub fn handle_disconnect(&self) {
-        // 1. Notify listeners that the transport state has changed.
-        if let Ok(guard) = self.state_change_handler.lock() {
-            if let Some(handler) = guard.as_ref() {
-                handler(RpcTransportState::Disconnected);
+        // UPDATED: Check and set the atomic flag to prevent running this logic multiple times.
+        if self.is_connected.swap(false, Ordering::SeqCst) {
+            if let Ok(guard) = self.state_change_handler.lock() {
+                if let Some(handler) = guard.as_ref() {
+                    handler(RpcTransportState::Disconnected);
+                }
+            }
+
+            if let Ok(mut dispatcher) = self.dispatcher.lock() {
+                let error = FrameDecodeError::ReadAfterCancel;
+                dispatcher.fail_all_pending_requests(error);
             }
         }
+    }
 
-        // 2. Fail all pending requests to prevent hangs.
-        if let Ok(mut dispatcher) = self.dispatcher.lock() {
-            let error = FrameDecodeError::ReadAfterCancel; // Represents a closed connection
-            dispatcher.fail_all_pending_requests(error);
-        }
+    /// Provides public access to the state change handler Arc<Mutex<...>>.
+    pub fn state_change_handler(&self) -> RpcTransportStateChangeHandler {
+        self.state_change_handler.clone()
+    }
+
+    /// NEW: A helper method to check the connection status.
+    pub fn is_connected(&self) -> bool {
+        self.is_connected.load(Ordering::SeqCst)
     }
 
     // This is part of the struct's own implementation, not a trait.
     pub fn get_endpoint(&self) -> Arc<RpcServiceEndpoint<()>> {
         self.endpoint.clone()
-    }
-
-    /// **NEW**: Provides public access to the state change handler `Arc<Mutex<...>>`.
-    pub fn state_change_handler(&self) -> RpcTransportStateChangeHandler {
-        self.state_change_handler.clone()
     }
 
     // Private accessors for the trait impl
@@ -78,8 +97,18 @@ impl RpcServiceCallerInterface for RpcWasmClient {
         &self,
         handler: impl Fn(RpcTransportState) + Send + Sync + 'static,
     ) {
-        if let Ok(mut state_handler) = self.state_change_handler.lock() {
-            *state_handler = Some(Box::new(handler));
+        let mut state_handler = self
+            .state_change_handler
+            .lock()
+            .expect("Mutex should not be poisoned");
+
+        *state_handler = Some(Box::new(handler));
+
+        // This will now compile successfully.
+        if self.is_connected() {
+            if let Some(h) = state_handler.as_ref() {
+                h(RpcTransportState::Connected);
+            }
         }
     }
 }
