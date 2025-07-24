@@ -17,3 +17,4 @@ tokio = { version = "1.45.1", features = ["sync"] }
 
 [dev-dependencies]
 example-muxio-rpc-service-definition = { workspace = true }
+tokio = { version = "1.45.1", features = ["full"] }

@@ -38,7 +38,7 @@ pub fn static_muxio_read_bytes_uint8(inbound_data: Uint8Array) -> Result<(), JsV
         let mut requests_to_process: Vec<(u32, RpcRequest)> = Vec::new();
         {
             // TODO: This might can be replaced with `process_incoming_bytes`
-            let mut dispatcher_guard = dispatcher_arc.lock().expect("Dispatcher mutex poisoned");
+            let mut dispatcher_guard = dispatcher_arc.lock().await;
             match dispatcher_guard.read_bytes(&inbound_bytes) {
                 Ok(request_ids) => {
                     for id in request_ids {
@@ -84,7 +84,7 @@ pub fn static_muxio_read_bytes_uint8(inbound_data: Uint8Array) -> Result<(), JsV
 
         // Stage 3: Synchronous Sending of Responses (lock briefly re-acquired)
         {
-            let mut dispatcher_guard = dispatcher_arc.lock().expect("Dispatcher mutex poisoned");
+            let mut dispatcher_guard = dispatcher_arc.lock().await;
             for response in responses_to_send {
                 let emit_fn_clone_for_respond = emit_fn_arc.clone();
                 let _ = dispatcher_guard.respond(
