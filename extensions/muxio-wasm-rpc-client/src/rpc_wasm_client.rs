@@ -27,12 +27,11 @@ impl RpcWasmClient {
             endpoint: Arc::new(RpcServiceEndpoint::new()),
             emit_callback: Arc::new(emit_callback),
             state_change_handler: Arc::new(Mutex::new(None)),
-            // MODIFIED: Connection is now false by default.
             is_connected: Arc::new(AtomicBool::new(false)),
         }
     }
 
-    /// NEW: Call this from your JavaScript glue code when the WebSocket `onopen` event fires.
+    /// Call this from your JavaScript glue code when the WebSocket `onopen` event fires.
     pub fn handle_connect(&self) {
         self.is_connected.store(true, Ordering::SeqCst);
         if let Ok(guard) = self.state_change_handler.lock() {

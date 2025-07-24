@@ -28,7 +28,6 @@ pub trait RpcServiceCallerInterface: Send + Sync {
     async fn call_rpc_streaming(
         &self,
         request: RpcRequest,
-        // The parameter is now the new, more expressive enum.
         dynamic_channel_type: DynamicChannelType,
     ) -> Result<
         (
@@ -150,9 +149,21 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                                 _ => {}
                             }
                         }
+                        *tx_lock = None; // Close the channel
+                    }
+                    RpcStreamEvent::Error {
+                        frame_decode_error, ..
+                    } => {
+                        if let Some(sender) = tx_lock.as_mut() {
+                            sender.send_and_ignore(Err(RpcServiceError::Transport(
+                                io::Error::new(
+                                    io::ErrorKind::ConnectionAborted,
+                                    frame_decode_error.to_string(),
+                                ),
+                            )));
+                        }
                         *tx_lock = None;
                     }
-                    _ => {}
                 }
             })
         };
@@ -169,7 +180,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                 )
             })
             .await
-            .map_err(|e| io::Error::other(format!("{e:?}")))?;
+            .map_err(|e| io::Error::other(format!("{:?}", e)))?;
 
         match ready_rx.await {
             Ok(Ok(())) => Ok((encoder, rx)),
