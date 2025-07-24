@@ -22,6 +22,8 @@ use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
 use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface};
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 use std::time::Duration;
 use tokio::{
     net::{TcpListener, ToSocketAddrs},
@@ -46,6 +48,7 @@ pub struct ConnectionContext {
     pub sender: WsSenderContext,
     pub addr: SocketAddr,
     pub mpsc_tx: mpsc::UnboundedSender<Message>,
+    pub is_connected: Arc<AtomicBool>,
     // Each connection gets its own dispatcher for making server-to-client calls.
     pub dispatcher: Arc<Mutex<RpcDispatcher<'static>>>,
 }
@@ -152,9 +155,12 @@ impl RpcServer {
         // Create the internal mpsc channel for this connection
         let (tx_mpsc, rx_mpsc) = mpsc::unbounded_channel::<Message>(); // Renamed for clarity
 
+        let is_connected_atomic = Arc::new(AtomicBool::new(true));
+
         let context = Arc::new(ConnectionContext {
             sender: Arc::new(Mutex::new(sender_ws)), // Renamed for clarity from 'sender'
             mpsc_tx: tx_mpsc.clone(),                // <--- USE THE CLONED SENDER HERE
+            is_connected: is_connected_atomic.clone(),
             addr,
             dispatcher: Arc::new(Mutex::new(RpcDispatcher::new())),
         });
@@ -178,6 +184,7 @@ impl RpcServer {
             tx_mpsc,     // <--- Pass tx_mpsc here as well
             addr,
             event_tx_clone,
+            is_connected_atomic,
         ));
     }
 
@@ -199,6 +206,7 @@ impl RpcServer {
         tx: mpsc::UnboundedSender<Message>,
         addr: SocketAddr,
         event_tx: Option<mpsc::UnboundedSender<RpcServerEvent>>,
+        is_connected_atomic: Arc<AtomicBool>,
     ) {
         let heartbeat_interval = Duration::from_secs(HEARTBEAT_INTERVAL);
         let client_timeout = Duration::from_secs(CLIENT_TIMEOUT);
@@ -251,6 +259,10 @@ impl RpcServer {
             }
         }
 
+        // When the loop breaks, the client is disconnected. Update the AtomicBool.
+        is_connected_atomic.store(false, Ordering::SeqCst); // <--- SET TO FALSE ON DISCONNECT
+        tracing::info!("Client {} connection status set to Disconnected.", addr);
+
         if let Some(tx) = event_tx {
             let _ = tx.send(RpcServerEvent::ClientDisconnected(addr));
         }
@@ -286,6 +298,10 @@ impl RpcServiceCallerInterface for ConnectionContextHandle {
                 // emit_fn, as the sender_task will handle the actual WebSocket error.
             }
         })
+    }
+
+    fn is_connected(&self) -> bool {
+        self.0.is_connected.load(Ordering::SeqCst) // Load from the AtomicBool
     }
 
     /// This is a client-side concept, so it's a no-op on the server.

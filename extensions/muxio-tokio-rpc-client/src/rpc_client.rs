@@ -302,6 +302,10 @@ impl RpcServiceCallerInterface for RpcClient {
         self.dispatcher.clone()
     }
 
+    fn is_connected(&self) -> bool {
+        self.is_connected.load(Ordering::Relaxed)
+    }
+
     fn get_emit_fn(&self) -> Arc<dyn Fn(Vec<u8>) + Send + Sync> {
         Arc::new({
             let tx = self.tx.clone();

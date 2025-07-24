@@ -29,6 +29,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
     // This uses TokioMutex, which is fine for async methods using .lock().await
     fn get_dispatcher(&self) -> Arc<TokioMutex<RpcDispatcher<'static>>>;
     fn get_emit_fn(&self) -> Arc<dyn Fn(Vec<u8>) + Send + Sync>;
+    fn is_connected(&self) -> bool;
 
     async fn call_rpc_streaming(
         &self,
@@ -41,6 +42,17 @@ pub trait RpcServiceCallerInterface: Send + Sync {
         ),
         RpcServiceError,
     > {
+        if !self.is_connected() {
+            println!(
+                "[RpcServiceCallerInterface::call_rpc_streaming] Client is disconnected. Rejecting call immediately for method ID: {}.",
+                request.rpc_method_id
+            );
+            return Err(RpcServiceError::Transport(io::Error::new(
+                io::ErrorKind::ConnectionAborted,
+                "RPC call attempted on a disconnected client.",
+            )));
+        }
+
         println!(
             "[RpcServiceCallerInterface::call_rpc_streaming] Starting for method ID: {}",
             request.rpc_method_id
