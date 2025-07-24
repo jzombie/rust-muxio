@@ -161,6 +161,10 @@ impl RpcServiceCallerInterface for RpcWasmClient {
         self.emit()
     }
 
+    fn is_connected(&self) -> bool {
+        self.is_connected()
+    }
+
     async fn set_state_change_handler(
         &self,
         handler: impl Fn(RpcTransportState) + Send + Sync + 'static,
