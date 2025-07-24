@@ -251,8 +251,9 @@ async fn test_pending_requests_fail_on_disconnect() {
     // 5. Await the result of the spawned RPC call task. It should be an error.
     println!("[Test] Waiting for spawned RPC call future to resolve (should be cancelled).");
     let result = timeout(Duration::from_secs(1), rx_rpc_result).await; // 1 sec timeout for resolution
+    // RPC REQUEST SHOULD BE CANCELED NOW
     println!(
-        "[Test] Spawned RPC call future resolution result: {:?}",
+        "[Test] ***** Spawned RPC call future resolution result: {:?} ***** ",
         result
     );
 
