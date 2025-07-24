@@ -45,6 +45,7 @@ pub enum RpcServerEvent {
 pub struct ConnectionContext {
     pub sender: WsSenderContext,
     pub addr: SocketAddr,
+    pub mpsc_tx: mpsc::UnboundedSender<Message>,
     // Each connection gets its own dispatcher for making server-to-client calls.
     pub dispatcher: Arc<Mutex<RpcDispatcher<'static>>>,
 }
@@ -146,31 +147,35 @@ impl RpcServer {
     }
 
     async fn handle_socket(self: Arc<Self>, socket: WebSocket, addr: SocketAddr) {
-        let (sender, receiver) = socket.split();
+        let (sender_ws, receiver_ws) = socket.split();
+
+        // Create the internal mpsc channel for this connection
+        let (tx_mpsc, rx_mpsc) = mpsc::unbounded_channel::<Message>(); // Renamed for clarity
 
         let context = Arc::new(ConnectionContext {
-            sender: Arc::new(Mutex::new(sender)),
+            sender: Arc::new(Mutex::new(sender_ws)), // Renamed for clarity from 'sender'
+            mpsc_tx: tx_mpsc.clone(),                // <--- USE THE CLONED SENDER HERE
             addr,
             dispatcher: Arc::new(Mutex::new(RpcDispatcher::new())),
         });
 
-        if let Some(tx) = &self.event_tx {
-            let _ = tx.send(RpcServerEvent::ClientConnected(ConnectionContextHandle(
+        if let Some(tx_event) = &self.event_tx {
+            // Renamed for clarity
+            let _ = tx_event.send(RpcServerEvent::ClientConnected(ConnectionContextHandle(
                 context.clone(),
             )));
         }
 
-        let (tx, rx) = mpsc::unbounded_channel::<Message>();
+        // Pass the receiver to the sender_task
+        tokio::spawn(Self::sender_task(context.clone(), rx_mpsc));
 
-        tokio::spawn(Self::sender_task(context.clone(), rx));
-
+        // Pass the sender to the receiver_task (for responding to client-initiated calls)
         let event_tx_clone = self.event_tx.clone();
-
         tokio::spawn(Self::receiver_task(
             self.endpoint.clone(),
             context,
-            receiver,
-            tx,
+            receiver_ws, // Renamed for clarity from 'receiver'
+            tx_mpsc,     // <--- Pass tx_mpsc here as well
             addr,
             event_tx_clone,
         ));
@@ -215,11 +220,14 @@ impl RpcServer {
                         Ok(Some(Ok(msg))) => {
                             match msg {
                                 Message::Binary(bytes) => {
+                                    println!("BEFORE DISPATCHER LOCK");
                                     let mut dispatcher = context.dispatcher.lock().await;
+                                    println!("AFTER DISPATCHER LOCK");
                                     let tx_clone = tx.clone();
                                     let on_emit = move |chunk: &[u8]| {
                                         let _ = tx_clone.send(Message::Binary(Bytes::copy_from_slice(chunk)));
                                     };
+
                                     if let Err(err) = endpoint.read_bytes(&mut dispatcher, context.clone(), &bytes, on_emit).await {
                                         tracing::error!("Error processing bytes from {}: {:?}", addr, err);
                                     }
@@ -258,29 +266,24 @@ impl RpcServer {
 /// such as server-push notifications or commands.
 #[async_trait::async_trait]
 impl RpcServiceCallerInterface for ConnectionContextHandle {
-    // The dispatcher is protected by a Tokio Mutex.
-    type DispatcherLock = Mutex<RpcDispatcher<'static>>;
-
-    fn get_dispatcher(&self) -> Arc<Self::DispatcherLock> {
+    fn get_dispatcher(&self) -> Arc<Mutex<RpcDispatcher<'static>>> {
         // Return the dispatcher associated with this specific connection.
         self.0.dispatcher.clone()
     }
 
     fn get_emit_fn(&self) -> Arc<dyn Fn(Vec<u8>) + Send + Sync> {
-        // Returns a thread-safe function that sends a raw byte payload
-        // over the WebSocket connection associated with this specific client.
-        // This is the lowest-level transport function used by the RPC caller.
         Arc::new({
-            let sender = self.0.sender.clone();
+            let mpsc_tx = self.0.mpsc_tx.clone(); // <--- CLONE THE MPSC SENDER
+
+            // This closure will be called by the RpcDispatcher/RpcServiceCallerInterface.
+            // It must be synchronous (not `async move` returning a Future)
+            // and should not block.
             move |chunk: Vec<u8>| {
-                let sender = sender.clone();
-                tokio::spawn(async move {
-                    let _ = sender
-                        .lock()
-                        .await
-                        .send(Message::Binary(chunk.into()))
-                        .await;
-                });
+                // This now sends the message to the internal MPSC channel, which is non-blocking.
+                // The actual async WebSocket send happens in the separate sender_task.
+                let _ = mpsc_tx.send(Message::Binary(chunk.into()));
+                // Ignoring the error if the receiver is dropped is acceptable for a "fire and forget"
+                // emit_fn, as the sender_task will handle the actual WebSocket error.
             }
         })
     }

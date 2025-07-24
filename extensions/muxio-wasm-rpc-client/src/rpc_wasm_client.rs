@@ -1,6 +1,9 @@
+use futures::future::join_all;
 use muxio::{frame::FrameDecodeError, rpc::RpcDispatcher};
+use muxio_rpc_service::constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE;
 use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
-use muxio_rpc_service_endpoint::RpcServiceEndpoint;
+use muxio_rpc_service_endpoint::RpcServiceEndpointInterface;
+use muxio_rpc_service_endpoint::{RpcServiceEndpoint, process_single_prebuffered_request}; // Import process_single_prebuffered_request
 use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
@@ -41,9 +44,80 @@ impl RpcWasmClient {
     }
 
     /// Call this from your JavaScript glue code when the WebSocket receives a message.
+    /// This now handles both dispatcher reading and endpoint processing of incoming requests.
     pub async fn process_incoming_bytes(&self, bytes: &[u8]) {
-        let mut dispatcher = self.dispatcher.lock().await;
-        let _ = dispatcher.read_bytes(bytes);
+        let dispatcher_arc = self.dispatcher.clone();
+        let endpoint_arc = self.endpoint.clone();
+        let emit_fn_arc = self.emit_callback.clone();
+
+        // Stage 1: Synchronous Reading from Dispatcher (lock briefly held)
+        let mut requests_to_process: Vec<(u32, muxio::rpc::RpcRequest)> = Vec::new();
+        {
+            // Acquire lock to read bytes into the dispatcher
+            let mut dispatcher_guard = dispatcher_arc.lock().await;
+            match dispatcher_guard.read_bytes(bytes) {
+                Ok(request_ids) => {
+                    for id in request_ids {
+                        // Check if the request is finalized and needs processing
+                        if dispatcher_guard
+                            .is_rpc_request_finalized(id)
+                            .unwrap_or(false)
+                        {
+                            // Take the request out of the dispatcher for processing
+                            if let Some(req) = dispatcher_guard.delete_rpc_request(id) {
+                                requests_to_process.push((id, req));
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::error!(
+                        "WASM client process_incoming_bytes: Dispatcher read_bytes error: {:?}",
+                        e
+                    );
+                    return; // Early exit on unrecoverable read error
+                }
+            }
+        } // IMPORTANT: `dispatcher_guard` is dropped here, releasing the lock.
+
+        // Stage 2: Asynchronous Processing of Requests (NO dispatcher lock held)
+        // This allows other tasks to potentially use the dispatcher while handlers run.
+        let mut response_futures = Vec::new();
+        let handlers_arc = endpoint_arc.get_prebuffered_handlers(); // Get a clone of the handlers Arc
+
+        for (request_id, request) in requests_to_process {
+            let handlers_arc_clone = handlers_arc.clone(); // Clone for each future
+            let handler_context = (); // Context is () for WASM client (no per-connection state needed by handlers)
+
+            let future = process_single_prebuffered_request(
+                // This function is async and calls the user's handlers
+                handlers_arc_clone,
+                handler_context,
+                request_id,
+                request,
+            );
+            response_futures.push(future);
+        }
+
+        // Await all responses concurrently. This is where the bulk of the "work" happens.
+        let responses_to_send = join_all(response_futures).await;
+
+        // Stage 3: Synchronous Sending of Responses (lock briefly re-acquired)
+        // Acquire lock again to write responses back to the dispatcher
+        {
+            let mut dispatcher_guard = dispatcher_arc.lock().await;
+            for response in responses_to_send {
+                let emit_fn_clone_for_respond = emit_fn_arc.clone();
+                let _ = dispatcher_guard.respond(
+                    response,
+                    DEFAULT_SERVICE_MAX_CHUNK_SIZE, // Use the imported constant
+                    move |chunk: &[u8]| {
+                        // This callback is synchronous and uses the cloned emit_fn
+                        emit_fn_clone_for_respond(chunk.to_vec());
+                    },
+                );
+            }
+        } // `dispatcher_guard` is dropped here.
     }
 
     /// Call this from your JavaScript glue code when the WebSocket's `onclose` or `onerror` event fires.
@@ -54,7 +128,7 @@ impl RpcWasmClient {
                 handler(RpcTransportState::Disconnected);
             }
             let mut dispatcher = self.dispatcher.lock().await;
-            let error = FrameDecodeError::ReadAfterCancel;
+            let error = FrameDecodeError::ReadAfterCancel; // Or an appropriate disconnection error
             dispatcher.fail_all_pending_requests(error);
         }
     }

@@ -298,9 +298,7 @@ impl RpcClient {
 
 #[async_trait::async_trait]
 impl RpcServiceCallerInterface for RpcClient {
-    type DispatcherLock = TokioMutex<RpcDispatcher<'static>>;
-
-    fn get_dispatcher(&self) -> Arc<Self::DispatcherLock> {
+    fn get_dispatcher(&self) -> Arc<TokioMutex<RpcDispatcher<'static>>> {
         self.dispatcher.clone()
     }
 

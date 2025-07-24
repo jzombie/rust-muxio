@@ -29,74 +29,91 @@ pub fn static_muxio_read_bytes_uint8(inbound_data: Uint8Array) -> Result<(), JsV
         .with(|cell| cell.borrow().clone())
         .ok_or_else(|| JsValue::from_str("RPC client not initialized"))?;
 
-    let dispatcher_arc = client_arc.get_dispatcher();
-    let endpoint_arc = client_arc.get_endpoint();
-    let emit_fn_arc = client_arc.get_emit_fn();
-
     spawn_local(async move {
-        // Stage 1: Synchronous Reading from Dispatcher (lock briefly held)
-        let mut requests_to_process: Vec<(u32, RpcRequest)> = Vec::new();
-        {
-            // TODO: This might can be replaced with `process_incoming_bytes`
-            let mut dispatcher_guard = dispatcher_arc.lock().await;
-            match dispatcher_guard.read_bytes(&inbound_bytes) {
-                Ok(request_ids) => {
-                    for id in request_ids {
-                        if dispatcher_guard
-                            .is_rpc_request_finalized(id)
-                            .unwrap_or(false)
-                        {
-                            if let Some(req) = dispatcher_guard.delete_rpc_request(id) {
-                                requests_to_process.push((id, req));
-                            }
-                        }
-                    }
-                }
-                Err(e) => {
-                    tracing::error!(
-                        "WASM static_read_bytes: Dispatcher read_bytes error: {:?}",
-                        e
-                    );
-                    return;
-                }
-            }
-        } // `dispatcher_guard` is dropped here.
-
-        // Stage 2: Asynchronous Processing of Requests (NO dispatcher lock held)
-        let mut response_futures = Vec::new();
-        let handlers_arc = endpoint_arc.get_prebuffered_handlers(); // Get the endpoint's handlers lock
-
-        for (request_id, request) in requests_to_process {
-            let handlers_arc_clone = handlers_arc.clone();
-            let handler_context = (); // Context is () for WASM client
-
-            // Call the new common utility function!
-            let future = process_single_prebuffered_request(
-                handlers_arc_clone,
-                handler_context,
-                request_id,
-                request,
-            );
-            response_futures.push(future);
-        }
-
-        let responses_to_send = join_all(response_futures).await;
-
-        // Stage 3: Synchronous Sending of Responses (lock briefly re-acquired)
-        {
-            let mut dispatcher_guard = dispatcher_arc.lock().await;
-            for response in responses_to_send {
-                let emit_fn_clone_for_respond = emit_fn_arc.clone();
-                let _ = dispatcher_guard.respond(
-                    response,
-                    DEFAULT_SERVICE_MAX_CHUNK_SIZE,
-                    move |chunk: &[u8]| {
-                        emit_fn_clone_for_respond(chunk.to_vec());
-                    },
-                );
-            }
-        }
+        // Use the new comprehensive method on the client
+        client_arc.process_incoming_bytes(&inbound_bytes).await;
     });
 
     Ok(())
 }
+
+// TODO: Clean up
+// #[wasm_bindgen]
+// pub fn static_muxio_read_bytes_uint8(inbound_data: Uint8Array) -> Result<(), JsValue> {
+//     let inbound_bytes = inbound_data.to_vec();
+
+//     let client_arc = MUXIO_STATIC_RPC_CLIENT_REF
+//         .with(|cell| cell.borrow().clone())
+//         .ok_or_else(|| JsValue::from_str("RPC client not initialized"))?;
+
+//     let dispatcher_arc = client_arc.get_dispatcher();
+//     let endpoint_arc = client_arc.get_endpoint();
+//     let emit_fn_arc = client_arc.get_emit_fn();
+
+//     spawn_local(async move {
+//         // Stage 1: Synchronous Reading from Dispatcher (lock briefly held)
+//         let mut requests_to_process: Vec<(u32, RpcRequest)> = Vec::new();
+//         {
+//             // TODO: This might can be replaced with `process_incoming_bytes`
+//             let mut dispatcher_guard = dispatcher_arc.lock().await;
+//             match dispatcher_guard.read_bytes(&inbound_bytes) {
+//                 Ok(request_ids) => {
+//                     for id in request_ids {
+//                         if dispatcher_guard
+//                             .is_rpc_request_finalized(id)
+//                             .unwrap_or(false)
+//                         {
+//                             if let Some(req) = dispatcher_guard.delete_rpc_request(id) {
+//                                 requests_to_process.push((id, req));
+//                             }
+//                         }
+//                     }
+//                 }
+//                 Err(e) => {
+//                     tracing::error!(
+//                         "WASM static_read_bytes: Dispatcher read_bytes error: {:?}",
+//                         e
+//                     );
+//                     return;
+//                 }
+//             }
+//         } // `dispatcher_guard` is dropped here.
+
+//         // Stage 2: Asynchronous Processing of Requests (NO dispatcher lock held)
+//         let mut response_futures = Vec::new();
+//         let handlers_arc = endpoint_arc.get_prebuffered_handlers(); // Get the endpoint's handlers lock
+
+//         for (request_id, request) in requests_to_process {
+//             let handlers_arc_clone = handlers_arc.clone();
+//             let handler_context = (); // Context is () for WASM client
+
+//             // Call the new common utility function!
+//             let future = process_single_prebuffered_request(
+//                 handlers_arc_clone,
+//                 handler_context,
+//                 request_id,
+//                 request,
+//             );
+//             response_futures.push(future);
+//         }
+
+//         let responses_to_send = join_all(response_futures).await;
+
+//         // Stage 3: Synchronous Sending of Responses (lock briefly re-acquired)
+//         {
+//             let mut dispatcher_guard = dispatcher_arc.lock().await;
+//             for response in responses_to_send {
+//                 let emit_fn_clone_for_respond = emit_fn_arc.clone();
+//                 let _ = dispatcher_guard.respond(
+//                     response,
+//                     DEFAULT_SERVICE_MAX_CHUNK_SIZE,
+//                     move |chunk: &[u8]| {
+//                         emit_fn_clone_for_respond(chunk.to_vec());
+//                     },
+//                 );
+//             }
+//         }
+//     });
+
+//     Ok(())
+// }
