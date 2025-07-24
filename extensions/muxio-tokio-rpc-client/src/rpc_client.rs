@@ -6,34 +6,30 @@ use std::fmt;
 use std::io;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::{
-    Arc,
+    Arc, Mutex as StdMutex, Weak,
     atomic::{AtomicBool, Ordering},
 };
-use tokio::runtime::Handle;
-use tokio::sync::{Mutex, mpsc};
+use std::time::Duration;
+use tokio::sync::{Mutex as TokioMutex, mpsc};
 use tokio::task::JoinHandle;
-use tokio_tungstenite::{connect_async, tungstenite::protocol::Message as WsMessage};
+use tokio_tungstenite::connect_async;
+use tokio_tungstenite::tungstenite::protocol::Message as WsMessage;
 
 type RpcTransportStateChangeHandler =
-    Arc<Mutex<Option<Box<dyn Fn(RpcTransportState) + Send + Sync>>>>;
+    Arc<StdMutex<Option<Box<dyn Fn(RpcTransportState) + Send + Sync>>>>;
 
 pub struct RpcClient {
-    dispatcher: Arc<Mutex<RpcDispatcher<'static>>>,
-    /// The endpoint for handling incoming RPC calls from the server.
-    endpoint: Arc<RpcServiceEndpoint<()>>,
+    dispatcher: Arc<TokioMutex<RpcDispatcher<'static>>>,
+    endpoint: Arc<RpcServiceEndpoint<()>>, // RESTORED
     tx: mpsc::UnboundedSender<WsMessage>,
     state_change_handler: RpcTransportStateChangeHandler,
     is_connected: Arc<AtomicBool>,
-    _task_handles: Mutex<Vec<JoinHandle<()>>>,
+    task_handles: Vec<JoinHandle<()>>,
 }
 
 impl fmt::Debug for RpcClient {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RpcClient")
-            .field("dispatcher", &"Arc<Mutex<RpcDispatcher>>")
-            .field("endpoint", &"Arc<RpcServiceEndpoint<()>>")
-            .field("tx", &"...")
-            .field("state_change_handler", &"...")
             .field("is_connected", &self.is_connected.load(Ordering::Relaxed))
             .finish()
     }
@@ -41,90 +37,258 @@ impl fmt::Debug for RpcClient {
 
 impl Drop for RpcClient {
     fn drop(&mut self) {
-        // The only job of Drop is to clean up the background tasks.
-        // The shutdown logic is handled by the `recv_handle` task.
-        for handle in self._task_handles.blocking_lock().iter() {
+        println!(
+            "[RpcClient::drop] Client is being dropped. Aborting tasks and calling shutdown_sync."
+        );
+        for handle in &self.task_handles {
             handle.abort();
         }
+        self.shutdown_sync();
+        println!("[RpcClient::drop] Client dropped finished.");
     }
 }
 
 impl RpcClient {
-    /// Creates a new RPC client and connects to a WebSocket server.
-    ///
-    /// The `host` can be either an IP address (v4 or v6) or a hostname that
-    /// will be resolved via DNS.
+    fn shutdown_sync(&self) {
+        println!(
+            "[RpcClient::shutdown_sync] Entered. Current is_connected: {}",
+            self.is_connected.load(Ordering::Relaxed)
+        );
+        if self.is_connected.swap(false, Ordering::SeqCst) {
+            println!(
+                "[RpcClient::shutdown_sync] is_connected was true, proceeding with sync shutdown."
+            );
+            if let Ok(guard) = self.state_change_handler.lock() {
+                if let Some(handler) = guard.as_ref() {
+                    println!(
+                        "[RpcClient::shutdown_sync] Calling Disconnected handler (sync path)."
+                    );
+                    handler(RpcTransportState::Disconnected);
+                } else {
+                    println!("[RpcClient::shutdown_sync] No state_change_handler set.");
+                }
+            } else {
+                println!("[RpcClient::shutdown_sync] Failed to acquire state_change_handler lock.");
+            }
+        } else {
+            println!("[RpcClient::shutdown_sync] Already disconnected or shutting down.");
+        }
+        println!("[RpcClient::shutdown_sync] Exited.");
+    }
+
+    async fn shutdown_async(&self) {
+        println!(
+            "[RpcClient::shutdown_async] Entered. Current is_connected: {}",
+            self.is_connected.load(Ordering::Relaxed)
+        );
+        if self.is_connected.swap(false, Ordering::SeqCst) {
+            println!(
+                "[RpcClient::shutdown_async] is_connected was true, proceeding with async shutdown."
+            );
+            if let Ok(guard) = self.state_change_handler.lock() {
+                if let Some(handler) = guard.as_ref() {
+                    println!(
+                        "[RpcClient::shutdown_async] Calling Disconnected handler (async path)."
+                    );
+                    handler(RpcTransportState::Disconnected);
+                } else {
+                    println!("[RpcClient::shutdown_async] No state_change_handler set.");
+                }
+            } else {
+                println!(
+                    "[RpcClient::shutdown_async] Failed to acquire state_change_handler lock."
+                );
+            }
+            // Ensure dispatcher lock is acquired to prevent other RPC calls during shutdown
+            let mut dispatcher = self.dispatcher.lock().await;
+            println!("[RpcClient::shutdown_async] Acquired dispatcher lock.");
+            dispatcher.fail_all_pending_requests(FrameDecodeError::ReadAfterCancel);
+            println!("[RpcClient::shutdown_async] All pending requests failed.");
+        } else {
+            println!("[RpcClient::shutdown_async] Already disconnected or shutting down.");
+        }
+        println!("[RpcClient::shutdown_async] Exited.");
+    }
+
     pub async fn new(host: &str, port: u16) -> Result<Arc<Self>, io::Error> {
         let websocket_url = match host.parse::<IpAddr>() {
             Ok(ip) => format!("ws://{}/ws", SocketAddr::new(ip, port)),
             Err(_) => format!("ws://{host}:{port}/ws"),
         };
-        let (ws_stream, _) = connect_async(&websocket_url)
-            .await
-            .map_err(|e| io::Error::new(io::ErrorKind::ConnectionRefused, e))?;
+        println!(
+            "[RpcClient::new] Attempting to connect to: {}",
+            websocket_url
+        );
+
+        let (ws_stream, response) = connect_async(&websocket_url).await.map_err(|e| {
+            println!("[RpcClient::new] Connection failed: {}", e);
+            io::Error::new(io::ErrorKind::ConnectionRefused, e)
+        })?;
+        println!(
+            "[RpcClient::new] Successfully connected to WebSocket. Response status: {}",
+            response.status()
+        );
 
         let (mut ws_sender, mut ws_receiver) = ws_stream.split();
         let (app_tx, mut app_rx) = mpsc::unbounded_channel::<WsMessage>();
+        println!("[RpcClient::new] WebSocket stream split and MPSC channel created.");
 
-        let client = Arc::new(Self {
-            dispatcher: Arc::new(Mutex::new(RpcDispatcher::new())),
-            endpoint: Arc::new(RpcServiceEndpoint::new()),
-            tx: app_tx.clone(),
-            state_change_handler: Arc::new(Mutex::new(None)),
-            is_connected: Arc::new(AtomicBool::new(true)),
-            _task_handles: Mutex::new(Vec::new()),
-        });
+        let client = Arc::new_cyclic(|weak_client: &Weak<RpcClient>| {
+            let state_change_handler: RpcTransportStateChangeHandler =
+                Arc::new(StdMutex::new(None));
+            let is_connected = Arc::new(AtomicBool::new(true));
+            let dispatcher = Arc::new(TokioMutex::new(RpcDispatcher::new()));
+            let endpoint = Arc::new(RpcServiceEndpoint::new());
+            let mut task_handles = Vec::new();
 
-        let mut task_handles = Vec::new();
-
-        // Receive loop
-        let client_recv = client.clone();
-        let recv_handle = tokio::spawn(async move {
-            while let Some(msg) = ws_receiver.next().await {
-                if let Ok(WsMessage::Binary(bytes)) = msg {
-                    let mut dispatcher = client_recv.dispatcher.lock().await;
-                    let on_emit = |chunk: &[u8]| {
-                        let _ = client_recv
-                            .tx
-                            .send(WsMessage::Binary(chunk.to_vec().into()));
-                    };
-                    let _ = client_recv
-                        .endpoint
-                        .read_bytes(&mut dispatcher, (), &bytes, on_emit)
-                        .await;
+            // Minimal heartbeat task to generate traffic
+            let heartbeat_tx = app_tx.clone();
+            let heartbeat_handle = tokio::spawn(async move {
+                println!("[RpcClient::heartbeat_task] Starting heartbeat task.");
+                let mut interval = tokio::time::interval(Duration::from_secs(1));
+                loop {
+                    interval.tick().await;
+                    if heartbeat_tx.send(WsMessage::Ping(vec![].into())).is_err() {
+                        println!(
+                            "[RpcClient::heartbeat_task] Failed to send ping, channel likely closed. Exiting."
+                        );
+                        break;
+                    }
+                    println!("[RpcClient::heartbeat_task] Sent ping.");
                 }
-            }
-            client_recv.shutdown().await;
-        });
-        task_handles.push(recv_handle);
+                println!("[RpcClient::heartbeat_task] Heartbeat task finished.");
+            });
+            task_handles.push(heartbeat_handle);
 
-        // Send loop
-        let send_handle = tokio::spawn(async move {
-            while let Some(msg) = app_rx.recv().await {
-                if ws_sender.send(msg).await.is_err() {
-                    break;
+            // Receive loop
+            let client_weak_recv = weak_client.clone();
+            let recv_handle = tokio::spawn(async move {
+                println!("[RpcClient::recv_handle] Starting receive loop.");
+                while let Some(msg_result) = ws_receiver.next().await {
+                    if let Some(client) = client_weak_recv.upgrade() {
+                        match msg_result {
+                            Ok(WsMessage::Binary(bytes)) => {
+                                println!(
+                                    "[RpcClient::recv_handle] Received binary message ({} bytes).",
+                                    bytes.len()
+                                );
+                                let mut dispatcher = client.dispatcher.lock().await;
+                                let on_emit = |chunk: &[u8]| {
+                                    let _ =
+                                        client.tx.send(WsMessage::Binary(chunk.to_vec().into()));
+                                    println!(
+                                        "[RpcClient::recv_handle] Emitted binary chunk ({} bytes).",
+                                        chunk.len()
+                                    );
+                                };
+                                let _ = client
+                                    .endpoint
+                                    .read_bytes(&mut dispatcher, (), &bytes, on_emit)
+                                    .await;
+                            }
+                            Ok(WsMessage::Ping(data)) => {
+                                println!("[RpcClient::recv_handle] Received Ping message.");
+                                let _ = client.tx.send(WsMessage::Pong(data.into()));
+                            }
+                            Ok(msg) => {
+                                println!(
+                                    "[RpcClient::recv_handle] Received other WebSocket message: {:?}",
+                                    msg
+                                );
+                            }
+                            Err(e) => {
+                                println!(
+                                    "[RpcClient::recv_handle] WebSocket receive error: {:?}",
+                                    e
+                                );
+                                // An error here often means the connection is broken.
+                                if let Some(client) = client_weak_recv.upgrade() {
+                                    println!(
+                                        "[RpcClient::recv_handle] Error: Upgraded client, spawning shutdown_async due to receive error."
+                                    );
+                                    tokio::spawn(async move {
+                                        client.shutdown_async().await;
+                                    });
+                                }
+                                break; // Exit loop on error
+                            }
+                        }
+                    } else {
+                        println!(
+                            "[RpcClient::recv_handle] Client Arc dropped while in loop. Exiting."
+                        );
+                        break;
+                    }
                 }
+                // This block is executed when ws_receiver.next().await returns None (stream ended)
+                // or if client_weak_recv.upgrade() fails in a subsequent loop iteration, or break is hit.
+                println!(
+                    "[RpcClient::recv_handle] ws_receiver stream ended or loop broke. Attempting final shutdown_async."
+                );
+                if let Some(client) = client_weak_recv.upgrade() {
+                    println!("[RpcClient::recv_handle] Client upgraded for final shutdown_async.");
+                    tokio::spawn(async move {
+                        client.shutdown_async().await;
+                    });
+                } else {
+                    println!(
+                        "[RpcClient::recv_handle] Client Arc already dropped at end of loop, cannot call shutdown_async."
+                    );
+                }
+                println!("[RpcClient::recv_handle] Receive loop finished.");
+            });
+            task_handles.push(recv_handle);
+
+            // Send loop
+            let client_weak_send = weak_client.clone();
+            let is_connected_send = is_connected.clone(); // Clone is_connected for this task
+            let send_handle = tokio::spawn(async move {
+                println!("[RpcClient::send_handle] Starting send loop.");
+                while let Some(msg) = app_rx.recv().await {
+                    // Check if client is still considered connected before attempting to send
+                    if !is_connected_send.load(Ordering::Acquire) {
+                        // Use Acquire for strong ordering
+                        println!(
+                            "[RpcClient::send_handle] Client is disconnected. Dropping message: {:?}",
+                            msg
+                        );
+                        // Don't try to send, just break or continue to drain if necessary
+                        break; // Exit loop if disconnected
+                    }
+
+                    println!("[RpcClient::send_handle] Sending message: {:?}", msg);
+                    if ws_sender.send(msg).await.is_err() {
+                        println!(
+                            "[RpcClient::send_handle] ws_sender failed to send message. Attempting shutdown_async."
+                        );
+                        if let Some(client) = client_weak_send.upgrade() {
+                            tokio::spawn(async move {
+                                client.shutdown_async().await;
+                            });
+                        } else {
+                            println!(
+                                "[RpcClient::send_handle] Client Arc already dropped, cannot call shutdown_async."
+                            );
+                        }
+                        break; // Break loop on send error
+                    }
+                }
+                println!("[RpcClient::send_handle] Send loop finished.");
+            });
+            task_handles.push(send_handle);
+
+            Self {
+                dispatcher,
+                endpoint,
+                tx: app_tx,
+                state_change_handler,
+                is_connected,
+                task_handles,
             }
         });
-        task_handles.push(send_handle);
 
-        *client._task_handles.lock().await = task_handles;
-
+        println!("[RpcClient::new] Client instance created successfully.");
         Ok(client)
-    }
-
-    /// A single, authoritative method to handle all shutdown and cleanup logic.
-    async fn shutdown(&self) {
-        if self.is_connected.swap(false, Ordering::SeqCst) {
-            let mut dispatcher = self.dispatcher.lock().await;
-            let error = FrameDecodeError::ReadAfterCancel;
-            dispatcher.fail_all_pending_requests(error);
-            tracing::warn!("Connection dropped. Failed all pending RPC requests.");
-
-            if let Some(handler) = self.state_change_handler.lock().await.as_ref() {
-                handler(RpcTransportState::Disconnected);
-            }
-        }
     }
 
     pub fn get_endpoint(&self) -> Arc<RpcServiceEndpoint<()>> {
@@ -134,7 +298,7 @@ impl RpcClient {
 
 #[async_trait::async_trait(?Send)]
 impl RpcServiceCallerInterface for RpcClient {
-    type DispatcherLock = Mutex<RpcDispatcher<'static>>;
+    type DispatcherLock = TokioMutex<RpcDispatcher<'static>>;
 
     fn get_dispatcher(&self) -> Arc<Self::DispatcherLock> {
         self.dispatcher.clone()
@@ -143,25 +307,55 @@ impl RpcServiceCallerInterface for RpcClient {
     fn get_emit_fn(&self) -> Arc<dyn Fn(Vec<u8>) + Send + Sync> {
         Arc::new({
             let tx = self.tx.clone();
+            let is_connected_clone = self.is_connected.clone(); // <-- Clone AtomicBool here
             move |chunk: Vec<u8>| {
-                let _ = tx.send(WsMessage::Binary(chunk.into()));
+                if !is_connected_clone.load(Ordering::Relaxed) {
+                    // <-- Check is_connected
+                    println!(
+                        "[RpcClient::get_emit_fn] Client is disconnected, dropping outgoing RPC data."
+                    );
+                    return; // Do not send if disconnected
+                }
+
+                let chunk_len = chunk.len();
+                let send_result = tx.send(WsMessage::Binary(chunk.into()));
+                match send_result {
+                    Ok(_) => println!(
+                        "[RpcClient::get_emit_fn] Emitted binary chunk ({} bytes) via mpsc.",
+                        chunk_len
+                    ),
+                    Err(e) => println!(
+                        "[RpcClient::get_emit_fn] Failed to send binary chunk ({} bytes) via mpsc: {}",
+                        chunk_len, e
+                    ),
+                }
             }
         })
     }
 
-    /// Sets a callback that will be invoked with the current `RpcTransportState`
-    /// whenever the WebSocket connection status changes.
     async fn set_state_change_handler(
         &self,
         handler: impl Fn(RpcTransportState) + Send + Sync + 'static,
     ) {
-        let mut state_handler = self.state_change_handler.lock().await;
+        let mut state_handler = self.state_change_handler.lock().unwrap();
         *state_handler = Some(Box::new(handler));
+        println!("[RpcClient::set_state_change_handler] Handler set.");
 
         if self.is_connected.load(Ordering::Relaxed) {
             if let Some(h) = state_handler.as_ref() {
+                println!(
+                    "[RpcClient::set_state_change_handler] Calling Connected handler (initial state)."
+                );
                 h(RpcTransportState::Connected);
+            } else {
+                println!(
+                    "[RpcClient::set_state_change_handler] Error: Handler disappeared after setting?"
+                );
             }
+        } else {
+            println!(
+                "[RpcClient::set_state_change_handler] Client not connected, skipping initial Connected call."
+            );
         }
     }
 }
