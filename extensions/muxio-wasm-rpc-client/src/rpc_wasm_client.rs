@@ -15,8 +15,8 @@ pub struct RpcWasmClient {
     /// The endpoint for handling incoming RPC calls from the host.
     endpoint: Arc<RpcServiceEndpoint<()>>,
     emit_callback: Arc<dyn Fn(Vec<u8>) + Send + Sync>,
+    // MODIFIED: Made `pub(crate)` for direct access within the crate.
     pub(crate) state_change_handler: RpcTransportStateChangeHandler,
-    // NEW: Field to track connection state.
     is_connected: Arc<AtomicBool>,
 }
 
@@ -27,7 +27,18 @@ impl RpcWasmClient {
             endpoint: Arc::new(RpcServiceEndpoint::new()),
             emit_callback: Arc::new(emit_callback),
             state_change_handler: Arc::new(Mutex::new(None)),
+            // MODIFIED: Connection is now false by default.
             is_connected: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    /// NEW: Call this from your JavaScript glue code when the WebSocket `onopen` event fires.
+    pub fn handle_connect(&self) {
+        self.is_connected.store(true, Ordering::SeqCst);
+        if let Ok(guard) = self.state_change_handler.lock() {
+            if let Some(handler) = guard.as_ref() {
+                handler(RpcTransportState::Connected);
+            }
         }
     }
 
@@ -40,14 +51,12 @@ impl RpcWasmClient {
 
     /// Call this from your JavaScript glue code when the WebSocket's `onclose` or `onerror` event fires.
     pub fn handle_disconnect(&self) {
-        // UPDATED: Check and set the atomic flag to prevent running this logic multiple times.
         if self.is_connected.swap(false, Ordering::SeqCst) {
             if let Ok(guard) = self.state_change_handler.lock() {
                 if let Some(handler) = guard.as_ref() {
                     handler(RpcTransportState::Disconnected);
                 }
             }
-
             if let Ok(mut dispatcher) = self.dispatcher.lock() {
                 let error = FrameDecodeError::ReadAfterCancel;
                 dispatcher.fail_all_pending_requests(error);
@@ -55,12 +64,7 @@ impl RpcWasmClient {
         }
     }
 
-    /// Provides public access to the state change handler Arc<Mutex<...>>.
-    pub fn state_change_handler(&self) -> RpcTransportStateChangeHandler {
-        self.state_change_handler.clone()
-    }
-
-    /// NEW: A helper method to check the connection status.
+    /// A helper method to check the connection status.
     pub fn is_connected(&self) -> bool {
         self.is_connected.load(Ordering::SeqCst)
     }
@@ -104,7 +108,7 @@ impl RpcServiceCallerInterface for RpcWasmClient {
 
         *state_handler = Some(Box::new(handler));
 
-        // This will now compile successfully.
+        // Immediately call the handler with the current state.
         if self.is_connected() {
             if let Some(h) = state_handler.as_ref() {
                 h(RpcTransportState::Connected);

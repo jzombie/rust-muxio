@@ -98,7 +98,7 @@ pub fn notify_static_client_transport_state_change(state_code: u8) -> Result<(),
     MUXIO_STATIC_RPC_CLIENT_REF.with(|cell| {
         if let Some(client) = cell.borrow().as_ref() {
             // Acquire the lock and invoke the handler if it's set.
-            if let Some(handler) = client.state_change_handler().lock().unwrap().as_ref() {
+            if let Some(handler) = client.state_change_handler.lock().unwrap().as_ref() {
                 handler(state);
             }
         }
