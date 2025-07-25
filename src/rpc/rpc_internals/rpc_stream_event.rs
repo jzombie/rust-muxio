@@ -20,7 +20,6 @@ pub enum RpcStreamEvent {
         rpc_request_id: u32,
         rpc_method_id: u64,
     },
-    // TODO: Beware that nothing is actually setting these option types as it stands
     Error {
         rpc_header: Option<Arc<RpcHeader>>,
         rpc_request_id: Option<u32>,
