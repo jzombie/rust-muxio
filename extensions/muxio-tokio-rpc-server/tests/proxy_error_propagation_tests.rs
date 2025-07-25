@@ -1,11 +1,10 @@
 //! This integration test verifies error propagation through a proxy server.
 //!
-//! Scenario: Client A -> Server B (Proxy) -> Client B (Provider).
+//! Scenario: Client A -> Server (Proxy) -> Client B (Provider).
 //! When Client B disconnects (crashes) while a call from Client A is pending,
-//! the error must propagate back through Server B to Client A.
+//! the error must propagate back through Server to Client A.
 
 use example_muxio_rpc_service_definition::prebuffered::Echo;
-use futures_util::StreamExt; // Needed for stream operations on DynamicReceiver
 use muxio_rpc_service::{
     error::{RpcServiceError, RpcServiceErrorCode},
     prebuffered::RpcMethodPrebuffered,
@@ -16,14 +15,11 @@ use muxio_tokio_rpc_server::utils::{bind_tcp_listener_on_random_port, tcp_listen
 use muxio_tokio_rpc_server::{
     ConnectionContextHandle, RpcServer, RpcServerEvent, RpcServiceEndpointInterface,
 };
-use std::collections::HashMap; // Used for client_b_handle_on_server_b_storage
 use std::error::Error;
 use std::io;
-use std::sync::{Arc, RwLock}; // Used for shared state management
-use tokio::net::TcpListener; // Used for server listener
-use tokio::sync::{Notify, mpsc as tokio_mpsc, oneshot}; // Used for async communication
-use tokio::time::{Duration, timeout}; // Used for timeouts and sleeps
-use tokio_tungstenite::tungstenite::protocol::Message as WsMessage; // Keeping for completeness, might not be directly used in this simplified test.
+use std::sync::{Arc, RwLock};
+use tokio::sync::{mpsc as tokio_mpsc, oneshot};
+use tokio::time::{Duration, timeout};
 
 #[tokio::test]
 async fn test_proxy_error_propagation_on_provider_disconnect() {
@@ -55,35 +51,35 @@ async fn test_proxy_error_propagation_on_provider_disconnect() {
         });
     }
 
-    tracing::info!("[Test Setup] Starting proxy error propagation test (Client A -> Server B -> Client B).");
+    tracing::info!("[Test Setup] Starting proxy error propagation test (Client A -> Server -> Client B).");
 
-    // --- 1. Start Server B (The Proxy Server) ---
-    let (server_b_listener, server_b_port) = bind_tcp_listener_on_random_port().await.unwrap();
-    let (server_b_host, _) = tcp_listener_to_host_port(&server_b_listener).unwrap();
-    let server_b_url = format!("ws://{}:{}/ws", server_b_host, server_b_port);
-    tracing::info!("[Server B] Listening on: {}", server_b_url);
+    // --- 1. Start Server (The Proxy Server) ---
+    let (server_listener, server_port) = bind_tcp_listener_on_random_port().await.unwrap();
+    let (server_host, _) = tcp_listener_to_host_port(&server_listener).unwrap();
+    let server_url = format!("ws://{}:{}/ws", server_host, server_port);
+    tracing::info!("[Server] Listening on: {}", server_url);
 
-    let (server_b_event_tx, mut server_b_event_rx) = tokio_mpsc::unbounded_channel();
-    let server_b = Arc::new(RpcServer::new(Some(server_b_event_tx)));
-    let server_b_endpoint = server_b.endpoint();
+    let (server_event_tx, mut server_event_rx) = tokio_mpsc::unbounded_channel();
+    let server = Arc::new(RpcServer::new(Some(server_event_tx)));
+    let server_endpoint = server.endpoint();
 
-    // Store Client B's ConnectionContextHandle on Server B.
-    // This is the handle Server B will use to proxy calls to Client B.
-    let client_b_handle_on_server_b_storage: Arc<RwLock<Option<ConnectionContextHandle>>> =
+    // Store Client B's ConnectionContextHandle on Server.
+    // This is the handle Server will use to proxy calls to Client B.
+    let client_b_handle_on_server_storage: Arc<RwLock<Option<ConnectionContextHandle>>> =
         Arc::new(RwLock::new(None));
 
-    // Register Server B's Echo handler (the proxy handler)
-    let client_b_handle_on_server_b_storage_clone = client_b_handle_on_server_b_storage.clone();
-    server_b_endpoint
+    // Register Server's Echo handler (the proxy handler)
+    let client_b_handle_on_server_storage_clone = client_b_handle_on_server_storage.clone();
+    server_endpoint
         // `ctx_raw_from_client_a` is the raw context value for Client A's incoming connection.
         // It needs to be wrapped into a ConnectionContextHandle.
         .register_prebuffered(Echo::METHOD_ID, move |ctx_raw_from_client_a, bytes| {
             let ctx_from_client_a = ConnectionContextHandle(ctx_raw_from_client_a); // Correctly wrap the raw ctx
-            let client_b_provider_handle_storage = client_b_handle_on_server_b_storage_clone.clone();
+            let client_b_provider_handle_storage = client_b_handle_on_server_storage_clone.clone();
             async move {
-            tracing::trace!("[Server B Proxy Handler] Echo method handler invoked (from Client A).");
+            tracing::trace!("[Server Proxy Handler] Echo method handler invoked (from Client A).");
             tracing::info!(
-                "[Server B Proxy Handler] Received Echo request from Client A ({}).",
+                "[Server Proxy Handler] Received Echo request from Client A ({}).",
                 ctx_from_client_a.0.addr
             );
             
@@ -92,22 +88,22 @@ async fn test_proxy_error_propagation_on_provider_disconnect() {
 
             if let Some(proxy_target_handle) = proxy_target_handle_opt {
                 tracing::info!(
-                    "[Server B Proxy Handler] Forwarding Echo request from Client A to Client B ({}). Message length: {}",
+                    "[Server Proxy Handler] Forwarding Echo request from Client A to Client B ({}). Message length: {}",
                     proxy_target_handle.0.addr, bytes.len()
                 );
-                // This is the proxy call from Server B to Client B using Client B's ConnectionContextHandle.
+                // This is the proxy call from Server to Client B using Client B's ConnectionContextHandle.
                 // This call is subject to the spawn_blocking workaround for internal muxio contention.
                 // It is critical that this call is still pending when Client B disconnects.
                 match Echo::call(&proxy_target_handle, bytes).await {
                     Ok(response_from_client_b) => {
-                        tracing::info!("[Server B Proxy Handler] Received success response from Client B.");
+                        tracing::info!("[Server Proxy Handler] Received success response from Client B.");
                         // Echo the response back to Client A (the original caller).
                         Echo::encode_response(response_from_client_b)
                             .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>)
                     }
                     Err(e) => {
                         tracing::error!(
-                            "[Server B Proxy Handler] RPC call to Client B FAILED: {}. Propagating error back to Client A.",
+                            "[Server Proxy Handler] RPC call to Client B FAILED: {}. Propagating error back to Client A.",
                             e
                         );
                         Err(Box::new(io::Error::new(
@@ -117,7 +113,7 @@ async fn test_proxy_error_propagation_on_provider_disconnect() {
                     }
                 }
             } else {
-                tracing::error!("[Server B Proxy Handler] Client B provider not registered/available. Rejecting Client A's call.");
+                tracing::error!("[Server Proxy Handler] Client B provider not registered/available. Rejecting Client A's call.");
                 Err(Box::new(io::Error::new(
                     io::ErrorKind::NotFound,
                     "Client B provider not available or not registered.",
@@ -127,44 +123,44 @@ async fn test_proxy_error_propagation_on_provider_disconnect() {
         .await
         .unwrap();
 
-    let server_b_task_handle = tokio::spawn({
-        let server_b = Arc::clone(&server_b);
+    let server_task_handle = tokio::spawn({
+        let server = Arc::clone(&server);
         async move {
-            server_b
-                .serve_with_listener(server_b_listener)
+            server
+                .serve_with_listener(server_listener)
                 .await
                 .unwrap();
-            tracing::info!("[Server B Task] Server B stopped.");
+            tracing::info!("[Server Task] Server stopped.");
         }
     });
 
-    // --- 2. Client A Connects to Server B ---
-    let client_a: Arc<RpcClient> = RpcClient::new(&server_b_host.to_string(), server_b_port)
+    // --- 2. Client A Connects to Server ---
+    let client_a: Arc<RpcClient> = RpcClient::new(&server_host.to_string(), server_port)
         .await
         .unwrap();
-    tracing::info!("[Client A] Connected to Server B.");
+    tracing::info!("[Client A] Connected to Server.");
     tokio::time::sleep(Duration::from_millis(50)).await;
 
-    // --- Wait for Server B to acknowledge Client A's connection ---
-    let client_a_event = server_b_event_rx
+    // --- Wait for Server to acknowledge Client A's connection ---
+    let client_a_event = server_event_rx
         .recv()
         .await
-        .expect("Server B should acknowledge Client A connection.");
+        .expect("Server should acknowledge Client A connection.");
     let _client_a_ctx_handle_val = match client_a_event {
         RpcServerEvent::ClientConnected(handle) => handle,
         _ => panic!("Expected ClientConnected event for Client A, but got a different event type."),
     };
     tracing::info!(
-        "[Server B] Acknowledged Client A connection ({}).",
+        "[Server] Acknowledged Client A connection ({}).",
         _client_a_ctx_handle_val.0.addr
     );
 
-    // --- 3. Client B Connects to Server B (as the Provider) ---
-    // This is the "provider" client that Server B will proxy requests to.
-    let client_b: Arc<RpcClient> = RpcClient::new(&server_b_host.to_string(), server_b_port)
+    // --- 3. Client B Connects to Server (as the Provider) ---
+    // This is the "provider" client that Server will proxy requests to.
+    let client_b: Arc<RpcClient> = RpcClient::new(&server_host.to_string(), server_port)
         .await
         .unwrap();
-    tracing::info!("[Client B] Connected to Server B (as provider).");
+    tracing::info!("[Client B] Connected to Server (as provider).");
     tokio::time::sleep(Duration::from_millis(50)).await; // Give time for connection to register
 
     // --- Setup for Client B's Disconnect ---
@@ -181,7 +177,7 @@ async fn test_proxy_error_propagation_on_provider_disconnect() {
             let tx_signal = client_b_handler_received_tx_clone.clone();
             async move {
                 tracing::trace!("[Client B Handler] Echo method handler invoked.");
-                tracing::info!("[Client B Handler] Received Echo request (proxied from Server B). Signaling receipt and then disconnecting.");
+                tracing::info!("[Client B Handler] Received Echo request (proxied from Server). Signaling receipt and then disconnecting.");
                 
                 // Signal the main test thread that the request has been received by Client B's handler.
                 if let Some(sender) = tx_signal.lock().await.take() {
@@ -204,41 +200,41 @@ async fn test_proxy_error_propagation_on_provider_disconnect() {
     tokio::task::yield_now().await;
     tracing::info!("[Client B] Echo handler registered and given time to activate.");
 
-    // --- Wait for Server B to acknowledge Client B's connection ---
-    // This is the ConnectionContextHandle for Client B on Server B.
-    let client_b_event_on_server_b = server_b_event_rx
+    // --- Wait for Server to acknowledge Client B's connection ---
+    // This is the ConnectionContextHandle for Client B on Server.
+    let client_b_event_on_server = server_event_rx
         .recv()
         .await
-        .expect("Server B should acknowledge Client B connection as a provider.");
-    let client_b_ctx_handle_from_server_b = match client_b_event_on_server_b {
+        .expect("Server should acknowledge Client B connection as a provider.");
+    let client_b_ctx_handle_from_server = match client_b_event_on_server {
         RpcServerEvent::ClientConnected(handle) => handle,
         _ => panic!("Expected ClientConnected event for Client B provider, but got a different event type."),
     };
     tracing::info!(
-        "[Server B] Acknowledged connection from Client B (Provider: {}).",
-        client_b_ctx_handle_from_server_b.0.addr
+        "[Server] Acknowledged connection from Client B (Provider: {}).",
+        client_b_ctx_handle_from_server.0.addr
     );
 
-    // Store the ConnectionContextHandle for Client B on Server B, for the proxy handler.
-    client_b_handle_on_server_b_storage
+    // Store the ConnectionContextHandle for Client B on Server, for the proxy handler.
+    client_b_handle_on_server_storage
         .write()
         .unwrap()
-        .replace(client_b_ctx_handle_from_server_b.clone());
-    tracing::info!("[Test Setup] Client B's ConnectionContextHandle stored on Server B for proxying.");
+        .replace(client_b_ctx_handle_from_server.clone());
+    tracing::info!("[Test Setup] Client B's ConnectionContextHandle stored on Server for proxying.");
 
-    // IMPORTANT: Wait for the ConnectionContextHandle (client_b_ctx_handle_from_server_b) to be truly ready for outgoing calls.
-    tracing::info!("[Test Setup] Waiting for Client B's ConnectionContextHandle (on Server B) to stabilize for outgoing calls.");
+    // IMPORTANT: Wait for the ConnectionContextHandle (client_b_ctx_handle_from_server) to be truly ready for outgoing calls.
+    tracing::info!("[Test Setup] Waiting for Client B's ConnectionContextHandle (on Server) to stabilize for outgoing calls.");
     let mut retries = 0;
     let max_retries = 10; // Try for up to 1 second (10 retries * 100ms)
     let retry_interval = Duration::from_millis(100);
 
     loop {
-        if client_b_ctx_handle_from_server_b.is_connected() {
-            tracing::info!("[Test Setup] Client B's ConnectionContextHandle (on Server B) reports connected. Proceeding with RPC test.");
+        if client_b_ctx_handle_from_server.is_connected() {
+            tracing::info!("[Test Setup] Client B's ConnectionContextHandle (on Server) reports connected. Proceeding with RPC test.");
             break;
         }
         if retries >= max_retries {
-            tracing::error!("[Test Setup] Client B's ConnectionContextHandle (on Server B) did not report connected after multiple retries ({}ms). This is unexpected; proceeding anyway but the test might fail here.", max_retries * retry_interval.as_millis());
+            tracing::error!("[Test Setup] Client B's ConnectionContextHandle (on Server) did not report connected after multiple retries ({}ms). This is unexpected; proceeding anyway but the test might fail here.", max_retries * retry_interval.as_millis());
             break;
         }
         tokio::time::sleep(retry_interval).await;
@@ -247,13 +243,13 @@ async fn test_proxy_error_propagation_on_provider_disconnect() {
     }
 
 
-    // --- Debug: Test direct call from Server B (using its ConnectionContextHandle for Client B) to Client B ---
-    // This verifies Server B can make a call *back* to Client B using the handle received from Client B's connection TO Server B.
-    tracing::info!("[Debug] Server B sending direct echo to Client B using its ConnectionContextHandle for Client B.");
+    // --- Debug: Test direct call from Server (using its ConnectionContextHandle for Client B) to Client B ---
+    // This verifies Server can make a call *back* to Client B using the handle received from Client B's connection TO Server.
+    tracing::info!("[Debug] Server sending direct echo to Client B using its ConnectionContextHandle for Client B.");
     let test_message_direct = b"direct test from server B to client B".to_vec();
 
     // The problematic call, still wrapped in spawn_blocking.
-    let client_b_ctx_handle_for_blocking_call_debug = client_b_ctx_handle_from_server_b.clone();
+    let client_b_ctx_handle_for_blocking_call_debug = client_b_ctx_handle_from_server.clone();
     let test_message_for_blocking_call_debug = test_message_direct.clone();
 
     // NOTE: This debug call will now *also* cause Client B to disconnect!
@@ -264,19 +260,19 @@ async fn test_proxy_error_propagation_on_provider_disconnect() {
     tracing::warn!("[Debug] Skipping direct call to Client B as its handler now triggers disconnect, which would interfere with the main test flow. This debug step is primarily for connectivity, which is now implied by Client B connecting.");
 
 
-    // --- 5. Main Call: Client A -> Server B (Echo) ---
+    // --- 5. Main Call: Client A -> Server (Echo) ---
     tracing::info!(
-        "[Client A] Making Echo RPC call to Server B ('{}'). This will be proxied to Client B.",
+        "[Client A] Making Echo RPC call to Server ('{}'). This will be proxied to Client B.",
         "some_message"
     );
     let message_to_proxy = b"hello from client a via proxy to client b".to_vec();
 
-    // The call from Client A to Server B needs `spawn_blocking` because Server B's handler will internally
+    // The call from Client A to Server needs `spawn_blocking` because Server's handler will internally
     // make a call that hits the `std::sync::Mutex` contention.
     let client_a_for_blocking_call = client_a.clone();
     let message_to_proxy_for_blocking_call = message_to_proxy.clone();
 
-    // Store the future but don't await it immediately. This call to Server B will then trigger the
+    // Store the future but don't await it immediately. This call to Server will then trigger the
     // proxy handler which in turn triggers Client B to disconnect.
     let main_proxied_call_future = tokio::task::spawn_blocking(move || {
         tokio::runtime::Handle::current().block_on(async move {
@@ -300,7 +296,7 @@ async fn test_proxy_error_propagation_on_provider_disconnect() {
     tokio::time::sleep(Duration::from_millis(100)).await;
     tokio::task::yield_now().await;
     tracing::info!(
-        "[Test Setup] Client A's Echo call to Server B should be pending, and Client B should be disconnecting/disconnected."
+        "[Test Setup] Client A's Echo call to Server should be pending, and Client B should be disconnecting/disconnected."
     );
 
 
@@ -310,19 +306,19 @@ async fn test_proxy_error_propagation_on_provider_disconnect() {
     tracing::info!("[Test Setup] Explicitly dropping Client B's RpcClient from main test thread (to ensure full cleanup).");
     drop(client_b); // This ensures the Arc is fully dropped, triggering RpcClient's cleanup.
 
-    // Wait for Client B to fully disconnect and for Server B to register it.
+    // Wait for Client B to fully disconnect and for Server to register it.
     tokio::time::sleep(Duration::from_millis(500)).await;
     tokio::task::yield_now().await;
     tracing::info!("[Test Setup] Client B RpcClient dropped and time given for disconnect propagation.");
 
-    // Assert Client B's ConnectionContextHandle on Server B is marked disconnected
-    // This confirms Server B detected the disconnect from its provider.
+    // Assert Client B's ConnectionContextHandle on Server is marked disconnected
+    // This confirms Server detected the disconnect from its provider.
     assert!(
-        !client_b_ctx_handle_from_server_b.is_connected(), // This is the handle representing Client B's connection to Server B
-        "Client B's connection handle on Server B should be marked disconnected."
+        !client_b_ctx_handle_from_server.is_connected(), // This is the handle representing Client B's connection to Server
+        "Client B's connection handle on Server should be marked disconnected."
     );
     tracing::info!(
-        "[Test Setup] Confirmed Client B's ConnectionContextHandle on Server B is marked disconnected."
+        "[Test Setup] Confirmed Client B's ConnectionContextHandle on Server is marked disconnected."
     );
 
     // --- 7. Assert Error Propagation: Client A's call should fail ---
@@ -344,7 +340,7 @@ async fn test_proxy_error_propagation_on_provider_disconnect() {
     let err = rpc_result.unwrap_err();
     tracing::info!("[Test Setup] Client A's Echo call error: {:?}", err);
 
-    // Assert the error kind from the proxy. It should be a system error from Server B.
+    // Assert the error kind from the proxy. It should be a system error from Server.
     match err {
         RpcServiceError::Rpc(payload) => {
             assert_eq!(
@@ -378,8 +374,8 @@ async fn test_proxy_error_propagation_on_provider_disconnect() {
     // Client A and Client B were dropped earlier to simulate disconnect.
 
     // Abort server tasks and give them time to terminate.
-    tracing::info!("[Cleanup] Aborting Server B's main task.");
-    server_b_task_handle.abort();
+    tracing::info!("[Cleanup] Aborting Server's main task.");
+    server_task_handle.abort();
 
     // Give ample time for all tasks (especially aborted ones) to unwind and drop resources.
     tokio::time::sleep(Duration::from_secs(2)).await;
