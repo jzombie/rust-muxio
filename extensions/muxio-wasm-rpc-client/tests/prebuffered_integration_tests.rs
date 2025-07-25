@@ -91,6 +91,9 @@ async fn test_success_client_server_roundtrip() {
         .expect("Failed to connect to server");
     let (mut ws_sender, mut ws_receiver) = ws_stream.split();
 
+    // This mimics the JavaScript glue code calling 'onopen'.
+    client.handle_connect().await;
+
     // This task is fine as it only deals with async channels.
     tokio::spawn(async move {
         while let Some(bytes) = to_bridge_rx.recv().await {
@@ -174,6 +177,9 @@ async fn test_error_client_server_roundtrip() {
     let (ws_stream, _) = connect_async(&server_url).await.expect("Failed to connect");
     let (mut ws_sender, mut ws_receiver) = ws_stream.split();
 
+    // This mimics the JavaScript glue code calling 'onopen'.
+    client.handle_connect().await;
+
     tokio::spawn(async move {
         while let Some(bytes) = to_bridge_rx.recv().await {
             if ws_sender
@@ -255,6 +261,9 @@ async fn test_large_prebuffered_payload_roundtrip_wasm() {
         .await
         .expect("Failed to connect to server");
     let (mut ws_sender, mut ws_receiver) = ws_stream.split();
+
+    // This mimics the JavaScript glue code calling 'onopen'.
+    client.handle_connect().await;
 
     // Bridge from WasmClient to real WebSocket
     tokio::spawn(async move {
