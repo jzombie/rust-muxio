@@ -45,7 +45,24 @@ muxio-rpc-service-endpoint = { path = "extensions/muxio-rpc-service-endpoint", v
 muxio-tokio-rpc-server = { path = "extensions/muxio-tokio-rpc-server", version = "0.10.0-alpha" }
 muxio-tokio-rpc-client = { path = "extensions/muxio-tokio-rpc-client", version = "0.10.0-alpha" }
 
-[dev-dependencies]
+# Third-party crates
+async-trait = "0.1.88"
+axum = { version = "0.8.4", features = ["ws"] }
 bitcode = "0.6.6"
+criterion = { version = "0.6.0" }
+doc-comment = "0.3.3"
+bytes = "1.10.1"
+futures = "0.3.31"
+futures-util = "0.3.31"
+num_enum = "0.7.3"
+tokio = { version = "1.45.1" }
+tokio-tungstenite = "0.26.2"
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+xxhash-rust = { version = "0.8.15", features = ["xxh3", "const_xxh3"] }
+
+# Muxio-core dev dedepencies
+[dev-dependencies]
+bitcode = { workspace = true } # Specifially used as dev in some crates
 rand = "0.9.1"
-tokio = { version = "1.45.1", features = ["full"] }
+tokio = { workspace = true, features = ["full"] } # Specifially used as dev in some crates
