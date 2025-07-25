@@ -860,6 +860,7 @@ dependencies = [
  "muxio",
  "muxio-rpc-service",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

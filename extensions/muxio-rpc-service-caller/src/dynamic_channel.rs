@@ -9,7 +9,7 @@ use muxio_rpc_service::error::RpcServiceError;
 use std::pin::Pin;
 
 /// Defines the type of channel to be used for an RPC call's response stream.
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum DynamicChannelType {
     Bounded,
     Unbounded,

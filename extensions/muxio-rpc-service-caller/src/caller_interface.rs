@@ -15,14 +15,12 @@ use muxio_rpc_service::{
     constants::{DEFAULT_RPC_STREAM_CHANNEL_BUFFER_SIZE, DEFAULT_SERVICE_MAX_CHUNK_SIZE},
     error::{RpcServiceError, RpcServiceErrorCode, RpcServiceErrorPayload},
 };
-use std::io;
-use std::mem;
-use std::sync::Arc;
-use tokio::sync::Mutex as TokioMutex; // Keep this alias for dispatcher, etc.
-// NO `use tokio::task;` (remove it if present from previous attempts)
-
-// Import std::sync::Mutex for internal use in recv_fn
-use std::sync::Mutex as StdMutex; // <--- ADD THIS IMPORT
+use std::{
+    io, mem,
+    sync::{Arc, Mutex as StdMutex},
+};
+use tokio::sync::Mutex as TokioMutex;
+use tracing::{self, instrument};
 
 #[async_trait::async_trait]
 pub trait RpcServiceCallerInterface: Send + Sync {
@@ -31,6 +29,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
     fn get_emit_fn(&self) -> Arc<dyn Fn(Vec<u8>) + Send + Sync>;
     fn is_connected(&self) -> bool;
 
+    #[instrument(skip(self))]
     async fn call_rpc_streaming(
         &self,
         request: RpcRequest,
@@ -43,8 +42,8 @@ pub trait RpcServiceCallerInterface: Send + Sync {
         RpcServiceError,
     > {
         if !self.is_connected() {
-            println!(
-                "[RpcServiceCallerInterface::call_rpc_streaming] Client is disconnected. Rejecting call immediately for method ID: {}.",
+            tracing::debug!(
+                "Client is disconnected. Rejecting call immediately for method ID: {}.",
                 request.rpc_method_id
             );
             return Err(RpcServiceError::Transport(io::Error::new(
@@ -53,16 +52,11 @@ pub trait RpcServiceCallerInterface: Send + Sync {
             )));
         }
 
-        println!(
-            "[RpcServiceCallerInterface::call_rpc_streaming] Starting for method ID: {}",
-            request.rpc_method_id
-        );
+        tracing::debug!("Starting for method ID: {}", request.rpc_method_id);
         let (tx, rx) = match dynamic_channel_type {
             DynamicChannelType::Unbounded => {
                 let (sender, receiver) = mpsc::unbounded();
-                println!(
-                    "[RpcServiceCallerInterface::call_rpc_streaming] Created Unbounded channel."
-                );
+                tracing::debug!("Created Unbounded channel.");
                 (
                     DynamicSender::Unbounded(sender),
                     DynamicReceiver::Unbounded(receiver),
@@ -70,9 +64,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
             }
             DynamicChannelType::Bounded => {
                 let (sender, receiver) = mpsc::channel(DEFAULT_RPC_STREAM_CHANNEL_BUFFER_SIZE);
-                println!(
-                    "[RpcServiceCallerInterface::call_rpc_streaming] Created Bounded channel."
-                );
+                tracing::debug!("Created Bounded channel.");
                 (
                     DynamicSender::Bounded(sender),
                     DynamicReceiver::Bounded(receiver),
@@ -85,9 +77,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
         let tx_arc = Arc::new(StdMutex::new(Some(tx))); // <--- USE StdMutex HERE
         let (ready_tx, ready_rx) = oneshot::channel::<Result<(), io::Error>>();
         let ready_tx_arc = Arc::new(StdMutex::new(Some(ready_tx))); // <--- USE StdMutex HERE
-        println!(
-            "[RpcServiceCallerInterface::call_rpc_streaming] Oneshot channel for readiness created."
-        );
+        tracing::debug!("Oneshot channel for readiness created.");
 
         let send_fn: Box<dyn RpcEmit + Send + Sync> = Box::new({
             let on_emit = self.get_emit_fn();
@@ -107,9 +97,10 @@ pub trait RpcServiceCallerInterface: Send + Sync {
 
             Box::new(move |evt| {
                 // This closure is SYNCHRONOUS
-                println!(
-                    "[RpcServiceCallerInterface::recv_fn for method {}] Received event: {:?}",
-                    method_id, evt
+                tracing::debug!(
+                    "[recv_fn for method: {}] Received event: {:?}",
+                    method_id,
+                    evt
                 );
 
                 // Acquire std::sync::Mutexes using .lock().unwrap()
@@ -132,8 +123,8 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                         let mut temp_ready_tx_option = mem::take(&mut *ready_tx_lock_guard);
                         if let Some(tx_sender) = temp_ready_tx_option.take() {
                             let _ = tx_sender.send(Ok(()));
-                            println!(
-                                "[RpcServiceCallerInterface::recv_fn for method {}] Sent readiness signal.",
+                            tracing::debug!(
+                                "[recv_fn for method: {}] Sent readiness signal.",
                                 method_id
                             );
                         }
@@ -146,39 +137,39 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                                 let mut temp_tx_option = mem::take(&mut *tx_lock_guard);
                                 if let Some(sender) = temp_tx_option.as_mut() {
                                     sender.send_and_ignore(Ok(bytes));
-                                    println!(
-                                        "[RpcServiceCallerInterface::recv_fn for method {}] Sent payload chunk ({} bytes) to DynamicSender.",
-                                        method_id, bytes_len
+                                    tracing::debug!(
+                                        "[recv_fn for method: {}] Sent payload chunk ({} bytes) to DynamicSender.",
+                                        method_id,
+                                        bytes_len
                                     );
                                 }
                                 *tx_lock_guard = temp_tx_option;
                             }
                             Some(_) => {
                                 error_buffer_lock_guard.extend(bytes);
-                                println!(
-                                    "[RpcServiceCallerInterface::recv_fn for method {}] Buffered error payload chunk ({} bytes).",
-                                    method_id, bytes_len
+                                tracing::debug!(
+                                    "[recv_fn for method: {}] Buffered error payload chunk ({} bytes).",
+                                    method_id,
+                                    bytes_len
                                 );
                             }
                             None => {
-                                println!(
-                                    "[RpcServiceCallerInterface::recv_fn for method {}] Received payload before status. Buffering.",
+                                tracing::debug!(
+                                    "[recv_fn for method: {}] Received payload before status. Buffering.",
                                     method_id
                                 );
                                 error_buffer_lock_guard.extend(bytes);
-                                println!(
-                                    "[RpcServiceCallerInterface::recv_fn for method {}] Buffered payload chunk ({} bytes) before status.",
-                                    method_id, bytes_len
+                                tracing::debug!(
+                                    "[recv_fn for method {}] Buffered payload chunk ({} bytes) before status.",
+                                    method_id,
+                                    bytes_len
                                 );
                             }
                         }
                         *status_lock_guard = current_status_option;
                     }
                     RpcStreamEvent::End { .. } => {
-                        println!(
-                            "[RpcServiceCallerInterface::recv_fn for method {}] Received End event.",
-                            method_id
-                        );
+                        tracing::debug!("[recv_fn for method: {}] Received End event.", method_id);
                         let final_status = mem::take(&mut *status_lock_guard);
                         let payload = std::mem::replace(&mut *error_buffer_lock_guard, Vec::new());
                         let mut temp_tx_option = mem::take(&mut *tx_lock_guard);
@@ -197,8 +188,8 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                                             message: final_msg,
                                         },
                                     )));
-                                    println!(
-                                        "[RpcServiceCallerInterface::recv_fn for method {}] Sent MethodNotFound error.",
+                                    tracing::debug!(
+                                        "[recv_fn for method: {}] Sent MethodNotFound error.",
                                         method_id
                                     );
                                 }
@@ -209,8 +200,8 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                                             message: "".into(),
                                         },
                                     )));
-                                    println!(
-                                        "[RpcServiceCallerInterface::recv_fn for method {}] Sent Fail error.",
+                                    tracing::debug!(
+                                        "[recv_fn for method: {}] Sent Fail error.",
                                         method_id
                                     );
                                 }
@@ -227,31 +218,33 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                                             message: final_msg,
                                         },
                                     )));
-                                    println!(
-                                        "[RpcServiceCallerInterface::recv_fn for method {}] Sent SystemError.",
+                                    tracing::debug!(
+                                        "[recv_fn for method: {}] Sent SystemError.",
                                         method_id
                                     );
                                 }
                                 _ => {
-                                    println!(
-                                        "[RpcServiceCallerInterface::recv_fn for method {}] Unexpected final status: {:?}. Closing channel.",
-                                        method_id, final_status
+                                    tracing::debug!(
+                                        "[recv_fn for method: {}] Unexpected final status: {:?}. Closing channel.",
+                                        method_id,
+                                        final_status
                                     );
                                 }
                             }
                         }
                         *tx_lock_guard = None;
-                        println!(
-                            "[RpcServiceCallerInterface::recv_fn for method {}] DynamicSender dropped/channel closed on End event.",
+                        tracing::debug!(
+                            "[recv_fn for method: {}] DynamicSender dropped/channel closed on End event.",
                             method_id
                         );
                     }
                     RpcStreamEvent::Error {
                         frame_decode_error, ..
                     } => {
-                        println!(
-                            "[RpcServiceCallerInterface::recv_fn for method {}] Received Error event: {:?}",
-                            method_id, frame_decode_error
+                        tracing::debug!(
+                            "[recv_fn for method: {}] Received Error event: {:?}",
+                            method_id,
+                            frame_decode_error
                         );
                         let error_to_send = RpcServiceError::Transport(io::Error::new(
                             io::ErrorKind::ConnectionAborted,
@@ -261,26 +254,26 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                         if let Some(tx_sender) = temp_ready_tx_option.take() {
                             let _ = tx_sender
                                 .send(Err(io::Error::other(frame_decode_error.to_string())));
-                            println!(
-                                "[RpcServiceCallerInterface::recv_fn for method {}] Sent error to readiness channel.",
+                            tracing::debug!(
+                                "[recv_fn for method: {}] Sent error to readiness channel.",
                                 method_id
                             );
                         }
                         let mut temp_tx_option = mem::take(&mut *tx_lock_guard);
                         if let Some(mut sender) = temp_tx_option.take() {
                             sender.send_and_ignore(Err(error_to_send));
-                            println!(
-                                "[RpcServiceCallerInterface::recv_fn for method {}] Sent Transport error to DynamicSender and dropped it.",
+                            tracing::debug!(
+                                "[recv_fn for method: {}] Sent Transport error to DynamicSender and dropped it.",
                                 method_id
                             );
                         } else {
-                            println!(
-                                "[RpcServiceCallerInterface::recv_fn for method {}] DynamicSender already gone, cannot send Transport error.",
+                            tracing::debug!(
+                                "[recv_fn for method: {}] DynamicSender already gone, cannot send Transport error.",
                                 method_id
                             );
                         }
-                        println!(
-                            "[RpcServiceCallerInterface::recv_fn for method {}] DynamicSender dropped/channel closed on Error event.",
+                        tracing::debug!(
+                            "[recv_fn for method: {}] DynamicSender dropped/channel closed on Error event.",
                             method_id
                         );
                     }
@@ -301,8 +294,8 @@ pub trait RpcServiceCallerInterface: Send + Sync {
             let dispatcher_arc_clone = self.get_dispatcher();
             let mut dispatcher_guard = dispatcher_arc_clone.lock().await;
 
-            println!(
-                "[RpcServiceCallerInterface::call_rpc_streaming] Registering call with dispatcher for method ID: {}.",
+            tracing::debug!(
+                "Registering call with dispatcher for method ID: {}.",
                 request.rpc_method_id
             );
 
@@ -315,10 +308,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                     false,
                 )
                 .map_err(|e| {
-                    println!(
-                        "[RpcServiceCallerInterface::call_rpc_streaming] Dispatcher.call failed: {:?}",
-                        e
-                    );
+                    tracing::debug!("Dispatcher.call failed: {:?}", e);
                     io::Error::other(format!("{:?}", e))
                 });
 
@@ -332,29 +322,20 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                 }
             }
 
-            println!(
-                "[RpcServiceCallerInterface::call_rpc_streaming] Dispatcher.call returned encoder."
-            );
+            tracing::debug!("Dispatcher.call returned encoder.");
         }
 
         match ready_rx.await {
             Ok(Ok(())) => {
-                println!(
-                    "[RpcServiceCallerInterface::call_rpc_streaming] Readiness signal received. Returning encoder and receiver."
-                );
+                tracing::debug!("Readiness signal received. Returning encoder and receiver.");
                 rx_result
             }
             Ok(Err(err)) => {
-                println!(
-                    "[RpcServiceCallerInterface::call_rpc_streaming] Readiness signal received with error: {:?}",
-                    err
-                );
+                tracing::debug!("Readiness signal received with error: {:?}", err);
                 Err(RpcServiceError::Transport(err))
             }
             Err(_) => {
-                println!(
-                    "[RpcServiceCallerInterface::call_rpc_streaming] Readiness channel closed prematurely."
-                );
+                tracing::debug!("Readiness channel closed prematurely.");
                 Err(RpcServiceError::Transport(io::Error::other(
                     "RPC setup channel closed prematurely",
                 )))
@@ -362,6 +343,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
         }
     }
 
+    #[instrument(skip(self, decode))]
     async fn call_rpc_buffered<T, F>(
         &self,
         request: RpcRequest,
@@ -377,58 +359,36 @@ pub trait RpcServiceCallerInterface: Send + Sync {
         T: Send + 'static,
         F: Fn(&[u8]) -> T + Send + Sync + 'static,
     {
-        println!(
-            "[RpcServiceCallerInterface::call_rpc_buffered] Starting for method ID: {}",
-            request.rpc_method_id
-        );
+        tracing::debug!("Starting for method ID: {}", request.rpc_method_id);
         let (encoder, mut stream) = self
             .call_rpc_streaming(request, DynamicChannelType::Unbounded)
             .await?;
-        println!(
-            "[RpcServiceCallerInterface::call_rpc_buffered] call_rpc_streaming returned. Entering stream consumption loop."
-        );
+        tracing::debug!("call_rpc_streaming returned. Entering stream consumption loop.");
 
         let mut success_buf = Vec::new();
         let mut err: Option<RpcServiceError> = None;
 
         while let Some(result) = stream.next().await {
-            println!(
-                "[RpcServiceCallerInterface::call_rpc_buffered] Stream yielded result: {:?}",
-                result
-            );
+            tracing::debug!("Stream yielded result: {:?}", result);
             match result {
                 Ok(chunk) => {
                     success_buf.extend_from_slice(&chunk);
-                    println!(
-                        "[RpcServiceCallerInterface::call_rpc_buffered] Added {} bytes to success buffer.",
-                        chunk.len()
-                    );
+                    tracing::debug!("Added {} bytes to success buffer.", chunk.len());
                 }
                 Err(e) => {
-                    println!(
-                        "[RpcServiceCallerInterface::call_rpc_buffered] Stream yielded error: {:?}",
-                        e
-                    );
+                    tracing::debug!("Stream yielded error: {:?}", e);
                     err = Some(e);
                     break;
                 }
             }
         }
-        println!(
-            "[RpcServiceCallerInterface::call_rpc_buffered] Stream consumption loop finished. Error: {:?}",
-            err
-        );
+        tracing::debug!("Stream consumption loop finished. Error: {:?}", err);
 
         if let Some(e) = err {
-            println!(
-                "[RpcServiceCallerInterface::call_rpc_buffered] Returning with error from stream: {:?}",
-                e
-            );
+            tracing::debug!("Returning with error from stream: {:?}", e);
             Ok((encoder, Err(e)))
         } else {
-            println!(
-                "[RpcServiceCallerInterface::call_rpc_buffered] Returning with success from stream."
-            );
+            tracing::debug!("Returning with success from stream.");
             Ok((encoder, Ok(decode(&success_buf))))
         }
     }

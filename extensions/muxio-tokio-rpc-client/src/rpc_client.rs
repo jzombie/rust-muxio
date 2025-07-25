@@ -2,25 +2,28 @@ use futures_util::{SinkExt, StreamExt};
 use muxio::{frame::FrameDecodeError, rpc::RpcDispatcher};
 use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
 use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface};
-use std::fmt;
-use std::io;
-use std::net::{IpAddr, SocketAddr};
-use std::sync::{
-    Arc, Mutex as StdMutex, Weak,
-    atomic::{AtomicBool, Ordering},
+use std::{
+    fmt, io,
+    net::{IpAddr, SocketAddr},
+    sync::{
+        Arc, Mutex as StdMutex, Weak,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Duration,
 };
-use std::time::Duration;
-use tokio::sync::{Mutex as TokioMutex, mpsc};
-use tokio::task::JoinHandle;
-use tokio_tungstenite::connect_async;
-use tokio_tungstenite::tungstenite::protocol::Message as WsMessage;
+
+use tokio::{
+    sync::{Mutex as TokioMutex, mpsc},
+    task::JoinHandle,
+};
+use tokio_tungstenite::{connect_async, tungstenite::protocol::Message as WsMessage};
 
 type RpcTransportStateChangeHandler =
     Arc<StdMutex<Option<Box<dyn Fn(RpcTransportState) + Send + Sync>>>>;
 
 pub struct RpcClient {
     dispatcher: Arc<TokioMutex<RpcDispatcher<'static>>>,
-    endpoint: Arc<RpcServiceEndpoint<()>>, // RESTORED
+    endpoint: Arc<RpcServiceEndpoint<()>>,
     tx: mpsc::UnboundedSender<WsMessage>,
     state_change_handler: RpcTransportStateChangeHandler,
     is_connected: Arc<AtomicBool>,
