@@ -23,7 +23,7 @@ thread_local! {
 /// # Usage
 /// This should be called once during WASM startup, typically from a JS
 /// `init()` or entrypoint wrapper, **before** any RPC calls are issued.
-pub fn init_static_client() {
+pub fn init_static_client() -> Option<Arc<RpcWasmClient>> {
     MUXIO_STATIC_RPC_CLIENT_REF.with(|cell| {
         if cell.borrow().is_none() {
             let rpc_wasm_client =
@@ -32,6 +32,8 @@ pub fn init_static_client() {
             *cell.borrow_mut() = Some(rpc_wasm_client);
         }
     });
+
+    get_static_client()
 }
 
 /// Asynchronously executes a closure with the static `RpcWasmClient`, returning
