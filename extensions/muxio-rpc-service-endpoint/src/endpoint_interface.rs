@@ -52,8 +52,8 @@ where
                     Err(RpcServiceEndpointError::Handler(err_msg.into()))
                 }
                 Entry::Vacant(entry) => {
-                    let wrapped = move |bytes: Vec<u8>, ctx: C| {
-                        Box::pin(handler(bytes, ctx))
+                    let wrapped = move |req_bytes: Vec<u8>, ctx: C| {
+                        Box::pin(handler(req_bytes, ctx))
                             as std::pin::Pin<Box<dyn Future<Output = _> + Send>>
                     };
                     entry.insert(Arc::new(wrapped));
