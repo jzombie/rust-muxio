@@ -9,9 +9,9 @@ license.workspace = true # Inherit from workspace
 publish.workspace = true # Inherit from workspace
 
 [dependencies]
-async-trait = "0.1.88"
-futures = "0.3.31"
+async-trait = { workspace = true }
+futures = { workspace = true }
 muxio = { workspace = true }
-num_enum = "0.7.3"
-xxhash-rust = { version = "0.8.15", features = ["xxh3", "const_xxh3"] }
-bitcode = "0.6.6"
+num_enum = { workspace = true }
+xxhash-rust = { workspace = true }
+bitcode = { workspace = true }

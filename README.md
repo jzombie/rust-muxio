@@ -44,7 +44,7 @@ Muxio is engineered to solve specific challenges in building modern, distributed
 
 - **Low-Latency, High-Performance Communication**: Muxio is built for speed. It uses a compact, **low-overhead binary protocol** (instead of text-based formats like JSON). This significantly reduces the size of data sent over the network and minimizes the CPU cycles needed for serialization and deserialization. By avoiding complex parsing, Muxio lowers end-to-end latency, making it well-suited for real-time applications such as financial data streaming, multiplayer games, and interactive remote tooling.
 
-- **Cross-Platform Code with Agnostic Frontends**: Write your core application logic once and deploy it across multiple platforms. Muxio achieves this through its generic [`RpcServiceCallerInterface` trait](./extensions/muxio-rpc-service-caller/src/caller_interface.rs), which abstracts away the underlying transport. The same application code that calls an RPC method can run on a native [`RpcClient`](./extensions/muxio-tokio-rpc-client/) using Tokio or a RpcWasmClient in a web browser with no changes, while additional client types can be added with minimal code, provided they implement the same aformentioned `RpcServiceCallerInterface`. This design ensures that improvements to the core service logic benefit all clients simultaneously, even custom-built clients.
+- **Cross-Platform Code with Agnostic Frontends**: Write your core application logic once and deploy it across multiple platforms. Muxio achieves this through its generic [`RpcServiceCallerInterface` trait](./extensions/muxio-rpc-service-caller/src/caller_interface.rs), which abstracts away the underlying transport. The same application code that calls an RPC method using the native [`RpcClient`](./extensions/muxio-tokio-rpc-client/) can also be utilized in a browser with the [`RpcWasmClient`](./extensions/muxio-wasm-rpc-client/) with minimal changes, while additional client types can also be added, provided they implement the same aformentioned `RpcServiceCallerInterface`. This design ensures that improvements to the core service logic benefit all clients simultaneously, even custom-built clients.
 
 - **Shared Service Definitions for Type-Safe APIs**: Enforce integrity between your server and client by defining RPC methods, inputs, and outputs in a shared crate. By implementing the [`RpcMethodPrebuffered` trait](./extensions/muxio-rpc-service-caller/src/prebuffered/) , both client and server depend on a single source of truth for the API contract. This completely eliminates a common class of runtime errors, as any mismatch in data structures between the client and server will result in a compile-time error.
 
@@ -138,16 +138,16 @@ async fn main() {
         rpc_client.set_state_change_handler(move |new_state: RpcTransportState| {
             // This code will run every time the connection state changes
             tracing::info!("[Callback] Transport state changed to: {:?}", new_state);
-        });
+        }).await;
 
         // `join!` will await all responses before proceeding
         let (res1, res2, res3, res4, res5, res6) = join!(
-            Add::call(&rpc_client, vec![1.0, 2.0, 3.0]),
-            Add::call(&rpc_client, vec![8.0, 3.0, 7.0]),
-            Mult::call(&rpc_client, vec![8.0, 3.0, 7.0]),
-            Mult::call(&rpc_client, vec![1.5, 2.5, 8.5]),
-            Echo::call(&rpc_client, b"testing 1 2 3".into()),
-            Echo::call(&rpc_client, b"testing 4 5 6".into()),
+            Add::call(&*rpc_client, vec![1.0, 2.0, 3.0]),
+            Add::call(&*rpc_client, vec![8.0, 3.0, 7.0]),
+            Mult::call(&*rpc_client, vec![8.0, 3.0, 7.0]),
+            Mult::call(&*rpc_client, vec![1.5, 2.5, 8.5]),
+            Echo::call(&*rpc_client, b"testing 1 2 3".into()),
+            Echo::call(&*rpc_client, b"testing 4 5 6".into()),
         );
 
         assert_eq!(res1.unwrap(), 6.0);

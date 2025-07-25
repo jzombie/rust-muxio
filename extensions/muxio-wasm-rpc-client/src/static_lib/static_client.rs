@@ -1,8 +1,9 @@
 use super::static_muxio_write_bytes;
-use crate::{RpcTransportState, RpcWasmClient};
+use crate::RpcWasmClient;
 use js_sys::Promise;
 use std::cell::RefCell;
 use std::sync::Arc;
+use tracing::{self, instrument};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
@@ -87,22 +88,25 @@ pub fn get_static_client() -> Option<Arc<RpcWasmClient>> {
 /// - `1`: Connected
 /// - `2`: Disconnected
 #[wasm_bindgen]
-pub fn notify_static_client_transport_state_change(state_code: u8) -> Result<(), JsValue> {
-    let state = match state_code {
-        0 => RpcTransportState::Connecting,
-        1 => RpcTransportState::Connected,
-        2 => RpcTransportState::Disconnected,
-        _ => return Err(JsValue::from_str("Invalid state code provided.")),
-    };
-
-    MUXIO_STATIC_RPC_CLIENT_REF.with(|cell| {
-        if let Some(client) = cell.borrow().as_ref() {
-            // Acquire the lock and invoke the handler if it's set.
-            if let Some(handler) = client.state_change_handler().lock().unwrap().as_ref() {
-                handler(state);
+#[instrument]
+pub fn notify_static_client_transport_state_change(state_code: u8) -> Promise {
+    with_static_client_async(move |client_arc| async move {
+        match state_code {
+            0 => {
+                tracing::debug!("Transport state changed to: connecting");
+                Ok(JsValue::undefined())
             }
+            1 => {
+                tracing::debug!("Transport state changed to: connected");
+                client_arc.handle_connect().await;
+                Ok(JsValue::undefined())
+            }
+            2 => {
+                tracing::debug!("Transport state changed to: disconnected");
+                client_arc.handle_disconnect().await;
+                Ok(JsValue::undefined())
+            }
+            _ => Err("Invalid state code provided.".to_string()),
         }
-        // It's not an error if the client isn't initialized or no handler is set.
-        Ok(())
     })
 }

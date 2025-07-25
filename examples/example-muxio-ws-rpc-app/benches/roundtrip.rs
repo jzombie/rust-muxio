@@ -53,7 +53,7 @@ fn bench_roundtrip(c: &mut Criterion) {
             // Spawn n concurrent RPC calls to the Add method.
             // These futures are submitted all at once and polled concurrently.
             for _ in 0..10 {
-                tasks.push(Add::call(&client, vec![1.0, 2.0, 3.0]));
+                tasks.push(Add::call(&*client, vec![1.0, 2.0, 3.0]));
             }
 
             let mut results = Vec::with_capacity(10);
@@ -71,7 +71,7 @@ fn bench_roundtrip(c: &mut Criterion) {
 
     c.bench_function("rpc_add_roundtrip_futures_unordered_singles", |b| {
         b.to_async(&rt).iter(|| async {
-            let res = Add::call(&client, vec![1.0, 2.0, 3.0]).await;
+            let res = Add::call(&*client, vec![1.0, 2.0, 3.0]).await;
             black_box(res.unwrap());
         });
     });

@@ -17,11 +17,14 @@ use futures_util::{
     SinkExt, StreamExt,
     stream::{SplitSink, SplitStream},
 };
+use muxio::frame::FrameDecodeError;
 use muxio::rpc::RpcDispatcher;
 use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
 use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface};
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 use std::time::Duration;
 use tokio::{
     net::{TcpListener, ToSocketAddrs},
@@ -45,6 +48,8 @@ pub enum RpcServerEvent {
 pub struct ConnectionContext {
     pub sender: WsSenderContext,
     pub addr: SocketAddr,
+    pub mpsc_tx: mpsc::UnboundedSender<Message>,
+    pub is_connected: Arc<AtomicBool>,
     // Each connection gets its own dispatcher for making server-to-client calls.
     pub dispatcher: Arc<Mutex<RpcDispatcher<'static>>>,
 }
@@ -146,33 +151,41 @@ impl RpcServer {
     }
 
     async fn handle_socket(self: Arc<Self>, socket: WebSocket, addr: SocketAddr) {
-        let (sender, receiver) = socket.split();
+        let (sender_ws, receiver_ws) = socket.split();
+
+        // Create the internal mpsc channel for this connection
+        let (tx_mpsc, rx_mpsc) = mpsc::unbounded_channel::<Message>(); // Renamed for clarity
+
+        let is_connected_atomic = Arc::new(AtomicBool::new(true));
 
         let context = Arc::new(ConnectionContext {
-            sender: Arc::new(Mutex::new(sender)),
+            sender: Arc::new(Mutex::new(sender_ws)), // Renamed for clarity from 'sender'
+            mpsc_tx: tx_mpsc.clone(),                // <--- USE THE CLONED SENDER HERE
+            is_connected: is_connected_atomic.clone(),
             addr,
             dispatcher: Arc::new(Mutex::new(RpcDispatcher::new())),
         });
 
-        if let Some(tx) = &self.event_tx {
-            let _ = tx.send(RpcServerEvent::ClientConnected(ConnectionContextHandle(
+        if let Some(tx_event) = &self.event_tx {
+            // Renamed for clarity
+            let _ = tx_event.send(RpcServerEvent::ClientConnected(ConnectionContextHandle(
                 context.clone(),
             )));
         }
 
-        let (tx, rx) = mpsc::unbounded_channel::<Message>();
+        // Pass the receiver to the sender_task
+        tokio::spawn(Self::sender_task(context.clone(), rx_mpsc));
 
-        tokio::spawn(Self::sender_task(context.clone(), rx));
-
+        // Pass the sender to the receiver_task (for responding to client-initiated calls)
         let event_tx_clone = self.event_tx.clone();
-
         tokio::spawn(Self::receiver_task(
             self.endpoint.clone(),
             context,
-            receiver,
-            tx,
+            receiver_ws, // Renamed for clarity from 'receiver'
+            tx_mpsc,     // <--- Pass tx_mpsc here as well
             addr,
             event_tx_clone,
+            is_connected_atomic,
         ));
     }
 
@@ -189,11 +202,12 @@ impl RpcServer {
 
     async fn receiver_task(
         endpoint: Arc<RpcServiceEndpoint<Arc<ConnectionContext>>>,
-        context: Arc<ConnectionContext>,
+        context: Arc<ConnectionContext>, // The Arc<ConnectionContext> for this client
         mut receiver: SplitStream<WebSocket>,
         tx: mpsc::UnboundedSender<Message>,
         addr: SocketAddr,
         event_tx: Option<mpsc::UnboundedSender<RpcServerEvent>>,
+        is_connected_atomic: Arc<AtomicBool>, // This is the AtomicBool for connection status
     ) {
         let heartbeat_interval = Duration::from_secs(HEARTBEAT_INTERVAL);
         let client_timeout = Duration::from_secs(CLIENT_TIMEOUT);
@@ -203,25 +217,47 @@ impl RpcServer {
                 _ = tokio::time::sleep(heartbeat_interval) => {
                     if tx.send(Message::Ping(vec![].into())).is_err() {
                         tracing::info!("Client {} disconnected (failed to send ping).", addr);
-                        break;
+                        break; // Break loop on send error
                     }
                 }
                 result = timeout(client_timeout, receiver.next()) => {
                     match result {
                         Err(_) => {
                             tracing::warn!("Client {} timed out. Closing connection.", addr);
-                            break;
+                            break; // Break loop on timeout
                         },
                         Ok(Some(Ok(msg))) => {
                             match msg {
                                 Message::Binary(bytes) => {
+                                    tracing::trace!("Before dispatcher lock");
                                     let mut dispatcher = context.dispatcher.lock().await;
+                                    tracing::trace!("After dispatcher lock");
                                     let tx_clone = tx.clone();
                                     let on_emit = move |chunk: &[u8]| {
                                         let _ = tx_clone.send(Message::Binary(Bytes::copy_from_slice(chunk)));
+                                        tracing::trace!(
+                                            "Server receiver_task: Emitted response chunk of {} bytes to client {}.",
+                                            chunk.len(),
+                                            addr
+                                        ); // Debug log
                                     };
+
+                                    tracing::info!(
+                                        "Server receiver_task: Processing incoming binary message ({} bytes) from client {}.",
+                                        bytes.len(),
+                                        addr
+                                    ); // Debug log
                                     if let Err(err) = endpoint.read_bytes(&mut dispatcher, context.clone(), &bytes, on_emit).await {
-                                        tracing::error!("Error processing bytes from {}: {:?}", addr, err);
+                                        tracing::error!(
+                                            "Server receiver_task: Error processing bytes from {}. Handler returned: {:?}",
+                                            addr,
+                                            err
+                                        ); // Debug log
+                                    } else {
+                                        tracing::info!(
+                                            "Server receiver_task: Successfully processed incoming binary message from client {}.",
+                                            addr
+                                        ); // Debug log
                                     }
                                 }
                                 Message::Pong(_) => {
@@ -229,22 +265,44 @@ impl RpcServer {
                                 }
                                 Message::Close(_) => {
                                     tracing::info!("Client {} initiated close.", addr);
-                                    break;
+                                    break; // Break loop on client close message
                                 }
                                 _ => {}
                             }
                         }
                         Ok(None) | Ok(Some(Err(_))) => {
                             tracing::info!("Client {} disconnected.", addr);
-                            break;
+                            break; // Break loop on stream end or receive error
                         }
                     }
                 }
             }
         }
+        // Execution reaches here when the connection is considered disconnected.
 
-        if let Some(tx) = event_tx {
-            let _ = tx.send(RpcServerEvent::ClientDisconnected(addr));
+        // 1. Update the AtomicBool status.
+        is_connected_atomic.store(false, Ordering::SeqCst);
+        tracing::info!("Client {} connection status set to Disconnected.", addr);
+
+        // 2. Fail all pending requests on this connection's dispatcher.
+        //    Acquire the dispatcher lock here and fail them immediately.
+        //    Use `lock().await` because this is an `async fn`.
+        //    This ensures they are failed *before* this task fully unwinds.
+        tracing::info!(
+            "Attempting to acquire dispatcher lock for {} to fail pending requests.",
+            addr
+        );
+        let mut dispatcher_guard = context.dispatcher.lock().await; // <--- CHANGE: AWAIT HERE
+        tracing::info!(
+            "Acquired dispatcher lock for {} to fail pending requests.",
+            addr
+        );
+        dispatcher_guard.fail_all_pending_requests(FrameDecodeError::ReadAfterCancel);
+        tracing::info!("Dispatcher for {} failed all pending requests.", addr);
+
+        // 3. Send the disconnect event.
+        if let Some(tx_event) = event_tx {
+            let _ = tx_event.send(RpcServerEvent::ClientDisconnected(addr));
         }
     }
 }
@@ -258,36 +316,35 @@ impl RpcServer {
 /// such as server-push notifications or commands.
 #[async_trait::async_trait]
 impl RpcServiceCallerInterface for ConnectionContextHandle {
-    // The dispatcher is protected by a Tokio Mutex.
-    type DispatcherLock = Mutex<RpcDispatcher<'static>>;
-
-    fn get_dispatcher(&self) -> Arc<Self::DispatcherLock> {
+    fn get_dispatcher(&self) -> Arc<Mutex<RpcDispatcher<'static>>> {
         // Return the dispatcher associated with this specific connection.
         self.0.dispatcher.clone()
     }
 
     fn get_emit_fn(&self) -> Arc<dyn Fn(Vec<u8>) + Send + Sync> {
-        // Returns a thread-safe function that sends a raw byte payload
-        // over the WebSocket connection associated with this specific client.
-        // This is the lowest-level transport function used by the RPC caller.
         Arc::new({
-            let sender = self.0.sender.clone();
+            let mpsc_tx = self.0.mpsc_tx.clone(); // <--- CLONE THE MPSC SENDER
+
+            // This closure will be called by the RpcDispatcher/RpcServiceCallerInterface.
+            // It must be synchronous (not `async move` returning a Future)
+            // and should not block.
             move |chunk: Vec<u8>| {
-                let sender = sender.clone();
-                tokio::spawn(async move {
-                    let _ = sender
-                        .lock()
-                        .await
-                        .send(Message::Binary(chunk.into()))
-                        .await;
-                });
+                // This now sends the message to the internal MPSC channel, which is non-blocking.
+                // The actual async WebSocket send happens in the separate sender_task.
+                let _ = mpsc_tx.send(Message::Binary(chunk.into()));
+                // Ignoring the error if the receiver is dropped is acceptable for a "fire and forget"
+                // emit_fn, as the sender_task will handle the actual WebSocket error.
             }
         })
     }
 
+    fn is_connected(&self) -> bool {
+        self.0.is_connected.load(Ordering::SeqCst) // Load from the AtomicBool
+    }
+
     /// This is a client-side concept, so it's a no-op on the server.
     /// The server manages the connection state directly.
-    fn set_state_change_handler(
+    async fn set_state_change_handler(
         &self,
         _handler: impl Fn(RpcTransportState) + Send + Sync + 'static,
     ) {

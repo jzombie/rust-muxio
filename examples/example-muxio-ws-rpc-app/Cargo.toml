@@ -8,21 +8,21 @@ license.workspace = true # Inherit from workspace
 publish = false # Explcitly false
 
 [dependencies]
-tokio = { version = "1.45.1", features = ["full"] }
-async-trait = "0.1.88"
+tokio = { workspace = true, features = ["full"] }
+async-trait = { workspace = true }
 muxio = { workspace = true }
 muxio-tokio-rpc-server = { workspace = true }
 muxio-tokio-rpc-client = { workspace = true }
-muxio-rpc-service-caller = { workspace = true, features=["tokio_support"] }
+muxio-rpc-service-caller = { workspace = true }
 example-muxio-rpc-service-definition = { workspace = true }
-tracing = "0.1.41"
-tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
 
 [[bench]]
 name = "roundtrip"
 harness = false
 
 [dev-dependencies]
-criterion = { version = "0.6.0", features = ["async_tokio"] }
-doc-comment = "0.3.3"
-futures = "0.3.31"
+criterion = { workspace = true, features = ["async_tokio"] }
+doc-comment = { workspace = true }
+futures = { workspace = true }

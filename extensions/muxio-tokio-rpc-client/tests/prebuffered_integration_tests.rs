@@ -70,12 +70,12 @@ async fn test_success_client_server_roundtrip() {
             .unwrap();
 
         let (res1, res2, res3, res4, res5, res6) = join!(
-            Add::call(&rpc_client, vec![1.0, 2.0, 3.0]),
-            Add::call(&rpc_client, vec![8.0, 3.0, 7.0]),
-            Mult::call(&rpc_client, vec![8.0, 3.0, 7.0]),
-            Mult::call(&rpc_client, vec![1.5, 2.5, 8.5]),
-            Echo::call(&rpc_client, b"testing 1 2 3".into()),
-            Echo::call(&rpc_client, b"testing 4 5 6".into()),
+            Add::call(rpc_client.as_ref(), vec![1.0, 2.0, 3.0]),
+            Add::call(rpc_client.as_ref(), vec![8.0, 3.0, 7.0]),
+            Mult::call(rpc_client.as_ref(), vec![8.0, 3.0, 7.0]),
+            Mult::call(rpc_client.as_ref(), vec![1.5, 2.5, 8.5]),
+            Echo::call(rpc_client.as_ref(), b"testing 1 2 3".into()),
+            Echo::call(rpc_client.as_ref(), b"testing 4 5 6".into()),
         );
 
         assert_eq!(res1.unwrap(), 6.0);
@@ -121,7 +121,7 @@ async fn test_error_client_server_roundtrip() {
         let rpc_client = RpcClient::new(&server_host.to_string(), server_port)
             .await
             .unwrap();
-        let res = Add::call(&rpc_client, vec![1.0, 2.0, 3.0]).await;
+        let res = Add::call(rpc_client.as_ref(), vec![1.0, 2.0, 3.0]).await;
 
         // Assert that the error was propagated correctly.
         assert!(res.is_err(), "Expected RPC call to fail but it succeeded");
@@ -182,7 +182,7 @@ async fn test_large_prebuffered_payload_roundtrip() {
 
     // Use the high-level `Echo::call` which uses the RpcCallPrebuffered trait.
     // This is a full, end-to-end test of the prebuffered logic.
-    let result = Echo::call(&client, large_payload.clone()).await;
+    let result = Echo::call(client.as_ref(), large_payload.clone()).await;
 
     // 4. --- ASSERT ---
     assert!(
@@ -214,7 +214,7 @@ async fn test_method_not_found_error() {
         .await
         .unwrap();
 
-    let result = Add::call(&client, vec![1.0, 2.0, 3.0]).await;
+    let result = Add::call(client.as_ref(), vec![1.0, 2.0, 3.0]).await;
 
     assert!(result.is_err());
     let err = result.unwrap_err();

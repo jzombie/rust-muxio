@@ -7,9 +7,9 @@ use crate::rpc::{
     },
 };
 use crate::utils::increment_u32_id;
-
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
+use tracing::{self, instrument};
 
 impl<'a> Default for RpcDispatcher<'a> {
     fn default() -> Self {
@@ -95,6 +95,7 @@ impl<'a> RpcDispatcher<'a> {
     ///
     /// If graceful recovery is ever desired, this behavior should be restructured
     /// behind a configurable panic policy or error reporting mechanism.
+    #[instrument(skip(self))]
     fn init_catch_all_response_handler(&mut self) {
         let rpc_request_queue_ref = Arc::clone(&self.rpc_request_queue);
 
@@ -137,6 +138,7 @@ impl<'a> RpcDispatcher<'a> {
                         };
 
                         queue.push_back((rpc_request_id, rpc_request));
+                        tracing::debug!("Added request {} to queue.", rpc_request_id);
                     }
 
                     RpcStreamEvent::PayloadChunk {
@@ -153,6 +155,16 @@ impl<'a> RpcDispatcher<'a> {
                                 .rpc_prebuffered_payload_bytes
                                 .get_or_insert_with(Vec::new);
                             payload.extend_from_slice(&bytes);
+                            tracing::debug!(
+                                "Appended {} bytes to payload for request {}.",
+                                bytes.len(),
+                                rpc_request_id
+                            );
+                        } else {
+                            tracing::debug!(
+                                "Payload chunk for unknown request {}. Dropped.",
+                                rpc_request_id
+                            );
                         }
                     }
 
@@ -163,6 +175,12 @@ impl<'a> RpcDispatcher<'a> {
                         {
                             // Set the `is_finalized` flag to true when the stream ends
                             rpc_request.is_finalized = true;
+                            tracing::debug!("Request {} finalized.", rpc_request_id);
+                        } else {
+                            tracing::debug!(
+                                "End event for unknown request {}. Dropped.",
+                                rpc_request_id
+                            );
                         }
                     }
 
@@ -172,7 +190,6 @@ impl<'a> RpcDispatcher<'a> {
                         rpc_method_id,
                         frame_decode_error,
                     } => {
-                        // TODO: Handle errors
                         tracing::error!(
                             "Error in stream. Method: {:?} {:?} {:?}: {:?}",
                             rpc_method_id,
@@ -180,6 +197,12 @@ impl<'a> RpcDispatcher<'a> {
                             rpc_request_id,
                             frame_decode_error
                         );
+                        tracing::debug!(
+                            "Received Error event for request {:?}. Error: {:?}",
+                            rpc_request_id,
+                            frame_decode_error
+                        );
+                        // TODO: Consider removing from queue or marking as errored
                     }
                 }
             }));
@@ -200,6 +223,7 @@ impl<'a> RpcDispatcher<'a> {
     /// - `on_emit`: Callback to transmit the encoded frames
     /// - `on_response`: Optional response stream handler
     /// - `prebuffer_response`: If true, buffer all chunks into one event
+    #[instrument(skip(self, on_emit, on_response))]
     pub fn call<E, R>(
         &mut self,
         rpc_request: RpcRequest,
@@ -216,6 +240,11 @@ impl<'a> RpcDispatcher<'a> {
 
         let rpc_request_id: u32 = self.next_rpc_request_id;
         self.next_rpc_request_id = increment_u32_id();
+        tracing::debug!(
+            "Initiating RPC call with request_id: {}, method_id: {}",
+            rpc_request_id,
+            rpc_method_id
+        );
 
         // Convert parameter bytes to metadata
         let rpc_metadata_bytes = rpc_request.rpc_param_bytes.unwrap_or_default();
@@ -235,16 +264,22 @@ impl<'a> RpcDispatcher<'a> {
             on_response,
             prebuffer_response,
         )?;
+        tracing::debug!("Encoder initialized for request_id: {}", rpc_request_id);
 
         // If the RPC request has a buffered payload, send it here
         if let Some(prebuffered_payload_bytes) = rpc_request.rpc_prebuffered_payload_bytes {
             encoder.write_bytes(&prebuffered_payload_bytes)?;
+            tracing::debug!(
+                "Sent prebuffered payload for request_id: {}",
+                rpc_request_id
+            );
         }
 
         // If the RPC request is pre-finalized, close the stream
         if rpc_request.is_finalized {
             encoder.flush()?;
             encoder.end_stream()?;
+            tracing::debug!("Request {} finalized and stream ended.", rpc_request_id);
         }
 
         Ok(encoder)
@@ -382,5 +417,41 @@ impl<'a> RpcDispatcher<'a> {
         } else {
             None
         }
+    }
+
+    /// Invokes all pending response handlers with an error and clears them.
+    ///
+    /// This is a crucial cleanup mechanism to prevent hanging requests when a
+    /// transport-level connection is dropped. It ensures that any code awaiting
+    /// a response is promptly notified of the failure.
+    #[instrument(skip(self))]
+    pub fn fail_all_pending_requests(&mut self, error: FrameDecodeError) {
+        tracing::error!("Entered. Error: {:?}", error);
+        tracing::debug!(
+            "Number of handlers before take: {}",
+            self.rpc_respondable_session.response_handlers.len()
+        );
+
+        // Take ownership of the handlers, leaving the map empty.
+        let handlers = std::mem::take(&mut self.rpc_respondable_session.response_handlers);
+
+        tracing::debug!("Taken {} handlers.", handlers.len());
+
+        for (request_id, mut handler) in handlers {
+            tracing::debug!("DELETING HANDLER for `request_id`: {request_id:?}");
+
+            // Create a synthetic error event to signal the failure.
+            let error_event = RpcStreamEvent::Error {
+                // We don't have the full header, but the request_id is essential.
+                rpc_header: None,
+                rpc_request_id: Some(request_id),
+                rpc_method_id: None, // Method ID isn't critical for cancellation
+                frame_decode_error: error.clone(),
+            };
+            // Call the handler with the error, waking up the waiting Future.
+            handler(error_event);
+            tracing::debug!("Handler for request_id {} called with error.", request_id);
+        }
+        tracing::debug!("Exited.");
     }
 }
