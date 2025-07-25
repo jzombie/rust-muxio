@@ -7,7 +7,7 @@
 use example_muxio_rpc_service_definition::prebuffered::Echo;
 use futures_util::{SinkExt, StreamExt};
 use muxio_rpc_service::prebuffered::RpcMethodPrebuffered;
-use muxio_rpc_service_caller::{RpcServiceCallerInterface, prebuffered::RpcCallPrebuffered};
+use muxio_rpc_service_caller::prebuffered::RpcCallPrebuffered;
 use muxio_tokio_rpc_server::{RpcServer, RpcServerEvent, RpcServiceEndpointInterface};
 use muxio_wasm_rpc_client::RpcWasmClient;
 use std::error::Error;
