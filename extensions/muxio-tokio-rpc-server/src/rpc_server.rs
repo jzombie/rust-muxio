@@ -229,9 +229,9 @@ impl RpcServer {
                         Ok(Some(Ok(msg))) => {
                             match msg {
                                 Message::Binary(bytes) => {
-                                    println!("BEFORE DISPATCHER LOCK"); // Debug log, remove later
+                                    tracing::trace!("Before dispatcher lock");
                                     let mut dispatcher = context.dispatcher.lock().await;
-                                    println!("AFTER DISPATCHER LOCK"); // Debug log, remove later
+                                    tracing::trace!("After dispatcher lock");
                                     let tx_clone = tx.clone();
                                     let on_emit = move |chunk: &[u8]| {
                                         let _ = tx_clone.send(Message::Binary(Bytes::copy_from_slice(chunk)));

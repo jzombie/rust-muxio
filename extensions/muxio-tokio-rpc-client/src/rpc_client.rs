@@ -230,14 +230,14 @@ impl RpcClient {
                     // Check if client is still considered connected before attempting to send
                     if !is_connected_send.load(Ordering::Acquire) {
                         // Use Acquire for strong ordering
-                        tracing::debug!("Client is disconnected. Dropping message: {:?}", msg);
+                        tracing::warn!("Client is disconnected. Dropping message: {:?}", msg);
                         // Don't try to send, just break or continue to drain if necessary
                         break; // Exit loop if disconnected
                     }
 
-                    tracing::debug!("Sending message: {:?}", msg);
+                    tracing::trace!("Sending message: {:?}", msg);
                     if ws_sender.send(msg).await.is_err() {
-                        tracing::debug!(
+                        tracing::error!(
                             "`ws_sender` failed to send message. Attempting `shutdown_async`."
                         );
                         if let Some(client) = client_weak_send.upgrade() {
@@ -245,7 +245,7 @@ impl RpcClient {
                                 client.shutdown_async().await;
                             });
                         } else {
-                            tracing::debug!(
+                            tracing::error!(
                                 "Client Arc already dropped, cannot call `shutdown_async`."
                             );
                         }
@@ -292,7 +292,7 @@ impl RpcServiceCallerInterface for RpcClient {
             let is_connected_clone = self.is_connected.clone();
             move |chunk: Vec<u8>| {
                 if !is_connected_clone.load(Ordering::Relaxed) {
-                    tracing::debug!("Client is disconnected, dropping outgoing RPC data.");
+                    tracing::warn!("Client is disconnected, dropping outgoing RPC data.");
                     return; // Do not send if disconnected
                 }
 

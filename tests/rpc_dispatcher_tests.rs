@@ -2,6 +2,7 @@ use bitcode::{Decode, Encode};
 use muxio::rpc::{RpcDispatcher, RpcRequest, RpcResponse, rpc_internals::RpcStreamEvent};
 use std::cell::RefCell;
 use std::rc::Rc;
+use tracing::{self, instrument};
 
 const ADD_METHOD_ID: u64 = 0x01;
 const MULT_METHOD_ID: u64 = 0x02;
@@ -27,6 +28,7 @@ struct MultResponseParams {
 }
 
 #[test]
+#[instrument]
 fn rpc_dispatcher_call_and_echo_response() {
     // Shared buffer for the outgoing response
     let outgoing_buf: Rc<RefCell<Vec<u8>>> = Rc::new(RefCell::new(Vec::new()));
@@ -87,7 +89,7 @@ fn rpc_dispatcher_call_and_echo_response() {
                                 rpc_method_id,
                             } => {
                                 assert_eq!(rpc_header.rpc_method_id, rpc_method_id);
-                                println!(
+                                tracing::debug!(
                                     "Client received header: ID = {rpc_request_id}, Header = {rpc_header:?}",
                                 );
                             }
@@ -97,13 +99,13 @@ fn rpc_dispatcher_call_and_echo_response() {
                                 ..
                             } => match rpc_method_id {
                                 id if id == ADD_METHOD_ID => {
-                                    println!(
+                                    tracing::debug!(
                                         "Add response: {:?}",
                                         bitcode::decode::<AddResponseParams>(&bytes)
                                     );
                                 }
                                 id if id == MULT_METHOD_ID => {
-                                    println!(
+                                    tracing::debug!(
                                         "Mult response: {:?}",
                                         bitcode::decode::<MultResponseParams>(&bytes)
                                     );
@@ -142,15 +144,15 @@ fn rpc_dispatcher_call_and_echo_response() {
                 let rpc_request = server_dispatcher.delete_rpc_request(rpc_request_id);
 
                 if let Some(rpc_request) = rpc_request {
-                    println!("Server received request header ID: {rpc_request_id:?}");
-                    println!("\t{rpc_request_id:?}: {rpc_request:?}");
+                    tracing::debug!("Server received request header ID: {rpc_request_id:?}");
+                    tracing::debug!("\t{rpc_request_id:?}: {rpc_request:?}");
 
                     let rpc_response = match rpc_request.rpc_method_id {
                         rpc_method_id if rpc_method_id == ADD_METHOD_ID => {
                             let request_params: AddRequestParams =
                                 bitcode::decode(&rpc_request.rpc_param_bytes.unwrap()).unwrap();
 
-                            println!("Server received request params: {request_params:?}");
+                            tracing::debug!("Server received request params: {request_params:?}");
 
                             let response_bytes = bitcode::encode(&AddResponseParams {
                                 result: request_params.numbers.iter().sum(),
@@ -169,7 +171,7 @@ fn rpc_dispatcher_call_and_echo_response() {
                             let request_params: MultRequestParams =
                                 bitcode::decode(&rpc_request.rpc_param_bytes.unwrap()).unwrap();
 
-                            println!("Server received request params: {request_params:?}");
+                            tracing::debug!("Server received request params: {request_params:?}");
 
                             let response_bytes = bitcode::encode(&MultResponseParams {
                                 result: request_params.numbers.iter().fold(1.0, |acc, &x| acc * x),

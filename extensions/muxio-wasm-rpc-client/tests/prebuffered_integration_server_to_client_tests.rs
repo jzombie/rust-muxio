@@ -16,8 +16,10 @@ use tokio::net::TcpListener;
 use tokio::sync::mpsc as tokio_mpsc;
 use tokio::time::{Duration, sleep};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message as WsMessage};
+use tracing::{self, instrument};
 
 #[tokio::test]
+#[instrument]
 async fn test_server_to_wasm_client_echo_roundtrip() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
@@ -46,7 +48,7 @@ async fn test_server_to_wasm_client_echo_roundtrip() {
         .register_prebuffered(Echo::METHOD_ID, |_, request_bytes| async move {
             let request = Echo::decode_request(&request_bytes)?;
             tracing::info!(
-                "WASM CLIENT (Test): Received server-initiated echo request: '{}'",
+                "[WASM CLIENT]: Received server-initiated echo request: '{}'",
                 String::from_utf8_lossy(&request)
             );
             Echo::encode_response(request).map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>)
@@ -87,16 +89,14 @@ async fn test_server_to_wasm_client_echo_roundtrip() {
 
     let ctx_handle = loop {
         if let Some(RpcServerEvent::ClientConnected(handle)) = event_rx.recv().await {
-            println!("CLIENT CONNECTED!!!!!");
-
-            tracing::info!("Server detected client connected.");
+            tracing::info!("[Server]: Client connected.");
             break handle;
         }
         sleep(Duration::from_millis(10)).await;
     };
 
     let test_message = b"hello from server via WASM client test!".to_vec();
-    tracing::info!("SERVER (Test): Initiating Echo call to WASM client...");
+    tracing::info!("[Server]: Initiating Echo call to WASM client...");
 
     let server_to_client_echo_result = Echo::call(&ctx_handle, test_message.clone()).await;
 
@@ -112,5 +112,5 @@ async fn test_server_to_wasm_client_echo_roundtrip() {
         "WASM client did not echo the correct message back to server"
     );
 
-    tracing::info!("SERVER (Test): Successfully received echo response from WASM client.");
+    tracing::info!("[Server]: Successfully received echo response from WASM client.");
 }

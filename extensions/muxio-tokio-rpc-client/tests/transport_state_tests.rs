@@ -281,14 +281,14 @@ async fn test_pending_requests_fail_on_disconnect() {
     );
 
     let err_string = rpc_result.unwrap_err().to_string();
-    println!("[Test] RPC error string: {}", err_string);
+    tracing::debug!("RPC error string: {}", err_string);
     // Error can be `ReadAfterCancel` or a general `Transport error` depending on propagation.
     assert!(
         err_string.contains("cancelled stream") || err_string.contains("Transport error"),
         "Error message should indicate that the request was cancelled due to a disconnect. Got: {}",
         err_string
     );
-    println!("[Test] test_pending_requests_fail_on_disconnect PASSED");
+    tracing::debug!("`test_pending_requests_fail_on_disconnect` PASSED");
 
     // --- END CRITICAL FIX ---
 
