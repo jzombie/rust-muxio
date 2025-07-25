@@ -138,16 +138,16 @@ async fn main() {
         rpc_client.set_state_change_handler(move |new_state: RpcTransportState| {
             // This code will run every time the connection state changes
             tracing::info!("[Callback] Transport state changed to: {:?}", new_state);
-        });
+        }).await;
 
         // `join!` will await all responses before proceeding
         let (res1, res2, res3, res4, res5, res6) = join!(
-            Add::call(&rpc_client, vec![1.0, 2.0, 3.0]),
-            Add::call(&rpc_client, vec![8.0, 3.0, 7.0]),
-            Mult::call(&rpc_client, vec![8.0, 3.0, 7.0]),
-            Mult::call(&rpc_client, vec![1.5, 2.5, 8.5]),
-            Echo::call(&rpc_client, b"testing 1 2 3".into()),
-            Echo::call(&rpc_client, b"testing 4 5 6".into()),
+            Add::call(&*rpc_client, vec![1.0, 2.0, 3.0]),
+            Add::call(&*rpc_client, vec![8.0, 3.0, 7.0]),
+            Mult::call(&*rpc_client, vec![8.0, 3.0, 7.0]),
+            Mult::call(&*rpc_client, vec![1.5, 2.5, 8.5]),
+            Echo::call(&*rpc_client, b"testing 1 2 3".into()),
+            Echo::call(&*rpc_client, b"testing 4 5 6".into()),
         );
 
         assert_eq!(res1.unwrap(), 6.0);

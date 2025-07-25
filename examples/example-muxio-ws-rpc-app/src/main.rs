@@ -71,19 +71,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Connect to the server
         let rpc_client = RpcClient::new(&server_host.to_string(), server_port).await?;
 
-        rpc_client.set_state_change_handler(move |new_state: RpcTransportState| {
-            // This code will run every time the connection state changes
-            tracing::info!("[Callback] Transport state changed to: {:?}", new_state);
-        });
+        rpc_client
+            .set_state_change_handler(move |new_state: RpcTransportState| {
+                // This code will run every time the connection state changes
+                tracing::info!("[Callback] Transport state changed to: {:?}", new_state);
+            })
+            .await;
 
         // `join!` will await all responses before proceeding
         let (res1, res2, res3, res4, res5, res6) = join!(
-            Add::call(&rpc_client, vec![1.0, 2.0, 3.0]),
-            Add::call(&rpc_client, vec![8.0, 3.0, 7.0]),
-            Mult::call(&rpc_client, vec![8.0, 3.0, 7.0]),
-            Mult::call(&rpc_client, vec![1.5, 2.5, 8.5]),
-            Echo::call(&rpc_client, b"testing 1 2 3".into()),
-            Echo::call(&rpc_client, b"testing 4 5 6".into()),
+            Add::call(&*rpc_client, vec![1.0, 2.0, 3.0]),
+            Add::call(&*rpc_client, vec![8.0, 3.0, 7.0]),
+            Mult::call(&*rpc_client, vec![8.0, 3.0, 7.0]),
+            Mult::call(&*rpc_client, vec![1.5, 2.5, 8.5]),
+            Echo::call(&*rpc_client, b"testing 1 2 3".into()),
+            Echo::call(&*rpc_client, b"testing 4 5 6".into()),
         );
 
         tracing::info!("Result from first add(): {:?}", res1);
