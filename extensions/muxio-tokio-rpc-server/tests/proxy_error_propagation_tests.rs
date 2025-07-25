@@ -173,7 +173,7 @@ async fn test_proxy_error_propagation_on_provider_disconnect() {
 
     let client_b_endpoint = client_b.get_endpoint();
     client_b_endpoint
-        .register_prebuffered(Echo::METHOD_ID, move |_, bytes| {
+        .register_prebuffered(Echo::METHOD_ID, move |_, _bytes| {
             let tx_signal = client_b_handler_received_tx_clone.clone();
             async move {
                 tracing::trace!("[Client B Handler] Echo method handler invoked.");
@@ -242,16 +242,7 @@ async fn test_proxy_error_propagation_on_provider_disconnect() {
         retries += 1;
     }
 
-
-    // --- Debug: Test direct call from Server (using its ConnectionContextHandle for Client B) to Client B ---
-    // This verifies Server can make a call *back* to Client B using the handle received from Client B's connection TO Server.
-    tracing::info!("[Debug] Server sending direct echo to Client B using its ConnectionContextHandle for Client B.");
-    let test_message_direct = b"direct test from server B to client B".to_vec();
-
-    // The problematic call, still wrapped in spawn_blocking.
-    let client_b_ctx_handle_for_blocking_call_debug = client_b_ctx_handle_from_server.clone();
-    let test_message_for_blocking_call_debug = test_message_direct.clone();
-
+   
     // NOTE: This debug call will now *also* cause Client B to disconnect!
     // This might affect the main call if Client B is already gone.
     // For a clean test, this debug call should NOT cause Client B to disconnect.
