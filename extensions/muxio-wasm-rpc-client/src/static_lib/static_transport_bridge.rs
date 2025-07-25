@@ -25,7 +25,7 @@ pub fn static_muxio_read_bytes_uint8(inbound_data: Uint8Array) -> Result<(), JsV
         .ok_or_else(|| JsValue::from_str("RPC client not initialized"))?;
 
     spawn_local(async move {
-        client_arc.process_incoming_bytes(&inbound_bytes).await;
+        client_arc.read_bytes(&inbound_bytes).await;
     });
 
     Ok(())

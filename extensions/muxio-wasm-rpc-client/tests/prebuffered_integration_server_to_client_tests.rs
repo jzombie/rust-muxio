@@ -77,10 +77,10 @@ async fn test_server_to_wasm_client_echo_roundtrip() {
         let client = client.clone();
         async move {
             while let Some(Ok(WsMessage::Binary(bytes))) = ws_receiver.next().await {
-                // Now, simply call the comprehensive `process_incoming_bytes` method
+                // Now, simply call the comprehensive `read_bytes` method
                 // on the RpcWasmClient. This method must be updated in `rpc_wasm_client.rs`
                 // to handle the full three-stage processing (read, process, respond).
-                client.process_incoming_bytes(&bytes).await;
+                client.read_bytes(&bytes).await;
             }
         }
     });

@@ -45,7 +45,7 @@ impl RpcWasmClient {
 
     /// Call this from your JavaScript glue code when the WebSocket receives a message.
     /// This now handles both dispatcher reading and endpoint processing of incoming requests.
-    pub async fn process_incoming_bytes(&self, bytes: &[u8]) {
+    pub async fn read_bytes(&self, bytes: &[u8]) {
         let dispatcher_arc = self.dispatcher.clone();
         let endpoint_arc = self.endpoint.clone();
         let emit_fn_arc = self.emit_callback.clone();
@@ -72,7 +72,7 @@ impl RpcWasmClient {
                 }
                 Err(e) => {
                     tracing::error!(
-                        "WASM client process_incoming_bytes: Dispatcher read_bytes error: {:?}",
+                        "WASM client `read_bytes`: Dispatcher `read_bytes` error: {:?}",
                         e
                     );
                     return; // Early exit on unrecoverable read error

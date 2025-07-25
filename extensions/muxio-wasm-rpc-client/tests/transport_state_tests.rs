@@ -56,8 +56,8 @@ async fn setup_wasm_client_bridge(
         async move {
             client_clone.handle_connect().await; // Mimic JS calling onopen
             while let Some(Ok(WsMessage::Binary(bytes))) = ws_receiver.next().await {
-                // `process_incoming_bytes` now handles the dispatcher locking and handler dispatch.
-                client_clone.process_incoming_bytes(&bytes).await;
+                // `read_bytes` now handles the dispatcher locking and handler dispatch.
+                client_clone.read_bytes(&bytes).await;
             }
             tracing::debug!("WebSocket to WASM client bridge receive loop finished.");
             client_clone.handle_disconnect().await; // Mimic JS calling onclose/onerror
@@ -249,7 +249,7 @@ async fn test_pending_requests_fail_on_disconnect() {
         tracing::debug!("[RPC Task] Starting spawned RPC call.");
         // Make the call. This will interact with the dispatcher and its emit_fn.
         // It should become pending before the disconnect if timed correctly.
-        // `Echo::call` for RpcWasmClient (via RpcServiceCallerInterface) internally calls `process_incoming_bytes`
+        // `Echo::call` for RpcWasmClient (via RpcServiceCallerInterface) internally calls `read_bytes`
         // which internally uses `spawn_blocking` for the dispatcher lock.
         let result = Echo::call(
             client_clone_for_rpc_task.as_ref(),
