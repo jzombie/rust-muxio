@@ -46,6 +46,13 @@ fn bench_roundtrip(c: &mut Criterion) {
         (client, server_task)
     });
 
+    // Benchmark: Measure time to complete 10 concurrent RPC requests using FuturesUnordered.
+    //
+    // This tests end-to-end RPC throughput under parallel load. Each call sends
+    // 3 floats to the server and waits for the sum response. All calls are submitted
+    // immediately and polled concurrently, allowing for overlapped network I/O and task wakeups.
+    //
+    // This is meant to measure overall throughput (requests/second) and task scheduling cost.
     c.bench_function("rpc_add_roundtrip_futures_unordered_batch_10", |b| {
         b.to_async(&rt).iter(|| async {
             let mut tasks = FuturesUnordered::new();
@@ -69,6 +76,12 @@ fn bench_roundtrip(c: &mut Criterion) {
         });
     });
 
+    // Benchmark: Measure latency of a single Add RPC call per iteration.
+    //
+    // This measures the cost of a single RPC request-response interaction over TCP.
+    // No concurrency is involved. It's the baseline for minimal roundtrip latency
+    // through the full stack: client encode → TCP write → server decode/compute/encode →
+    // TCP read → client decode.
     c.bench_function("rpc_add_roundtrip_futures_unordered_singles", |b| {
         b.to_async(&rt).iter(|| async {
             let res = Add::call(&*client, vec![1.0, 2.0, 3.0]).await;
