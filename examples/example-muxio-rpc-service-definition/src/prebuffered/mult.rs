@@ -24,21 +24,21 @@ impl RpcMethodPrebuffered for Mult {
         Ok(bitcode::encode(&MultRequestParams { numbers }))
     }
 
-    fn decode_request(req_bytes: &[u8]) -> Result<Self::Input, io::Error> {
-        let req_params: MultRequestParams = bitcode::decode::<MultRequestParams>(req_bytes)
+    fn decode_request(request_bytes: &[u8]) -> Result<Self::Input, io::Error> {
+        let request_params: MultRequestParams = bitcode::decode::<MultRequestParams>(request_bytes)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
-        Ok(req_params.numbers)
+        Ok(request_params.numbers)
     }
 
     fn encode_response(product: Self::Output) -> Result<Vec<u8>, io::Error> {
         Ok(bitcode::encode(&MultResponseParams { product }))
     }
 
-    fn decode_response(resp_bytes: &[u8]) -> Result<Self::Output, io::Error> {
-        let resp_params = bitcode::decode::<MultResponseParams>(resp_bytes)
+    fn decode_response(response_bytes: &[u8]) -> Result<Self::Output, io::Error> {
+        let response_params = bitcode::decode::<MultResponseParams>(response_bytes)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
-        Ok(resp_params.product)
+        Ok(response_params.product)
     }
 }

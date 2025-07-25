@@ -504,7 +504,7 @@ fn rpc_session_bidirectional_roundtrip() {
     enc.flush().expect("flush failed");
     enc.end_stream().expect("end_stream failed");
 
-    let mut req_buf = Vec::new();
+    let mut request_buf = Vec::new();
     let mut seen_hdr = None;
 
     for chunk in &outbound {
@@ -525,7 +525,7 @@ fn rpc_session_bidirectional_roundtrip() {
                     bytes,
                     ..
                 } => {
-                    req_buf.extend(bytes);
+                    request_buf.extend(bytes);
 
                     Ok(())
                 }
@@ -535,7 +535,7 @@ fn rpc_session_bidirectional_roundtrip() {
             .expect("server.read_bytes failed");
     }
 
-    assert_eq!(req_buf, b"ping");
+    assert_eq!(request_buf, b"ping");
     assert!(seen_hdr.is_some());
 
     // Send a reply back

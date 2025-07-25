@@ -55,7 +55,7 @@ where
         let encoded_args = Self::encode_request(input)?;
         tracing::debug!("Arguments encoded ({} bytes).", encoded_args.len());
 
-        let (req_param_bytes, req_payload_bytes) =
+        let (request_param_bytes, request_payload_bytes) =
             if encoded_args.len() >= DEFAULT_SERVICE_MAX_CHUNK_SIZE {
                 tracing::warn!("Arguments are large, using payload_bytes.");
                 (None, Some(encoded_args))
@@ -66,8 +66,8 @@ where
 
         let request = RpcRequest {
             rpc_method_id: Self::METHOD_ID,
-            rpc_param_bytes: req_param_bytes,
-            rpc_prebuffered_payload_bytes: req_payload_bytes,
+            rpc_param_bytes: request_param_bytes,
+            rpc_prebuffered_payload_bytes: request_payload_bytes,
             is_finalized: true, // IMPORTANT: All prebuffered requests should be considered finalized
         };
         tracing::debug!("RpcRequest created: {:?}", request);

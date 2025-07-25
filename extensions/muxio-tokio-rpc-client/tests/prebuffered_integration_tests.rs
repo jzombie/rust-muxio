@@ -32,23 +32,32 @@ async fn test_success_client_server_roundtrip() {
 
         // Register handlers on the endpoint, not the server.
         let _ = join!(
-            endpoint.register_prebuffered(Add::METHOD_ID, |req_bytes: Vec<u8>, _ctx| async move {
-                let req_params = Add::decode_request(&req_bytes)?;
-                let sum = req_params.iter().sum();
-                let resp_bytes = Add::encode_response(sum)?;
-                Ok(resp_bytes)
-            }),
-            endpoint.register_prebuffered(Mult::METHOD_ID, |req_bytes: Vec<u8>, _ctx| async move {
-                let req_params = Mult::decode_request(&req_bytes)?;
-                let product = req_params.iter().product();
-                let resp_bytes = Mult::encode_response(product)?;
-                Ok(resp_bytes)
-            }),
-            endpoint.register_prebuffered(Echo::METHOD_ID, |req_bytes: Vec<u8>, _ctx| async move {
-                let req_params = Echo::decode_request(&req_bytes)?;
-                let resp_bytes = Echo::encode_response(req_params)?;
-                Ok(resp_bytes)
-            })
+            endpoint.register_prebuffered(
+                Add::METHOD_ID,
+                |request_bytes: Vec<u8>, _ctx| async move {
+                    let request_params = Add::decode_request(&request_bytes)?;
+                    let sum = request_params.iter().sum();
+                    let response_bytes = Add::encode_response(sum)?;
+                    Ok(response_bytes)
+                }
+            ),
+            endpoint.register_prebuffered(
+                Mult::METHOD_ID,
+                |request_bytes: Vec<u8>, _ctx| async move {
+                    let request_params = Mult::decode_request(&request_bytes)?;
+                    let product = request_params.iter().product();
+                    let response_bytes = Mult::encode_response(product)?;
+                    Ok(response_bytes)
+                }
+            ),
+            endpoint.register_prebuffered(
+                Echo::METHOD_ID,
+                |request_bytes: Vec<u8>, _ctx| async move {
+                    let request_params = Echo::decode_request(&request_bytes)?;
+                    let response_bytes = Echo::encode_response(request_params)?;
+                    Ok(response_bytes)
+                }
+            )
         );
 
         // Spawn the server using the pre-bound listener
@@ -101,11 +110,11 @@ async fn test_error_client_server_roundtrip() {
 
         // Note: The `join!` macro is not strictly necessary for a single future,
         // but we use it here to show the pattern is consistent.
-        let _ = join!(
-            endpoint.register_prebuffered(Add::METHOD_ID, |_req_bytes: Vec<u8>, _ctx| async move {
-                Err("Addition failed".into())
-            }),
-        );
+        let _ =
+            join!(endpoint.register_prebuffered(
+                Add::METHOD_ID,
+                |_request_bytes: Vec<u8>, _ctx| async move { Err("Addition failed".into()) }
+            ),);
 
         let _server_task = tokio::spawn({
             let server = Arc::clone(&server);
@@ -154,9 +163,9 @@ async fn test_large_prebuffered_payload_roundtrip() {
 
     // Register a simple "echo" handler on the server for our test to call.
     endpoint
-        .register_prebuffered(Echo::METHOD_ID, |req_bytes: Vec<u8>, _ctx| async move {
+        .register_prebuffered(Echo::METHOD_ID, |request_bytes: Vec<u8>, _ctx| async move {
             // The handler simply returns the bytes it received.
-            Ok(Echo::encode_response(req_bytes).unwrap())
+            Ok(Echo::encode_response(request_bytes).unwrap())
         })
         .await
         .unwrap();

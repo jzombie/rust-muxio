@@ -53,13 +53,13 @@ where
                     };
 
                     // Serialize the structured payload to send to the caller.
-                    let resp_payload_bytes = bitcode::encode(payload);
+                    let response_payload_bytes = bitcode::encode(payload);
 
                     RpcResponse {
                         rpc_request_id: request_id,
                         rpc_method_id: request.rpc_method_id,
                         rpc_result_status: Some(result_status.into()),
-                        rpc_prebuffered_payload_bytes: Some(resp_payload_bytes),
+                        rpc_prebuffered_payload_bytes: Some(response_payload_bytes),
                         is_finalized: true,
                     }
                 } else {
