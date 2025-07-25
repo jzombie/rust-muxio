@@ -140,7 +140,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                     }
                     RpcStreamEvent::PayloadChunk { bytes, .. } => {
                         let bytes_len = bytes.len();
-                        let mut current_status_option = mem::take(&mut *status_lock_guard);
+                        let current_status_option = mem::take(&mut *status_lock_guard);
                         match current_status_option.as_ref() {
                             Some(RpcResultStatus::Success) => {
                                 let mut temp_tx_option = mem::take(&mut *tx_lock_guard);

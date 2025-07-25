@@ -1,5 +1,5 @@
 use super::static_muxio_write_bytes;
-use crate::{RpcTransportState, RpcWasmClient};
+use crate::RpcWasmClient;
 use js_sys::Promise;
 use std::cell::RefCell;
 use std::sync::Arc;
@@ -87,20 +87,24 @@ pub fn get_static_client() -> Option<Arc<RpcWasmClient>> {
 /// - `1`: Connected
 /// - `2`: Disconnected
 #[wasm_bindgen]
-pub fn notify_static_client_transport_state_change(state_code: u8) -> Result<(), JsValue> {
-    MUXIO_STATIC_RPC_CLIENT_REF.with(|cell| {
-        if let Some(client) = cell.borrow().as_ref() {
-            match state_code {
-                0 => {} // 0 == Connecting
-                1 => {
-                    client.handle_connect();
-                } // 1 == Connected
-                2 => {
-                    client.handle_disconnect();
-                } // 2 == Disconnected
-                _ => return Err(JsValue::from_str("Invalid state code provided.")),
+pub fn notify_static_client_transport_state_change(state_code: u8) -> Promise {
+    with_static_client_async(move |client_arc| async move {
+        match state_code {
+            0 => {
+                // TODO: Tracing debug
+                Ok(JsValue::undefined())
             }
+            1 => {
+                // TODO: Tracing debug
+                client_arc.handle_connect().await;
+                Ok(JsValue::undefined())
+            }
+            2 => {
+                // TODO: Tracing debug
+                client_arc.handle_disconnect().await;
+                Ok(JsValue::undefined())
+            }
+            _ => Err("Invalid state code provided.".to_string()),
         }
-        Ok(())
     })
 }

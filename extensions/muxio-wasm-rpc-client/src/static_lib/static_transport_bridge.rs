@@ -1,11 +1,5 @@
 use super::MUXIO_STATIC_RPC_CLIENT_REF;
-use futures::future::join_all;
 use js_sys::Uint8Array;
-use muxio::rpc::RpcRequest;
-use muxio_rpc_service::constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE;
-use muxio_rpc_service_caller::RpcServiceCallerInterface;
-use muxio_rpc_service_endpoint::RpcServiceEndpointInterface;
-use muxio_rpc_service_endpoint::process_single_prebuffered_request;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
