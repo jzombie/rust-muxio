@@ -58,7 +58,7 @@ async fn test_proxy_error_propagation_on_provider_disconnect() {
     // --- 1. Start Server (The Proxy Server) ---
     let (server_listener, server_port) = bind_tcp_listener_on_random_port().await.unwrap();
     let (server_host, _) = tcp_listener_to_host_port(&server_listener).unwrap();
-    let server_url = format!("ws://{}:{}/ws", server_host, server_port);
+    let server_url = format!("ws://{server_host}:{server_port}/ws");
     tracing::info!("[Server] Listening on: {}", server_url);
 
     let (server_event_tx, mut server_event_rx) = tokio_mpsc::unbounded_channel();
@@ -110,7 +110,7 @@ async fn test_proxy_error_propagation_on_provider_disconnect() {
                         );
                         Err(Box::new(io::Error::new(
                             io::ErrorKind::ConnectionAborted,
-                            format!("Proxy call to provider (Client B) failed: {}", e),
+                            format!("Proxy call to provider (Client B) failed: {e}"),
                         )) as Box<dyn Error + Send + Sync>)
                     }
                 }
@@ -381,7 +381,7 @@ async fn test_proxy_error_propagation_on_provider_disconnect() {
                 payload.message
             );
         }
-        _ => panic!("Expected RpcServiceError::Rpc, but got: {:?}", err),
+        _ => panic!("Expected RpcServiceError::Rpc, but got: {err:?}"),
     }
 
     tracing::info!("[Test Setup] Proxy error propagation test PASSED.");

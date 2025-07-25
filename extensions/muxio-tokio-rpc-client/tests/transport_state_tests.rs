@@ -32,6 +32,7 @@ async fn test_client_errors_on_connection_failure() {
 
 #[tokio::test]
 #[instrument]
+#[allow(clippy::await_holding_lock)]
 async fn test_transport_state_change_handler() {
     tracing::debug!("Running test_transport_state_change_handler");
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -233,7 +234,7 @@ async fn test_pending_requests_fail_on_disconnect() {
             b"this will fail".to_vec(),
         )
         .await;
-        tracing::debug!("[RPC Task] RPC call completed with result: {:?}", result);
+        tracing::debug!("[RPC Task] RPC call completed with result: {result:?}",);
         let _ = tx_rpc_result.send(result); // Send result back to main test thread
     });
     tracing::debug!("RPC call spawned to run in background.");
@@ -260,15 +261,11 @@ async fn test_pending_requests_fail_on_disconnect() {
     tracing::debug!("Waiting for spawned RPC call future to resolve (should be cancelled).");
     let result = timeout(Duration::from_secs(1), rx_rpc_result).await; // 1 sec timeout for resolution
     // RPC REQUEST SHOULD BE CANCELED NOW
-    tracing::debug!(
-        "[Test] ***** Spawned RPC call future resolution result: {:?} ***** ",
-        result
-    );
+    tracing::debug!("[Test] ***** Spawned RPC call future resolution result: {result:?} ***** ",);
 
     assert!(
         result.is_ok(),
-        "Test timed out waiting for RPC call to resolve. Result: {:?}",
-        result
+        "Test timed out waiting for RPC call to resolve. Result: {result:?}",
     );
 
     let rpc_result = result
@@ -276,8 +273,7 @@ async fn test_pending_requests_fail_on_disconnect() {
         .expect("Oneshot channel should not be dropped");
     assert!(
         rpc_result.is_err(),
-        "Expected the pending RPC call to fail, but it succeeded. Result: {:?}",
-        rpc_result
+        "Expected the pending RPC call to fail, but it succeeded. Result: {rpc_result:?}",
     );
 
     let err_string = rpc_result.unwrap_err().to_string();
@@ -285,8 +281,7 @@ async fn test_pending_requests_fail_on_disconnect() {
     // Error can be `ReadAfterCancel` or a general `Transport error` depending on propagation.
     assert!(
         err_string.contains("cancelled stream") || err_string.contains("Transport error"),
-        "Error message should indicate that the request was cancelled due to a disconnect. Got: {}",
-        err_string
+        "Error message should indicate that the request was cancelled due to a disconnect. Got: {err_string}",
     );
     tracing::debug!("`test_pending_requests_fail_on_disconnect` PASSED");
 

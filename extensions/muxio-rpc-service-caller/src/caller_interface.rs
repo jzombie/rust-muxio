@@ -175,14 +175,18 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                     RpcStreamEvent::End { .. } => {
                         tracing::trace!("[recv_fn for method: {}] Received End event.", method_id);
                         let final_status = mem::take(&mut *status_lock_guard);
-                        let payload = std::mem::replace(&mut *error_buffer_lock_guard, Vec::new());
+
+                        // FIXME: This replacement is indeed okay?
+                        // let payload = std::mem::replace(&mut *error_buffer_lock_guard, Vec::new());
+                        let payload = std::mem::take(&mut *error_buffer_lock_guard);
+
                         let mut temp_tx_option = mem::take(&mut *tx_lock_guard);
                         if let Some(mut sender) = temp_tx_option.take() {
                             match final_status {
                                 Some(RpcResultStatus::MethodNotFound) => {
                                     let msg = String::from_utf8_lossy(&payload).to_string();
                                     let final_msg = if msg.is_empty() {
-                                        format!("RPC method not found: {:?}", final_status)
+                                        format!("RPC method not found: {final_status:?}")
                                     } else {
                                         msg
                                     };
@@ -212,7 +216,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                                 Some(RpcResultStatus::SystemError) => {
                                     let msg = String::from_utf8_lossy(&payload).to_string();
                                     let final_msg = if msg.is_empty() {
-                                        format!("RPC failed with status: {:?}", final_status)
+                                        format!("RPC failed with status: {final_status:?}")
                                     } else {
                                         msg
                                     };
@@ -223,15 +227,12 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                                         },
                                     )));
                                     tracing::trace!(
-                                        "[recv_fn for method: {}] Sent SystemError.",
-                                        method_id
+                                        "[recv_fn for method: {method_id}] Sent SystemError.",
                                     );
                                 }
                                 _ => {
                                     tracing::trace!(
-                                        "[recv_fn for method: {}] Unexpected final status: {:?}. Closing channel.",
-                                        method_id,
-                                        final_status
+                                        "[recv_fn for method: {method_id}] Unexpected final status: {final_status:?}. Closing channel.",
                                     );
                                 }
                             }
@@ -312,8 +313,8 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                     false,
                 )
                 .map_err(|e| {
-                    tracing::error!("Dispatcher.call failed: {:?}", e);
-                    io::Error::other(format!("{:?}", e))
+                    tracing::error!("Dispatcher.call failed: {e:?}");
+                    io::Error::other(format!("{e:?}"))
                 });
 
             match result_encoder {

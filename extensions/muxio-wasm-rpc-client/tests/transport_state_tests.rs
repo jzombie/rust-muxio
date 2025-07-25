@@ -75,7 +75,7 @@ async fn setup_wasm_client_bridge(
 async fn test_client_errors_on_connection_failure() {
     tracing::info!("Running test_client_errors_on_connection_failure (WASM)");
     let (_, unused_port) = bind_tcp_listener_on_random_port().await.unwrap();
-    tracing::debug!("Attempting to connect to unused port: {}", unused_port);
+    tracing::debug!("Attempting to connect to unused port: {unused_port}");
 
     // RpcWasmClient::new does not actually connect, it sets up the internal channels.
     // The actual connection happens in setup_wasm_client_bridge.
@@ -85,7 +85,7 @@ async fn test_client_errors_on_connection_failure() {
     // The connection should fail immediately, so the timeout wrapper should return Ok(Err(...)).
     let connect_result = timeout(
         Duration::from_secs(2), // Use 2 seconds to be safe
-        setup_wasm_client_bridge(&format!("ws://127.0.0.1:{}/ws", unused_port)),
+        setup_wasm_client_bridge(&format!("ws://127.0.0.1:{unused_port}/ws")),
     )
     .await;
 
@@ -112,6 +112,7 @@ async fn test_client_errors_on_connection_failure() {
 
 #[tokio::test]
 #[instrument]
+#[allow(clippy::await_holding_lock)]
 async fn test_transport_state_change_handler() {
     tracing::info!("Running test_transport_state_change_handler (WASM)");
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -193,6 +194,7 @@ async fn test_transport_state_change_handler() {
     // Clean up all spawned tasks and resources.
     server_task.abort();
     ws_send_handle.abort(); // Abort the bridge send task
+
     tokio::time::sleep(Duration::from_millis(10)).await; // Small sleep for abort propagation
 }
 
@@ -258,7 +260,7 @@ async fn test_pending_requests_fail_on_disconnect() {
             b"this will fail".to_vec(),
         )
         .await;
-        tracing::debug!("[RPC Task] RPC call completed with result: {:?}", result);
+        tracing::debug!("[RPC Task] RPC call completed with result: {result:?}",);
         let _ = tx_rpc_result.send(result); // Send result back to main test thread
     });
     tracing::debug!("RPC call spawned to run in background.");
@@ -285,15 +287,11 @@ async fn test_pending_requests_fail_on_disconnect() {
     // 5. Await the result of the spawned RPC call task. It should be an error.
     tracing::debug!("Waiting for spawned RPC call future to resolve (should be cancelled).");
     let result = timeout(Duration::from_secs(1), rx_rpc_result).await; // 1 sec timeout for resolution
-    tracing::debug!(
-        "[Test] ***** Spawned RPC call future resolution result: {:?} ***** ",
-        result
-    );
+    tracing::debug!("[Test] ***** Spawned RPC call future resolution result: {result:?} ***** ",);
 
     assert!(
         result.is_ok(),
-        "Test timed out waiting for RPC call to resolve. Result: {:?}",
-        result
+        "Test timed out waiting for RPC call to resolve. Result: {result:?}",
     );
 
     let rpc_result = result
@@ -301,8 +299,7 @@ async fn test_pending_requests_fail_on_disconnect() {
         .expect("Oneshot channel should not be dropped");
     assert!(
         rpc_result.is_err(),
-        "Expected the pending RPC call to fail, but it succeeded. Result: {:?}",
-        rpc_result
+        "Expected the pending RPC call to fail, but it succeeded. Result: {rpc_result:?}",
     );
 
     let err_string = rpc_result.unwrap_err().to_string();
@@ -313,8 +310,7 @@ async fn test_pending_requests_fail_on_disconnect() {
             || err_string.contains("cancelled stream")
             || err_string.contains("Transport error")
             || err_string.contains("Client is disconnected"),
-        "Error message should indicate that the request was cancelled due to a disconnect. Got: {}",
-        err_string
+        "Error message should indicate that the request was cancelled due to a disconnect. Got: {err_string}",
     );
     tracing::info!("`test_pending_requests_fail_on_disconnect` PASSED (WASM)");
 

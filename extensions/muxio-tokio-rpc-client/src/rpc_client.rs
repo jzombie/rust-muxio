@@ -178,7 +178,7 @@ impl RpcClient {
                             }
                             Ok(WsMessage::Ping(data)) => {
                                 tracing::debug!("Received Ping message.");
-                                let _ = client.tx.send(WsMessage::Pong(data.into()));
+                                let _ = client.tx.send(WsMessage::Pong(data));
                             }
                             Ok(msg) => {
                                 tracing::debug!("Received other WebSocket message: {:?}", msg);
