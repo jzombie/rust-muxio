@@ -32,19 +32,19 @@ async fn test_success_client_server_roundtrip() {
 
         // Register handlers on the endpoint, not the server.
         let _ = join!(
-            endpoint.register_prebuffered(Add::METHOD_ID, |_, bytes: Vec<u8>| async move {
+            endpoint.register_prebuffered(Add::METHOD_ID, |bytes: Vec<u8>, _ctx| async move {
                 let params = Add::decode_request(&bytes)?;
                 let sum = params.iter().sum();
                 let response_bytes = Add::encode_response(sum)?;
                 Ok(response_bytes)
             }),
-            endpoint.register_prebuffered(Mult::METHOD_ID, |_, bytes: Vec<u8>| async move {
+            endpoint.register_prebuffered(Mult::METHOD_ID, |bytes: Vec<u8>, _ctx| async move {
                 let params = Mult::decode_request(&bytes)?;
                 let product = params.iter().product();
                 let response_bytes = Mult::encode_response(product)?;
                 Ok(response_bytes)
             }),
-            endpoint.register_prebuffered(Echo::METHOD_ID, |_, bytes: Vec<u8>| async move {
+            endpoint.register_prebuffered(Echo::METHOD_ID, |bytes: Vec<u8>, _ctx| async move {
                 let params = Echo::decode_request(&bytes)?;
                 let response_bytes = Echo::encode_response(params)?;
                 Ok(response_bytes)
@@ -102,7 +102,7 @@ async fn test_error_client_server_roundtrip() {
         // Note: The `join!` macro is not strictly necessary for a single future,
         // but we use it here to show the pattern is consistent.
         let _ = join!(
-            endpoint.register_prebuffered(Add::METHOD_ID, |_, _bytes: Vec<u8>| async move {
+            endpoint.register_prebuffered(Add::METHOD_ID, |_bytes: Vec<u8>, _ctx| async move {
                 Err("Addition failed".into())
             }),
         );
@@ -154,7 +154,7 @@ async fn test_large_prebuffered_payload_roundtrip() {
 
     // Register a simple "echo" handler on the server for our test to call.
     endpoint
-        .register_prebuffered(Echo::METHOD_ID, |_, bytes: Vec<u8>| async move {
+        .register_prebuffered(Echo::METHOD_ID, |bytes: Vec<u8>, _ctx| async move {
             // The handler simply returns the bytes it received.
             Ok(Echo::encode_response(bytes).unwrap())
         })

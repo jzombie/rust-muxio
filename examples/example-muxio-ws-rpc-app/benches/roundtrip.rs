@@ -22,7 +22,7 @@ fn bench_roundtrip(c: &mut Criterion) {
         let endpoint = server.endpoint();
 
         endpoint
-            .register_prebuffered(Add::METHOD_ID, |_, bytes| async move {
+            .register_prebuffered(Add::METHOD_ID, |bytes, _ctx| async move {
                 let params = Add::decode_request(&bytes)?;
                 let sum = params.iter().sum();
                 let response_bytes = Add::encode_response(sum)?;

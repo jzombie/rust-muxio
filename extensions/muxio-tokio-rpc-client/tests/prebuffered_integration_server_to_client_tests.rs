@@ -51,7 +51,7 @@ async fn test_server_to_tokio_client_echo_roundtrip() {
     // This is crucial for the server-to-client call to work.
     let client_endpoint = client.get_endpoint();
     client_endpoint
-        .register_prebuffered(Echo::METHOD_ID, |_, request_bytes| async move {
+        .register_prebuffered(Echo::METHOD_ID, |request_bytes, _ctx| async move {
             let request = Echo::decode_request(&request_bytes)?;
             tracing::info!(
                 "TOKIO CLIENT (Test): Received server-initiated echo request: '{}'",

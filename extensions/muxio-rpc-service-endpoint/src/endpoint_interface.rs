@@ -38,7 +38,7 @@ where
         handler: F,
     ) -> Result<(), RpcServiceEndpointError>
     where
-        F: Fn(C, Vec<u8>) -> Fut + Send + Sync + 'static,
+        F: Fn(Vec<u8>, C) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>>>
             + Send
             + 'static,
@@ -48,13 +48,12 @@ where
                 // `method_id` is now u64, matches HashMap key
                 Entry::Occupied(_) => {
                     let err_msg =
-                        format!("a handler for method ID {method_id} is already registered");
+                        format!("A handler for method ID {method_id} is already registered.");
                     Err(RpcServiceEndpointError::Handler(err_msg.into()))
                 }
                 Entry::Vacant(entry) => {
-                    // TODO: Move `ctx` to 2nd arg position for more idiomatic Rust
-                    let wrapped = move |ctx: C, bytes: Vec<u8>| {
-                        Box::pin(handler(ctx, bytes))
+                    let wrapped = move |bytes: Vec<u8>, ctx: C| {
+                        Box::pin(handler(bytes, ctx))
                             as std::pin::Pin<Box<dyn Future<Output = _> + Send>>
                     };
                     entry.insert(Arc::new(wrapped));

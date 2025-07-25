@@ -32,7 +32,7 @@ where
         let args_for_handler = if !payload.is_empty() { payload } else { params };
 
         // Call the actual user-defined async handler. This might also `await` internally.
-        match handler(context, args_for_handler.to_vec()).await {
+        match handler(args_for_handler.to_vec(), context).await {
             Ok(encoded) => RpcResponse {
                 rpc_request_id: request_id,
                 rpc_method_id: request.rpc_method_id,

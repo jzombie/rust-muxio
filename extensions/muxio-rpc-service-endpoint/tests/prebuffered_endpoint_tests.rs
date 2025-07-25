@@ -109,11 +109,11 @@ fn client_get_finalized_response(
 async fn test_handler_registration() {
     let endpoint = RpcServiceEndpoint::<()>::new();
     let result1 = endpoint
-        .register_prebuffered(101, |_, _: Vec<u8>| async { Ok(vec![]) })
+        .register_prebuffered(101, |_bytes: Vec<u8>, _ctx| async { Ok(vec![]) })
         .await;
     assert!(result1.is_ok());
     let result2 = endpoint
-        .register_prebuffered(101, |_, _: Vec<u8>| async { Ok(vec![]) })
+        .register_prebuffered(101, |_bytes: Vec<u8>, _ctx| async { Ok(vec![]) })
         .await;
     assert!(matches!(result2, Err(RpcServiceEndpointError::Handler(_))));
 }
@@ -123,7 +123,7 @@ async fn test_read_bytes_success() {
     let endpoint = Arc::new(RpcServiceEndpoint::<()>::new());
     const METHOD_ID: u64 = 202;
     endpoint
-        .register_prebuffered(METHOD_ID, |_, req_bytes: Vec<u8>| async move {
+        .register_prebuffered(METHOD_ID, |req_bytes: Vec<u8>, _ctx| async move {
             let num = u32::from_le_bytes(req_bytes.try_into().unwrap());
             Ok((num * 2).to_le_bytes().to_vec())
         })
@@ -146,7 +146,7 @@ async fn test_read_bytes_handler_system_error() {
     let error_message = "a specific internal error occurred";
 
     endpoint
-        .register_prebuffered(METHOD_ID, move |_, _: Vec<u8>| async move {
+        .register_prebuffered(METHOD_ID, move |_bytes: Vec<u8>, _ctx| async move {
             Err(error_message.into())
         })
         .await
@@ -176,7 +176,7 @@ async fn test_read_bytes_handler_structured_fail_error() {
         .register_prebuffered(METHOD_ID, {
             // Clone the payload to move it into the async handler.
             let error_payload_clone = error_payload.clone();
-            move |_, _: Vec<u8>| {
+            move |_bytes: Vec<u8>, _ctx| {
                 let error_payload = error_payload_clone.clone();
                 async move {
                     // 2. Wrap the payload in `RpcServiceEndointHandlerError`, then box it.
@@ -227,7 +227,7 @@ async fn test_large_payload_request_response_cycle() {
     endpoint
         .register_prebuffered(LARGE_PAYLOAD_METHOD_ID, {
             let expected_response = expected_response_payload.clone();
-            move |_, req_bytes: Vec<u8>| {
+            move |req_bytes: Vec<u8>, _ctx| {
                 let mut resp_bytes = req_bytes.clone();
                 resp_bytes.extend_from_slice(b"_processed");
                 assert_eq!(resp_bytes, expected_response);
