@@ -3,6 +3,7 @@ use crate::RpcWasmClient;
 use js_sys::Promise;
 use std::cell::RefCell;
 use std::sync::Arc;
+use tracing::{self, instrument};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
@@ -87,20 +88,21 @@ pub fn get_static_client() -> Option<Arc<RpcWasmClient>> {
 /// - `1`: Connected
 /// - `2`: Disconnected
 #[wasm_bindgen]
+#[instrument]
 pub fn notify_static_client_transport_state_change(state_code: u8) -> Promise {
     with_static_client_async(move |client_arc| async move {
         match state_code {
             0 => {
-                // TODO: Tracing debug
+                tracing::debug!("Transport state changed to: connecting");
                 Ok(JsValue::undefined())
             }
             1 => {
-                // TODO: Tracing debug
+                tracing::debug!("Transport state changed to: connected");
                 client_arc.handle_connect().await;
                 Ok(JsValue::undefined())
             }
             2 => {
-                // TODO: Tracing debug
+                tracing::debug!("Transport state changed to: disconnected");
                 client_arc.handle_disconnect().await;
                 Ok(JsValue::undefined())
             }
