@@ -17,6 +17,7 @@ use futures_util::{
     SinkExt, StreamExt,
     stream::{SplitSink, SplitStream},
 };
+use muxio::frame::FrameDecodeError;
 use muxio::rpc::RpcDispatcher;
 use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
 use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface};
@@ -201,12 +202,12 @@ impl RpcServer {
 
     async fn receiver_task(
         endpoint: Arc<RpcServiceEndpoint<Arc<ConnectionContext>>>,
-        context: Arc<ConnectionContext>,
+        context: Arc<ConnectionContext>, // The Arc<ConnectionContext> for this client
         mut receiver: SplitStream<WebSocket>,
         tx: mpsc::UnboundedSender<Message>,
         addr: SocketAddr,
         event_tx: Option<mpsc::UnboundedSender<RpcServerEvent>>,
-        is_connected_atomic: Arc<AtomicBool>,
+        is_connected_atomic: Arc<AtomicBool>, // This is the AtomicBool for connection status
     ) {
         let heartbeat_interval = Duration::from_secs(HEARTBEAT_INTERVAL);
         let client_timeout = Duration::from_secs(CLIENT_TIMEOUT);
@@ -216,28 +217,47 @@ impl RpcServer {
                 _ = tokio::time::sleep(heartbeat_interval) => {
                     if tx.send(Message::Ping(vec![].into())).is_err() {
                         tracing::info!("Client {} disconnected (failed to send ping).", addr);
-                        break;
+                        break; // Break loop on send error
                     }
                 }
                 result = timeout(client_timeout, receiver.next()) => {
                     match result {
                         Err(_) => {
                             tracing::warn!("Client {} timed out. Closing connection.", addr);
-                            break;
+                            break; // Break loop on timeout
                         },
                         Ok(Some(Ok(msg))) => {
                             match msg {
                                 Message::Binary(bytes) => {
-                                    println!("BEFORE DISPATCHER LOCK");
+                                    println!("BEFORE DISPATCHER LOCK"); // Debug log, remove later
                                     let mut dispatcher = context.dispatcher.lock().await;
-                                    println!("AFTER DISPATCHER LOCK");
+                                    println!("AFTER DISPATCHER LOCK"); // Debug log, remove later
                                     let tx_clone = tx.clone();
                                     let on_emit = move |chunk: &[u8]| {
                                         let _ = tx_clone.send(Message::Binary(Bytes::copy_from_slice(chunk)));
+                                        tracing::trace!(
+                                            "Server receiver_task: Emitted response chunk of {} bytes to client {}.",
+                                            chunk.len(),
+                                            addr
+                                        ); // Debug log
                                     };
 
+                                    tracing::info!(
+                                        "Server receiver_task: Processing incoming binary message ({} bytes) from client {}.",
+                                        bytes.len(),
+                                        addr
+                                    ); // Debug log
                                     if let Err(err) = endpoint.read_bytes(&mut dispatcher, context.clone(), &bytes, on_emit).await {
-                                        tracing::error!("Error processing bytes from {}: {:?}", addr, err);
+                                        tracing::error!(
+                                            "Server receiver_task: Error processing bytes from {}. Handler returned: {:?}",
+                                            addr,
+                                            err
+                                        ); // Debug log
+                                    } else {
+                                        tracing::info!(
+                                            "Server receiver_task: Successfully processed incoming binary message from client {}.",
+                                            addr
+                                        ); // Debug log
                                     }
                                 }
                                 Message::Pong(_) => {
@@ -245,26 +265,44 @@ impl RpcServer {
                                 }
                                 Message::Close(_) => {
                                     tracing::info!("Client {} initiated close.", addr);
-                                    break;
+                                    break; // Break loop on client close message
                                 }
                                 _ => {}
                             }
                         }
                         Ok(None) | Ok(Some(Err(_))) => {
                             tracing::info!("Client {} disconnected.", addr);
-                            break;
+                            break; // Break loop on stream end or receive error
                         }
                     }
                 }
             }
         }
+        // Execution reaches here when the connection is considered disconnected.
 
-        // When the loop breaks, the client is disconnected. Update the AtomicBool.
-        is_connected_atomic.store(false, Ordering::SeqCst); // <--- SET TO FALSE ON DISCONNECT
+        // 1. Update the AtomicBool status.
+        is_connected_atomic.store(false, Ordering::SeqCst);
         tracing::info!("Client {} connection status set to Disconnected.", addr);
 
-        if let Some(tx) = event_tx {
-            let _ = tx.send(RpcServerEvent::ClientDisconnected(addr));
+        // 2. Fail all pending requests on this connection's dispatcher.
+        //    Acquire the dispatcher lock here and fail them immediately.
+        //    Use `lock().await` because this is an `async fn`.
+        //    This ensures they are failed *before* this task fully unwinds.
+        tracing::info!(
+            "Attempting to acquire dispatcher lock for {} to fail pending requests.",
+            addr
+        );
+        let mut dispatcher_guard = context.dispatcher.lock().await; // <--- CHANGE: AWAIT HERE
+        tracing::info!(
+            "Acquired dispatcher lock for {} to fail pending requests.",
+            addr
+        );
+        dispatcher_guard.fail_all_pending_requests(FrameDecodeError::ReadAfterCancel);
+        tracing::info!("Dispatcher for {} failed all pending requests.", addr);
+
+        // 3. Send the disconnect event.
+        if let Some(tx_event) = event_tx {
+            let _ = tx_event.send(RpcServerEvent::ClientDisconnected(addr));
         }
     }
 }
