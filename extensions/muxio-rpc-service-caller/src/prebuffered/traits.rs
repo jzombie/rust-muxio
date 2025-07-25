@@ -27,6 +27,25 @@ where
     T::Input: Send + 'static,
     T::Output: Send + 'static + Debug, // Add Debug trait bound here
 {
+    /// ### Large Argument Handling
+    ///
+    /// Due to underlying network transport limitations, a single RPC header frame
+    /// cannot exceed a certain size (typically ~64KB). To handle arguments of any
+    /// size, this method implements a "smart" transport strategy:
+    ///
+    /// 1.  **If the encoded arguments are small** (smaller than `DEFAULT_SERVICE_MAX_CHUNK_SIZE`),
+    ///     they are sent in the `rpc_param_bytes` field of the request, which is part of
+    ///     the initial header frame.
+    ///
+    /// 2.  **If the encoded arguments are large**, they cannot be sent in the header. Instead,
+    ///     they are placed into the `rpc_prebuffered_payload_bytes` field. The underlying
+    ///     `RpcDispatcher` will then automatically chunk this data and stream it as a
+    ///     payload after the header.
+    ///
+    /// This ensures that RPC calls with large argument sets do not fail due to transport
+    /// limitations, while still using the most efficient method for small arguments. The
+    /// server-side `RpcServiceEndpointInterface` is designed with corresponding logic to
+    ///  find the arguments in either location.
     #[instrument(skip(rpc_client, input))]
     async fn call<C: RpcServiceCallerInterface + Send + Sync>(
         rpc_client: &C,
