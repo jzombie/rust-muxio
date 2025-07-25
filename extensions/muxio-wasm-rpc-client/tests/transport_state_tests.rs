@@ -22,7 +22,6 @@ use tracing::{self, instrument};
 
 // Helper function to set up the RpcWasmClient and its WebSocket bridge
 // Returns the client, a handle for messages *from* WASM, and a handle for messages *to* WASM.
-// MODIFIED: Now returns a Result to propagate connection errors instead of panicking.
 async fn setup_wasm_client_bridge(
     server_url: &str,
 ) -> Result<(Arc<RpcWasmClient>, JoinHandle<()>, JoinHandle<()>), WsError> {
@@ -33,7 +32,6 @@ async fn setup_wasm_client_bridge(
         let _ = from_wasm_tx.send(bytes);
     }));
 
-    // MODIFIED: Propagate the connection error instead of using .expect()
     let (ws_stream, _) = connect_async(server_url).await?;
     let (mut ws_sender, mut ws_receiver) = ws_stream.split();
 
@@ -66,7 +64,6 @@ async fn setup_wasm_client_bridge(
         }
     });
 
-    // MODIFIED: Wrap successful result in Ok()
     Ok((client, ws_send_handle, ws_recv_handle))
 }
 
@@ -83,7 +80,6 @@ async fn test_client_errors_on_connection_failure() {
     // The actual connection happens in setup_wasm_client_bridge.
     let client_for_drop = Arc::new(RpcWasmClient::new(|_| {})); // Client instance only for setup/drop
 
-    // MODIFIED: The test logic is updated to handle the Result from the helper.
     // The connection should fail immediately, so the timeout wrapper should return Ok(Err(...)).
     let connect_result = timeout(
         Duration::from_secs(2), // Use 2 seconds to be safe
@@ -143,9 +139,8 @@ async fn test_transport_state_change_handler() {
         tracing::debug!("[Server Task] Server accept loop finished.");
     });
 
-    let received_states = Arc::new(Mutex::new(Vec::new())); // std::sync::Mutex for state accessible in synchronous callbacks.
+    let received_states = Arc::new(Mutex::new(Vec::new()));
 
-    // MODIFIED: Unwrapping result as this test expects a successful connection.
     let (client, ws_send_handle, ws_recv_handle) =
         setup_wasm_client_bridge(&server_url).await.unwrap();
 
@@ -234,7 +229,6 @@ async fn test_pending_requests_fail_on_disconnect() {
         tracing::debug!("[Server Task Pending] Server task finished.");
     });
 
-    // MODIFIED: Unwrapping result as this test expects a successful connection.
     let (client, ws_send_handle, ws_recv_handle) =
         setup_wasm_client_bridge(&server_url).await.unwrap();
 

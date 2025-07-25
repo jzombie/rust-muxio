@@ -73,7 +73,6 @@ async fn test_server_to_wasm_client_echo_roundtrip() {
         }
     });
 
-    // --- CRUCIAL CHANGE STARTS HERE ---
     tokio::spawn({
         let client = client.clone();
         async move {
@@ -85,7 +84,6 @@ async fn test_server_to_wasm_client_echo_roundtrip() {
             }
         }
     });
-    // --- CRUCIAL CHANGE ENDS HERE ---
 
     let ctx_handle = loop {
         if let Some(RpcServerEvent::ClientConnected(handle)) = event_rx.recv().await {
