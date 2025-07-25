@@ -19,14 +19,17 @@ pub(crate) fn static_muxio_write_bytes(bytes: &[u8]) {
 pub fn static_muxio_read_bytes_uint8(inbound_data: Uint8Array) -> Result<(), JsValue> {
     let inbound_bytes = inbound_data.to_vec();
 
+    // TODO: Use `get_static_client` for easier use
     let client_arc = MUXIO_STATIC_RPC_CLIENT_REF
         .with(|cell| cell.borrow().clone())
         .ok_or_else(|| JsValue::from_str("RPC client not initialized"))?;
 
     spawn_local(async move {
-        // Use the new comprehensive method on the client
         client_arc.process_incoming_bytes(&inbound_bytes).await;
     });
 
     Ok(())
 }
+
+// TODO: Expose `static_muxio_handle_connect`
+// TODO: Expose `static_muxio_handle_disconnect`
