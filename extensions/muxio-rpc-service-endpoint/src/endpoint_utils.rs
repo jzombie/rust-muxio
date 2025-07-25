@@ -32,7 +32,7 @@ where
         let args_for_handler = if !payload.is_empty() { payload } else { params };
 
         // Call the actual user-defined async handler. This might also `await` internally.
-        match handler(context, args_for_handler.to_vec()).await {
+        match handler(args_for_handler.to_vec(), context).await {
             Ok(encoded) => RpcResponse {
                 rpc_request_id: request_id,
                 rpc_method_id: request.rpc_method_id,
@@ -46,20 +46,20 @@ where
                     let payload = &handler_error.0;
 
                     // Map the error code to the wire-protocol status.
-                    let status = match payload.code {
+                    let result_status = match payload.code {
                         RpcServiceErrorCode::Fail => RpcResultStatus::Fail,
                         RpcServiceErrorCode::System => RpcResultStatus::SystemError,
                         RpcServiceErrorCode::NotFound => RpcResultStatus::MethodNotFound,
                     };
 
                     // Serialize the structured payload to send to the caller.
-                    let payload_bytes = bitcode::encode(payload);
+                    let response_payload_bytes = bitcode::encode(payload);
 
                     RpcResponse {
                         rpc_request_id: request_id,
                         rpc_method_id: request.rpc_method_id,
-                        rpc_result_status: Some(status.into()),
-                        rpc_prebuffered_payload_bytes: Some(payload_bytes),
+                        rpc_result_status: Some(result_status.into()),
+                        rpc_prebuffered_payload_bytes: Some(response_payload_bytes),
                         is_finalized: true,
                     }
                 } else {

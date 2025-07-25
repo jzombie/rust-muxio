@@ -17,7 +17,7 @@ pub trait RpcMethodPrebuffered {
     ///
     /// # Arguments
     /// * `bytes` - Serialized request payload.
-    fn decode_request(bytes: &[u8]) -> Result<Self::Input, io::Error>;
+    fn decode_request(request_bytes: &[u8]) -> Result<Self::Input, io::Error>;
 
     /// Encodes the response value into a byte array.
     fn encode_response(output: Self::Output) -> Result<Vec<u8>, io::Error>;
@@ -26,7 +26,7 @@ pub trait RpcMethodPrebuffered {
     ///
     /// # Arguments
     /// * `bytes` - Serialized response payload.
-    fn decode_response(bytes: &[u8]) -> Result<Self::Output, io::Error>;
+    fn decode_response(response_bytes: &[u8]) -> Result<Self::Output, io::Error>;
 }
 
 // TODO: Integrate
@@ -40,16 +40,16 @@ pub trait RpcMethodPrebuffered {
 //         bitcode::encode(&input).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
 //     }
 
-//     fn decode_request(bytes: &[u8]) -> Result<Self::Input, io::Error> {
-//         bitcode::decode(bytes).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
+//     fn decode_request(request_bytes: &[u8]) -> Result<Self::Input, io::Error> {
+//         bitcode::decode(request_bytes).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
 //     }
 
 //     fn encode_response(output: Self::Output) -> Result<Vec<u8>, io::Error> {
 //         bitcode::encode(&output).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
 //     }
 
-//     fn decode_response(bytes: &[u8]) -> Result<Self::Output, io::Error> {
-//         bitcode::decode(bytes).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
+//     fn decode_response(response_bytes: &[u8]) -> Result<Self::Output, io::Error> {
+//         bitcode::decode(response_bytes).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
 //     }
 // }
 
@@ -67,15 +67,15 @@ pub trait RpcMethodPrebuffered {
 //         <T as BitcodeRpcMethodPrebuffered>::encode_request(input)
 //     }
 
-//     fn decode_request(bytes: &[u8]) -> Result<Self::Input, io::Error> {
-//         <T as BitcodeRpcMethodPrebuffered>::decode_request(bytes)
+//     fn decode_request(request_bytes: &[u8]) -> Result<Self::Input, io::Error> {
+//         <T as BitcodeRpcMethodPrebuffered>::decode_request(request_bytes)
 //     }
 
 //     fn encode_response(output: Self::Output) -> Result<Vec<u8>, io::Error> {
 //         <T as BitcodeRpcMethodPrebuffered>::encode_response(output)
 //     }
 
-//     fn decode_response(bytes: &[u8]) -> Result<Self::Output, io::Error> {
-//         <T as BitcodeRpcMethodPrebuffered>::decode_response(bytes)
+//     fn decode_response(response_bytes: &[u8]) -> Result<Self::Output, io::Error> {
+//         <T as BitcodeRpcMethodPrebuffered>::decode_response(response_bytes)
 //     }
 // }

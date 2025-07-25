@@ -75,7 +75,7 @@ async fn test_proxy_error_propagation_on_provider_disconnect() {
     server_endpoint
         // `ctx_raw_from_client_a` is the raw context value for Client A's incoming connection.
         // It needs to be wrapped into a ConnectionContextHandle.
-        .register_prebuffered(Echo::METHOD_ID, move |ctx_raw_from_client_a, bytes| {
+        .register_prebuffered(Echo::METHOD_ID, move |bytes, ctx_raw_from_client_a| {
             let ctx_from_client_a = ConnectionContextHandle(ctx_raw_from_client_a); // Correctly wrap the raw ctx
             let client_b_provider_handle_storage = client_b_handle_on_server_storage_clone.clone();
             async move {
@@ -173,7 +173,7 @@ async fn test_proxy_error_propagation_on_provider_disconnect() {
 
     let client_b_endpoint = client_b.get_endpoint();
     client_b_endpoint
-        .register_prebuffered(Echo::METHOD_ID, move |_, _bytes| {
+        .register_prebuffered(Echo::METHOD_ID, move |_request_bytes, _ctx| {
             let tx_signal = client_b_handler_received_tx_clone.clone();
             async move {
                 tracing::trace!("[Client B Handler] Echo method handler invoked.");

@@ -31,23 +31,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Register server methods on the endpoint
         let _ = join!(
-            endpoint.register_prebuffered(Add::METHOD_ID, |_, bytes: Vec<u8>| async move {
-                let params = Add::decode_request(&bytes)?;
-                let sum = params.iter().sum();
-                let response_bytes = Add::encode_response(sum)?;
-                Ok(response_bytes)
-            }),
-            endpoint.register_prebuffered(Mult::METHOD_ID, |_, bytes: Vec<u8>| async move {
-                let params = Mult::decode_request(&bytes)?;
-                let product = params.iter().product();
-                let response_bytes = Mult::encode_response(product)?;
-                Ok(response_bytes)
-            }),
-            endpoint.register_prebuffered(Echo::METHOD_ID, |_, bytes: Vec<u8>| async move {
-                let params = Echo::decode_request(&bytes)?;
-                let response_bytes = Echo::encode_response(params)?;
-                Ok(response_bytes)
-            })
+            endpoint.register_prebuffered(
+                Add::METHOD_ID,
+                |request_bytes: Vec<u8>, _ctx| async move {
+                    let request_params = Add::decode_request(&request_bytes)?;
+                    let sum = request_params.iter().sum();
+                    let response_bytes = Add::encode_response(sum)?;
+                    Ok(response_bytes)
+                }
+            ),
+            endpoint.register_prebuffered(
+                Mult::METHOD_ID,
+                |request_bytes: Vec<u8>, _ctx| async move {
+                    let request_params = Mult::decode_request(&request_bytes)?;
+                    let product = request_params.iter().product();
+                    let response_bytes = Mult::encode_response(product)?;
+                    Ok(response_bytes)
+                }
+            ),
+            endpoint.register_prebuffered(
+                Echo::METHOD_ID,
+                |request_bytes: Vec<u8>, _ctx| async move {
+                    let request_params = Echo::decode_request(&request_bytes)?;
+                    let response_bytes = Echo::encode_response(request_params)?;
+                    Ok(response_bytes)
+                }
+            )
         );
 
         // Spawn the server using the pre-bound listener

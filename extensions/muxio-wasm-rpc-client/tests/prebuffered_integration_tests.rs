@@ -49,21 +49,21 @@ async fn test_success_client_server_roundtrip() {
 
     // Register handlers on the server.
     let _ = join!(
-        endpoint.register_prebuffered(Add::METHOD_ID, |_, bytes| async move {
-            let params = Add::decode_request(&bytes)?;
-            let sum = params.iter().sum();
+        endpoint.register_prebuffered(Add::METHOD_ID, |request_bytes, _ctx| async move {
+            let request_params = Add::decode_request(&request_bytes)?;
+            let sum = request_params.iter().sum();
             let response_bytes = Add::encode_response(sum)?;
             Ok(response_bytes)
         }),
-        endpoint.register_prebuffered(Mult::METHOD_ID, |_, bytes| async move {
-            let params = Mult::decode_request(&bytes)?;
-            let product = params.iter().product();
+        endpoint.register_prebuffered(Mult::METHOD_ID, |request_bytes, _ctx| async move {
+            let request_params = Mult::decode_request(&request_bytes)?;
+            let product = request_params.iter().product();
             let response_bytes = Mult::encode_response(product)?;
             Ok(response_bytes)
         }),
-        endpoint.register_prebuffered(Echo::METHOD_ID, |_, bytes| async move {
-            let params = Echo::decode_request(&bytes)?;
-            let response_bytes = Echo::encode_response(params)?;
+        endpoint.register_prebuffered(Echo::METHOD_ID, |request_bytes, _ctx| async move {
+            let request_params = Echo::decode_request(&request_bytes)?;
+            let response_bytes = Echo::encode_response(request_params)?;
             Ok(response_bytes)
         })
     );
@@ -153,7 +153,7 @@ async fn test_error_client_server_roundtrip() {
     let endpoint = server.endpoint();
 
     endpoint
-        .register_prebuffered(Add::METHOD_ID, |_, _bytes| async move {
+        .register_prebuffered(Add::METHOD_ID, |_request_bytes, _ctx| async move {
             Err("Addition failed".into())
         })
         .await
@@ -237,10 +237,10 @@ async fn test_large_prebuffered_payload_roundtrip_wasm() {
 
     // Register a simple "echo" handler on the server for our test to call.
     endpoint
-        .register_prebuffered(Echo::METHOD_ID, |_, bytes: Vec<u8>| async move {
+        .register_prebuffered(Echo::METHOD_ID, |request_bytes: Vec<u8>, _ctx| async move {
             // The handler simply returns the bytes it received.
-            let params = Echo::decode_request(&bytes)?;
-            Ok(Echo::encode_response(params)?)
+            let request_params = Echo::decode_request(&request_bytes)?;
+            Ok(Echo::encode_response(request_params)?)
         })
         .await
         .unwrap();
