@@ -60,7 +60,7 @@ where
                 tracing::warn!("Arguments are large, using payload_bytes.");
                 (None, Some(encoded_args))
             } else {
-                tracing::debug!("Arguments are small, using param_bytes.");
+                tracing::trace!("Arguments are small, using param_bytes.");
                 (Some(encoded_args), None)
             };
 
@@ -70,7 +70,7 @@ where
             rpc_prebuffered_payload_bytes: request_payload_bytes,
             is_finalized: true, // IMPORTANT: All prebuffered requests should be considered finalized
         };
-        tracing::debug!("RpcRequest created: {:?}", request);
+        tracing::trace!("RpcRequest created: {:?}", request);
 
         let decode_closure =
             |buffer: &[u8]| -> Result<Self::Output, io::Error> { Self::decode_response(buffer) };
@@ -79,18 +79,18 @@ where
         let (_encoder, nested_result) = rpc_client
             .call_rpc_buffered(request, decode_closure)
             .await?;
-        tracing::debug!(
+        tracing::trace!(
             "`rpc_client.call_rpc_buffered` returned. Nested result: {:?}",
             nested_result
         );
 
         match nested_result {
             Ok(decode_result) => {
-                tracing::debug!("Unpacking nested_result: Ok. Decoding response.");
+                tracing::trace!("Unpacking nested_result: Ok. Decoding response.");
                 decode_result.map_err(RpcServiceError::Transport)
             }
             Err(e) => {
-                tracing::debug!("Unpacking nested_result: Err. Returning error: {:?}", e);
+                tracing::trace!("Unpacking nested_result: Err. Returning error: {:?}", e);
                 Err(e)
             }
         }
