@@ -35,7 +35,7 @@ pub async fn static_muxio_read_bytes_uint8(inbound_data: Uint8Array) -> Result<(
 pub async fn static_muxio_handle_connect() -> Result<(), JsValue> {
     match get_static_client() {
         Some(static_client) => Ok(static_client.handle_connect().await),
-        None => Err("No registered static WASM client".into()),
+        None => Err("No registered static `RpcWasmClient`".into()),
     }
 }
 
@@ -44,6 +44,6 @@ pub async fn static_muxio_handle_connect() -> Result<(), JsValue> {
 pub async fn static_muxio_handle_disconnect() -> Result<(), JsValue> {
     match get_static_client() {
         Some(static_client) => Ok(static_client.handle_disconnect().await),
-        None => Err("No registered static WASM client".into()),
+        None => Err("No registered static `RpcWasmClient`".into()),
     }
 }
