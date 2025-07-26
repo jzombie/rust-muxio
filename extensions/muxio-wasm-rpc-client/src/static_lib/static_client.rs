@@ -3,7 +3,6 @@ use crate::RpcWasmClient;
 use js_sys::Promise;
 use std::cell::RefCell;
 use std::sync::Arc;
-use tracing::{self, instrument};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
