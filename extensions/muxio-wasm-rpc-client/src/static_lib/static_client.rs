@@ -90,8 +90,10 @@ pub fn get_static_client() -> Option<Arc<RpcWasmClient>> {
 /// - `1`: Connected
 /// - `2`: Disconnected
 #[wasm_bindgen]
-#[instrument]
 pub fn notify_static_client_transport_state_change(state_code: u8) -> Promise {
+    // Note: This function is intentionally not wrapped with `[tracing] instruction` macro:
+    // __wbindgen_describe_notify_static_client_transport_state_change: unknown instruction Block(Block { seq: Id { idx: 1 } })
+
     with_static_client_async(move |client_arc| async move {
         match state_code {
             0 => {
