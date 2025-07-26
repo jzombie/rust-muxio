@@ -79,37 +79,3 @@ where
 pub fn get_static_client() -> Option<Arc<RpcWasmClient>> {
     MUXIO_STATIC_RPC_CLIENT_REF.with(|cell| cell.borrow().clone())
 }
-
-/// Notifies the static Rust client of a transport state change.
-/// This should be called from the JavaScript host environment (e.g., in
-/// a WebSocket's `onopen` or `onclose` event listeners).
-///
-/// # JS-side State Mapping:
-/// - `0`: Connecting
-/// - `1`: Connected
-/// - `2`: Disconnected
-#[wasm_bindgen]
-pub fn notify_static_client_transport_state_change(state_code: u8) -> Promise {
-    // Note: This function is intentionally not wrapped with `[tracing] instruction` macro:
-    // __wbindgen_describe_notify_static_client_transport_state_change: unknown instruction Block(Block { seq: Id { idx: 1 } })
-
-    with_static_client_async(move |client_arc| async move {
-        match state_code {
-            0 => {
-                tracing::debug!("Transport state changed to: connecting");
-                Ok(JsValue::undefined())
-            }
-            1 => {
-                tracing::debug!("Transport state changed to: connected");
-                client_arc.handle_connect().await;
-                Ok(JsValue::undefined())
-            }
-            2 => {
-                tracing::debug!("Transport state changed to: disconnected");
-                client_arc.handle_disconnect().await;
-                Ok(JsValue::undefined())
-            }
-            _ => Err("Invalid state code provided.".to_string()),
-        }
-    })
-}
