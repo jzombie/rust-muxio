@@ -1,7 +1,8 @@
+use crate::static_lib::get_static_client;
+
 use super::MUXIO_STATIC_RPC_CLIENT_REF;
 use js_sys::Uint8Array;
 use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::spawn_local;
 
 #[wasm_bindgen]
 extern "C" {
@@ -16,7 +17,7 @@ pub(crate) fn static_muxio_write_bytes(bytes: &[u8]) {
 
 /// Entry point from JavaScript when binary data arrives from the network.
 #[wasm_bindgen]
-pub fn static_muxio_read_bytes_uint8(inbound_data: Uint8Array) -> Result<(), JsValue> {
+pub async fn static_muxio_read_bytes_uint8(inbound_data: Uint8Array) -> Result<(), JsValue> {
     let inbound_bytes = inbound_data.to_vec();
 
     // TODO: Use `get_static_client` for easier use
@@ -24,12 +25,25 @@ pub fn static_muxio_read_bytes_uint8(inbound_data: Uint8Array) -> Result<(), JsV
         .with(|cell| cell.borrow().clone())
         .ok_or_else(|| JsValue::from_str("RPC client not initialized"))?;
 
-    spawn_local(async move {
-        client_arc.read_bytes(&inbound_bytes).await;
-    });
+    client_arc.read_bytes(&inbound_bytes).await;
 
     Ok(())
 }
 
-// TODO: Expose `static_muxio_handle_connect`
-// TODO: Expose `static_muxio_handle_disconnect`
+/// Call this from your JavaScript glue code when the WebSocket `onopen` event fires.
+#[wasm_bindgen]
+pub async fn static_muxio_handle_connect() -> Result<(), JsValue> {
+    match get_static_client() {
+        Some(static_client) => Ok(static_client.handle_connect().await),
+        None => Err("No registered static WASM client".into()),
+    }
+}
+
+/// Call this from your JavaScript glue code when the WebSocket's `onclose` or `onerror` event fires.
+#[wasm_bindgen]
+pub async fn static_muxio_handle_disconnect() -> Result<(), JsValue> {
+    match get_static_client() {
+        Some(static_client) => Ok(static_client.handle_disconnect().await),
+        None => Err("No registered static WASM client".into()),
+    }
+}
