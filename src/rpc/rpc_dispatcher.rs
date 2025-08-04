@@ -223,7 +223,7 @@ impl<'a> RpcDispatcher<'a> {
     /// - `on_emit`: Callback to transmit the encoded frames
     /// - `on_response`: Optional response stream handler
     /// - `prebuffer_response`: If true, buffer all chunks into one event
-    #[instrument(skip(self, on_emit, on_response))]
+    #[instrument(skip(self, rpc_request, on_emit, on_response))]
     pub fn call<E, R>(
         &mut self,
         rpc_request: RpcRequest,

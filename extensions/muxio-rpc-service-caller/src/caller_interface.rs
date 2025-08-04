@@ -29,7 +29,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
     fn get_emit_fn(&self) -> Arc<dyn Fn(Vec<u8>) + Send + Sync>;
     fn is_connected(&self) -> bool;
 
-    #[instrument(skip(self))]
+    #[instrument(skip(self, request))]
     async fn call_rpc_streaming(
         &self,
         request: RpcRequest,
@@ -348,7 +348,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
         }
     }
 
-    #[instrument(skip(self, decode))]
+    #[instrument(skip(self, request, decode))]
     async fn call_rpc_buffered<T, F>(
         &self,
         request: RpcRequest,
