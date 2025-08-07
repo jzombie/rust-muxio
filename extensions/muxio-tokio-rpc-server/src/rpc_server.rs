@@ -216,7 +216,7 @@ impl RpcServer {
             tokio::select! {
                 _ = tokio::time::sleep(heartbeat_interval) => {
                     if tx.send(Message::Ping(vec![].into())).is_err() {
-                        tracing::info!("Client {} disconnected (failed to send ping).", addr);
+                        tracing::error!("Client {} disconnected (failed to send ping).", addr);
                         break; // Break loop on send error
                     }
                 }
@@ -239,25 +239,25 @@ impl RpcServer {
                                             "Server receiver_task: Emitted response chunk of {} bytes to client {}.",
                                             chunk.len(),
                                             addr
-                                        ); // Debug log
+                                        );
                                     };
 
-                                    tracing::info!(
+                                    tracing::debug!(
                                         "Server receiver_task: Processing incoming binary message ({} bytes) from client {}.",
                                         bytes.len(),
                                         addr
-                                    ); // Debug log
+                                    );
                                     if let Err(err) = endpoint.read_bytes(&mut dispatcher, context.clone(), &bytes, on_emit).await {
                                         tracing::error!(
                                             "Server receiver_task: Error processing bytes from {}. Handler returned: {:?}",
                                             addr,
                                             err
-                                        ); // Debug log
+                                        );
                                     } else {
-                                        tracing::info!(
+                                        tracing::debug!(
                                             "Server receiver_task: Successfully processed incoming binary message from client {}.",
                                             addr
-                                        ); // Debug log
+                                        );
                                     }
                                 }
                                 Message::Pong(_) => {
@@ -282,23 +282,23 @@ impl RpcServer {
 
         // 1. Update the AtomicBool status.
         is_connected_atomic.store(false, Ordering::SeqCst);
-        tracing::info!("Client {} connection status set to Disconnected.", addr);
+        tracing::debug!("Client {} connection status set to Disconnected.", addr);
 
         // 2. Fail all pending requests on this connection's dispatcher.
         //    Acquire the dispatcher lock here and fail them immediately.
         //    Use `lock().await` because this is an `async fn`.
         //    This ensures they are failed *before* this task fully unwinds.
-        tracing::info!(
+        tracing::debug!(
             "Attempting to acquire dispatcher lock for {} to fail pending requests.",
             addr
         );
         let mut dispatcher_guard = context.dispatcher.lock().await; // <--- CHANGE: AWAIT HERE
-        tracing::info!(
+        tracing::debug!(
             "Acquired dispatcher lock for {} to fail pending requests.",
             addr
         );
         dispatcher_guard.fail_all_pending_requests(FrameDecodeError::ReadAfterCancel);
-        tracing::info!("Dispatcher for {} failed all pending requests.", addr);
+        tracing::debug!("Dispatcher for {} failed all pending requests.", addr);
 
         // 3. Send the disconnect event.
         if let Some(tx_event) = event_tx {
