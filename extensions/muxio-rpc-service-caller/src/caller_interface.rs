@@ -389,9 +389,9 @@ pub trait RpcServiceCallerInterface: Send + Sync {
         }
         tracing::debug!("Stream consumption loop finished");
 
-        if let Some(e) = err {
-            tracing::error!("Returning with error from stream: {:?}", e);
-            Ok((encoder, Err(e)))
+        if let Some(rpc_service_error) = err {
+            tracing::error!("Returning with error from stream: {:?}", rpc_service_error);
+            Ok((encoder, Err(rpc_service_error)))
         } else {
             tracing::debug!("Returning with success from stream.");
             Ok((encoder, Ok(decode(&success_buf))))
