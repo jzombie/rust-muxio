@@ -172,10 +172,10 @@ impl RpcServiceCallerInterface for RpcWasmClient {
         let mut state_handler = self.state_change_handler.lock().await;
         *state_handler = Some(Box::new(handler));
 
-        if self.is_connected() {
-            if let Some(h) = state_handler.as_ref() {
-                h(RpcTransportState::Connected);
-            }
+        if self.is_connected()
+            && let Some(h) = state_handler.as_ref()
+        {
+            h(RpcTransportState::Connected);
         }
     }
 }

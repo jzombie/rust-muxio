@@ -162,10 +162,8 @@ impl<'a> RpcRespondableSession<'a> {
                 }
             }
 
-            if !handled {
-                if let Some(cb) = self.catch_all_response_handler.as_mut() {
-                    cb(evt);
-                }
+            if !handled && let Some(cb) = self.catch_all_response_handler.as_mut() {
+                cb(evt);
             }
 
             Ok(())
