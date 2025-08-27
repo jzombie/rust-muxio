@@ -4,7 +4,7 @@ use muxio_rpc_service::constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE;
 use muxio_rpc_service::error::{RpcServiceErrorCode, RpcServiceErrorPayload};
 use muxio_rpc_service_endpoint::{
     RpcServiceEndpoint, RpcServiceEndpointInterface,
-    error::{RpcServiceEndointHandlerError, RpcServiceEndpointError},
+    error::{RpcServiceEndpointError, RpcServiceEndpointHandlerError},
 };
 use std::sync::{Arc, Mutex};
 
@@ -179,8 +179,8 @@ async fn test_read_bytes_handler_structured_fail_error() {
             move |_request_bytes: Vec<u8>, _ctx| {
                 let error_payload = error_payload_clone.clone();
                 async move {
-                    // 2. Wrap the payload in `RpcServiceEndointHandlerError`, then box it.
-                    Err(Box::new(RpcServiceEndointHandlerError(error_payload))
+                    // 2. Wrap the payload in `RpcServiceEndpointHandlerError`, then box it.
+                    Err(Box::new(RpcServiceEndpointHandlerError(error_payload))
                         as Box<dyn std::error::Error + Send + Sync>)
                 }
             }

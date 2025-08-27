@@ -98,16 +98,15 @@ impl FrameMuxStreamDecoder {
 
                     self.buffer.drain(..total);
 
-                    if let Some(stream) = self.streams.get(&stream_id) {
-                        if stream.is_canceled {
-                            frame.decode_error = Some(FrameDecodeError::ReadAfterCancel);
-                            queue.push_back(Ok(frame));
-                            continue;
-                        }
-
-                        // Note: We do not check `stream.is_ended` here because frames may arrive out of order.
-                        // The `End` frame could be received before all prior data frames. In contrast,
-                        // a canceled stream is always considered terminated immediately and must be discarded.
+                    // Note: We do not check `stream.is_ended` here because frames may arrive out of order.
+                    // The `End` frame could be received before all prior data frames. In contrast,
+                    // a canceled stream is always considered terminated immediately and must be discarded.
+                    if let Some(stream) = self.streams.get(&stream_id)
+                        && stream.is_canceled
+                    {
+                        frame.decode_error = Some(FrameDecodeError::ReadAfterCancel);
+                        queue.push_back(Ok(frame));
+                        continue;
                     }
 
                     if frame_kind == FrameKind::Cancel {
