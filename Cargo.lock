@@ -904,7 +904,6 @@ version = "0.10.0-alpha"
 dependencies = [
  "async-trait",
  "axum",
- "bitcode",
  "bytemuck",
  "bytes",
  "example-muxio-rpc-service-definition",
@@ -914,7 +913,6 @@ dependencies = [
  "muxio-rpc-service-caller",
  "muxio-rpc-service-endpoint",
  "muxio-tokio-rpc-client",
- "muxio-tokio-rpc-server",
  "tokio",
  "tokio-tungstenite",
  "tracing",

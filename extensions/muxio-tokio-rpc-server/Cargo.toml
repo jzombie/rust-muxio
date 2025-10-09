@@ -22,9 +22,7 @@ async-trait = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
-bitcode.workspace = true
-bytemuck = "1.23.1"
-example-muxio-rpc-service-definition.workspace = true
-muxio-tokio-rpc-client.workspace = true
-muxio-tokio-rpc-server.workspace = true
+bytemuck.workspace = true
 tracing-subscriber = { workspace = true, features = ["fmt"] }
+muxio-tokio-rpc-client = { workspace = true }
+example-muxio-rpc-service-definition.workspace = true
