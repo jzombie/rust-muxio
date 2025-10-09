@@ -26,4 +26,4 @@ jobs:
         run: cargo install cargo-all-features
 
       - name: Run tests with all feature combinations
-        run: cargo test-all-features --workspace --all-targets --verbose
+        run: cargo all-features test --workspace --all-targets --verbose
