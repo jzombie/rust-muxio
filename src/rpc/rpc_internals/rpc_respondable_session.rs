@@ -21,7 +21,7 @@ impl<'a> Default for RpcRespondableSession<'a> {
 pub struct RpcRespondableSession<'a> {
     rpc_session: RpcSession,
     // TODO: Make these names less vague
-    response_handlers: HashMap<u32, Box<dyn FnMut(RpcStreamEvent) + Send + 'a>>,
+    pub(crate) response_handlers: HashMap<u32, Box<dyn FnMut(RpcStreamEvent) + Send + 'a>>,
     catch_all_response_handler: Option<Box<dyn FnMut(RpcStreamEvent) + Send + 'a>>,
     prebuffered_responses: HashMap<u32, Vec<u8>>, // Track buffered responses by request ID
     prebuffering_flags: HashMap<u32, bool>, // Track whether pre-buffering is enabled for each request
@@ -162,10 +162,8 @@ impl<'a> RpcRespondableSession<'a> {
                 }
             }
 
-            if !handled {
-                if let Some(cb) = self.catch_all_response_handler.as_mut() {
-                    cb(evt);
-                }
+            if !handled && let Some(cb) = self.catch_all_response_handler.as_mut() {
+                cb(evt);
             }
 
             Ok(())

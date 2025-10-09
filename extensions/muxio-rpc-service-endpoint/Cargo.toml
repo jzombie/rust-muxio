@@ -9,24 +9,24 @@ license.workspace = true # Inherit from workspace
 publish.workspace = true # Inherit from workspace
 
 [dependencies]
-async-trait = "0.1.88"
-futures = "0.3.31"
+async-trait = { workspace = true }
+bitcode = { workspace = true }
+futures = { workspace = true }
 muxio = { workspace = true }
 muxio-rpc-service = { workspace = true }
 muxio-rpc-service-caller = { workspace = true }
+tracing = { workspace = true }
 
 # Optional dependencies
-tokio = { version = "1.45.1", features = ["sync"], optional = true }
-tracing = "0.1.41"
+tokio = { workspace = true, features = ["sync"], optional = true }
 
 [features]
 default = []
 tokio_support = [
     "dep:tokio", # Enables the optional tokio dependency in THIS crate.
-    "muxio-rpc-service-caller/tokio_support" # Enables the feature in the CALLER crate.
 ]
 
 [dev-dependencies]
-# doc-comment = "0.3.3" # TODO: Re-enable
-tokio = { version = "1.45.1", features = ["full"] }
+# doc-comment = { workspace = true } # TODO: Re-enable
+tokio = { workspace = true, features = ["full"] }
 example-muxio-rpc-service-definition = { workspace = true }

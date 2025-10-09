@@ -1,21 +1,24 @@
 use muxio::frame::{FrameDecodeError, FrameEncodeError};
+use muxio_rpc_service::error::{RpcServiceErrorCode, RpcServiceErrorPayload};
 use std::fmt;
+use std::io;
 
-/// A special error type that wraps a byte payload for the client.
-///
-/// When a handler returns this specific error, the endpoint will send its
-/// contents back to the client with a `Fail` status. Any other error type
-/// will result in a generic `SystemError`.
+/// The special error type that a handler should return to send a
+/// structured error to the caller.
 #[derive(Debug)]
-pub struct HandlerPayloadError(pub Vec<u8>);
+pub struct RpcServiceEndpointHandlerError(pub RpcServiceErrorPayload);
 
-impl fmt::Display for HandlerPayloadError {
+impl fmt::Display for RpcServiceEndpointHandlerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Handler failed with a custom payload for the client")
+        write!(
+            f,
+            "Handler failed with code {:?}: {}",
+            self.0.code, self.0.message
+        )
     }
 }
 
-impl std::error::Error for HandlerPayloadError {}
+impl std::error::Error for RpcServiceEndpointHandlerError {}
 
 /// Represents errors that can occur within the endpoint's own logic.
 #[derive(Debug)]
@@ -34,5 +37,15 @@ impl From<FrameDecodeError> for RpcServiceEndpointError {
 impl From<FrameEncodeError> for RpcServiceEndpointError {
     fn from(err: FrameEncodeError) -> Self {
         RpcServiceEndpointError::Encode(err)
+    }
+}
+
+impl From<io::Error> for RpcServiceEndpointHandlerError {
+    fn from(err: io::Error) -> Self {
+        let payload = RpcServiceErrorPayload {
+            code: RpcServiceErrorCode::Fail, // Default to a 'Fail' code
+            message: err.to_string(),
+        };
+        RpcServiceEndpointHandlerError(payload)
     }
 }

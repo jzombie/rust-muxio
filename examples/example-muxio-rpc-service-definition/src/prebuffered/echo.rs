@@ -13,15 +13,15 @@ impl RpcMethodPrebuffered for Echo {
         Ok(input)
     }
 
-    fn decode_request(bytes: &[u8]) -> Result<Self::Input, io::Error> {
-        Ok(bytes.to_vec())
+    fn decode_request(request_bytes: &[u8]) -> Result<Self::Input, io::Error> {
+        Ok(request_bytes.to_vec())
     }
 
     fn encode_response(output: Self::Output) -> Result<Vec<u8>, io::Error> {
         Ok(output)
     }
 
-    fn decode_response(bytes: &[u8]) -> Result<Self::Output, io::Error> {
-        Ok(bytes.to_vec())
+    fn decode_response(response_bytes: &[u8]) -> Result<Self::Output, io::Error> {
+        Ok(response_bytes.to_vec())
     }
 }

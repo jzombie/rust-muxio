@@ -11,8 +11,8 @@ use tokio::sync::Mutex;
 // --- Generic Definitions ---
 pub type RpcPrebufferedHandler<C> = Arc<
     dyn Fn(
-            C,
             Vec<u8>,
+            C,
         ) -> Pin<
             Box<
                 dyn Future<Output = Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>>>

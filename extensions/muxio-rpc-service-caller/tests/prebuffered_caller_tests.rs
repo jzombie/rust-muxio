@@ -1,68 +1,46 @@
 use example_muxio_rpc_service_definition::prebuffered::Echo;
 use futures::channel::mpsc;
 use muxio::rpc::{
-    RpcRequest,
+    RpcDispatcher, RpcRequest,
     rpc_internals::{RpcHeader, RpcMessageType, RpcStreamEncoder, rpc_trait::RpcEmit},
 };
-use muxio_rpc_service::prebuffered::RpcMethodPrebuffered;
+use muxio_rpc_service::{
+    error::{RpcServiceError, RpcServiceErrorCode, RpcServiceErrorPayload},
+    prebuffered::RpcMethodPrebuffered,
+};
 use muxio_rpc_service_caller::{
-    RpcServiceCallerInterface, RpcTransportState, WithDispatcher, error::RpcCallerError,
+    RpcServiceCallerInterface, RpcTransportState,
+    dynamic_channel::{DynamicChannelType, DynamicReceiver, DynamicSender},
     prebuffered::RpcCallPrebuffered,
 };
-use std::{
-    io,
-    sync::{Arc, Mutex},
-};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use tokio::sync::Mutex as TokioMutex;
 
-// --- Test Setup: Mock Implementations ---
-
-// NOTE: This now needs to use the dynamic channel types from your new module.
-// Make sure your lib.rs exports `dynamic_channel`.
-use muxio_rpc_service_caller::dynamic_channel::{
-    DynamicChannelType, DynamicReceiver, DynamicSender,
-};
+// --- Test Setup: Mock Implementation ---
 
 type SharedResponseSender = Arc<Mutex<Option<DynamicSender>>>;
 
-/// A mock client that allows us to inject specific stream responses for testing.
 #[derive(Clone)]
 struct MockRpcClient {
-    /// A shared structure to allow the test harness to provide the sender half of the
-    /// mpsc channel to the mock implementation after it's been created.
     response_sender_provider: SharedResponseSender,
-}
-
-// Create a newtype wrapper around `Mutex<()>` to satisfy the orphan rule.
-#[allow(dead_code)] // Ignores: field `0` is never read
-struct MockDispatcherLock(Mutex<()>);
-
-// Dummy implementation of the dispatcher trait for our newtype.
-#[async_trait::async_trait]
-impl WithDispatcher for MockDispatcherLock {
-    async fn with_dispatcher<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&mut muxio::rpc::RpcDispatcher<'static>) -> R + Send,
-        R: Send,
-    {
-        let mut dummy_dispatcher = muxio::rpc::RpcDispatcher::new();
-        f(&mut dummy_dispatcher)
-    }
+    is_connected_atomic: Arc<AtomicBool>,
 }
 
 #[async_trait::async_trait]
 impl RpcServiceCallerInterface for MockRpcClient {
-    type DispatcherLock = MockDispatcherLock;
-
-    fn get_dispatcher(&self) -> Arc<Self::DispatcherLock> {
-        Arc::new(MockDispatcherLock(Mutex::new(())))
+    fn get_dispatcher(&self) -> Arc<TokioMutex<RpcDispatcher<'static>>> {
+        Arc::new(TokioMutex::new(RpcDispatcher::new()))
     }
 
     fn get_emit_fn(&self) -> Arc<dyn Fn(Vec<u8>) + Send + Sync> {
         Arc::new(|_| {})
     }
 
-    /// This is the core of the mock. It creates a new channel and gives the sender
-    /// half back to the test harness via the shared `response_sender_provider`.
+    fn is_connected(&self) -> bool {
+        self.is_connected_atomic.load(Ordering::SeqCst)
+    }
+
     async fn call_rpc_streaming(
         &self,
         _request: RpcRequest,
@@ -72,46 +50,45 @@ impl RpcServiceCallerInterface for MockRpcClient {
             RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>,
             DynamicReceiver,
         ),
-        io::Error,
+        RpcServiceError,
     > {
-        // The mock will now also respect the channel choice.
-        let (tx, rx) = if dynamic_channel_type == DynamicChannelType::Unbounded {
-            let (sender, receiver) = mpsc::unbounded();
-            (
-                DynamicSender::Unbounded(sender),
-                DynamicReceiver::Unbounded(receiver),
-            )
-        } else {
-            let (sender, receiver) = mpsc::channel(8);
-            (
-                DynamicSender::Bounded(sender),
-                DynamicReceiver::Bounded(receiver),
-            )
+        let (tx, rx) = match dynamic_channel_type {
+            DynamicChannelType::Unbounded => {
+                let (sender, receiver) = mpsc::unbounded();
+                (
+                    DynamicSender::Unbounded(sender),
+                    DynamicReceiver::Unbounded(receiver),
+                )
+            }
+            DynamicChannelType::Bounded => {
+                let (sender, receiver) = mpsc::channel(8);
+                (
+                    DynamicSender::Bounded(sender),
+                    DynamicReceiver::Bounded(receiver),
+                )
+            }
         };
 
-        let dummy_encoder = {
-            let dummy_header = RpcHeader {
-                rpc_msg_type: RpcMessageType::Call,
-                rpc_request_id: 0,
-                rpc_method_id: 0,
-                rpc_metadata_bytes: vec![],
-            };
-            let on_emit: Box<dyn RpcEmit + Send + Sync> = Box::new(|_| {});
-            RpcStreamEncoder::new(0, 1024, &dummy_header, on_emit).unwrap()
+        let dummy_header = RpcHeader {
+            rpc_msg_type: RpcMessageType::Call,
+            rpc_request_id: 0,
+            rpc_method_id: 0,
+            rpc_metadata_bytes: vec![],
         };
+
+        let emit_fn: Box<dyn RpcEmit + Send + Sync> = Box::new(|_: &[u8]| {});
+        let dummy_encoder = RpcStreamEncoder::new(0, 1024, &dummy_header, emit_fn).unwrap();
 
         *self.response_sender_provider.lock().unwrap() = Some(tx);
 
         Ok((dummy_encoder, rx))
     }
 
-    /// A no-op implementation for the state change handler.
-    /// This mock doesn't need to do anything with the handler, so the body is empty.
-    fn set_state_change_handler(
+    async fn set_state_change_handler(
         &self,
         _handler: impl Fn(RpcTransportState) + Send + Sync + 'static,
     ) {
-        // No operation needed for the mock.
+        // no-op
     }
 }
 
@@ -120,8 +97,11 @@ impl RpcServiceCallerInterface for MockRpcClient {
 #[tokio::test]
 async fn test_buffered_call_success() {
     let sender_provider = Arc::new(Mutex::new(None));
+    let is_connected_state = Arc::new(AtomicBool::new(true));
+
     let client = MockRpcClient {
         response_sender_provider: sender_provider.clone(),
+        is_connected_atomic: is_connected_state.clone(),
     };
 
     let echo_payload = b"hello world".to_vec();
@@ -155,8 +135,11 @@ async fn test_buffered_call_success() {
 #[tokio::test]
 async fn test_buffered_call_remote_error() {
     let sender_provider = Arc::new(Mutex::new(None));
+    let is_connected_state = Arc::new(AtomicBool::new(true));
+
     let client = MockRpcClient {
         response_sender_provider: sender_provider.clone(),
+        is_connected_atomic: is_connected_state,
     };
 
     let decode_fn = |bytes: &[u8]| -> Vec<u8> { bytes.to_vec() };
@@ -168,10 +151,11 @@ async fn test_buffered_call_remote_error() {
             }
             tokio::time::sleep(std::time::Duration::from_millis(1)).await;
         };
-        let error_payload = b"item does not exist".to_vec();
-        sender.send_and_ignore(Err(RpcCallerError::RemoteError {
-            payload: error_payload,
-        }));
+
+        sender.send_and_ignore(Err(RpcServiceError::Rpc(RpcServiceErrorPayload {
+            code: RpcServiceErrorCode::Fail,
+            message: "item does not exist".into(),
+        })));
     });
 
     let request = RpcRequest {
@@ -184,8 +168,9 @@ async fn test_buffered_call_remote_error() {
     let (_, result) = client.call_rpc_buffered(request, decode_fn).await.unwrap();
 
     match result {
-        Err(RpcCallerError::RemoteError { payload }) => {
-            assert_eq!(payload, b"item does not exist");
+        Err(RpcServiceError::Rpc(err)) => {
+            assert_eq!(err.code, RpcServiceErrorCode::Fail);
+            assert_eq!(err.message, "item does not exist");
         }
         _ => panic!("Expected a RemoteError, but got something else."),
     }
@@ -194,8 +179,11 @@ async fn test_buffered_call_remote_error() {
 #[tokio::test]
 async fn test_prebuffered_trait_converts_error() {
     let sender_provider = Arc::new(Mutex::new(None));
+    let is_connected_state = Arc::new(AtomicBool::new(true));
+
     let client = MockRpcClient {
         response_sender_provider: sender_provider.clone(),
+        is_connected_atomic: is_connected_state,
     };
 
     tokio::spawn(async move {
@@ -205,18 +193,20 @@ async fn test_prebuffered_trait_converts_error() {
             }
             tokio::time::sleep(std::time::Duration::from_millis(1)).await;
         };
-        let error_message = "Method has panicked".to_string();
-        sender.send_and_ignore(Err(RpcCallerError::RemoteSystemError(error_message)));
+
+        sender.send_and_ignore(Err(RpcServiceError::Rpc(RpcServiceErrorPayload {
+            code: RpcServiceErrorCode::System,
+            message: "Method has panicked".into(),
+        })));
     });
 
     let result = Echo::call(&client, b"some input".to_vec()).await;
 
     assert!(result.is_err());
-    let io_error = result.unwrap_err();
-    assert_eq!(io_error.kind(), io::ErrorKind::Other);
-    assert!(
-        io_error
-            .to_string()
-            .contains("Remote system error: Method has panicked")
-    );
+    if let Err(RpcServiceError::Rpc(err)) = result {
+        assert_eq!(err.code, RpcServiceErrorCode::System);
+        assert_eq!(err.message, "Method has panicked");
+    } else {
+        panic!("Expected Rpc error");
+    }
 }

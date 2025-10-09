@@ -21,7 +21,9 @@
 use example_muxio_rpc_service_definition::prebuffered::{Add, Echo, Mult};
 use futures_util::{SinkExt, StreamExt};
 use muxio_rpc_service::{
-    constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE, prebuffered::RpcMethodPrebuffered,
+    constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE,
+    error::{RpcServiceError, RpcServiceErrorCode},
+    prebuffered::RpcMethodPrebuffered,
 };
 use muxio_rpc_service_caller::RpcServiceCallerInterface;
 use muxio_rpc_service_caller::prebuffered::RpcCallPrebuffered;
@@ -42,26 +44,26 @@ async fn test_success_client_server_roundtrip() {
     let server_url = format!("ws://{addr}/ws");
 
     // Wrap server in an Arc immediately to manage ownership correctly.
-    let server = Arc::new(RpcServer::new());
+    let server = Arc::new(RpcServer::new(None));
     let endpoint = server.endpoint(); // Get endpoint for registration
 
     // Register handlers on the server.
     let _ = join!(
-        endpoint.register_prebuffered(Add::METHOD_ID, |_, bytes| async move {
-            let params = Add::decode_request(&bytes)?;
-            let sum = params.iter().sum();
+        endpoint.register_prebuffered(Add::METHOD_ID, |request_bytes, _ctx| async move {
+            let request_params = Add::decode_request(&request_bytes)?;
+            let sum = request_params.iter().sum();
             let response_bytes = Add::encode_response(sum)?;
             Ok(response_bytes)
         }),
-        endpoint.register_prebuffered(Mult::METHOD_ID, |_, bytes| async move {
-            let params = Mult::decode_request(&bytes)?;
-            let product = params.iter().product();
+        endpoint.register_prebuffered(Mult::METHOD_ID, |request_bytes, _ctx| async move {
+            let request_params = Mult::decode_request(&request_bytes)?;
+            let product = request_params.iter().product();
             let response_bytes = Mult::encode_response(product)?;
             Ok(response_bytes)
         }),
-        endpoint.register_prebuffered(Echo::METHOD_ID, |_, bytes| async move {
-            let params = Echo::decode_request(&bytes)?;
-            let response_bytes = Echo::encode_response(params)?;
+        endpoint.register_prebuffered(Echo::METHOD_ID, |request_bytes, _ctx| async move {
+            let request_params = Echo::decode_request(&request_bytes)?;
+            let response_bytes = Echo::encode_response(request_params)?;
             Ok(response_bytes)
         })
     );
@@ -89,6 +91,9 @@ async fn test_success_client_server_roundtrip() {
         .expect("Failed to connect to server");
     let (mut ws_sender, mut ws_receiver) = ws_stream.split();
 
+    // This mimics the JavaScript glue code calling 'onopen'.
+    client.handle_connect().await;
+
     // This task is fine as it only deals with async channels.
     tokio::spawn(async move {
         while let Some(bytes) = to_bridge_rx.recv().await {
@@ -109,7 +114,7 @@ async fn test_success_client_server_roundtrip() {
                 let dispatcher = client.get_dispatcher();
                 // We move the blocking lock() and synchronous read_bytes() call
                 // onto a dedicated blocking thread to avoid freezing the test runtime.
-                task::spawn_blocking(move || dispatcher.lock().unwrap().read_bytes(&bytes))
+                task::spawn_blocking(move || dispatcher.blocking_lock().read_bytes(&bytes))
                     .await
                     .unwrap() // Unwrap JoinError
                     .unwrap(); // Unwrap Result from read_bytes
@@ -144,11 +149,11 @@ async fn test_error_client_server_roundtrip() {
     let server_url = format!("ws://{addr}/ws");
 
     // Use the same Arc/endpoint pattern for consistency.
-    let server = Arc::new(RpcServer::new());
+    let server = Arc::new(RpcServer::new(None));
     let endpoint = server.endpoint();
 
     endpoint
-        .register_prebuffered(Add::METHOD_ID, |_, _bytes| async move {
+        .register_prebuffered(Add::METHOD_ID, |_request_bytes, _ctx| async move {
             Err("Addition failed".into())
         })
         .await
@@ -172,6 +177,9 @@ async fn test_error_client_server_roundtrip() {
     let (ws_stream, _) = connect_async(&server_url).await.expect("Failed to connect");
     let (mut ws_sender, mut ws_receiver) = ws_stream.split();
 
+    // This mimics the JavaScript glue code calling 'onopen'.
+    client.handle_connect().await;
+
     tokio::spawn(async move {
         while let Some(bytes) = to_bridge_rx.recv().await {
             if ws_sender
@@ -190,7 +198,7 @@ async fn test_error_client_server_roundtrip() {
         async move {
             while let Some(Ok(WsMessage::Binary(bytes))) = ws_receiver.next().await {
                 let dispatcher = client.get_dispatcher();
-                task::spawn_blocking(move || dispatcher.lock().unwrap().read_bytes(&bytes))
+                task::spawn_blocking(move || dispatcher.blocking_lock().read_bytes(&bytes))
                     .await
                     .unwrap()
                     .unwrap();
@@ -202,13 +210,20 @@ async fn test_error_client_server_roundtrip() {
     let res = Add::call(client.as_ref(), vec![1.0, 2.0, 3.0]).await;
 
     // 4. Assert that the error was propagated correctly.
-    assert!(res.is_err());
+    assert!(res.is_err(), "Expected RPC call to fail but it succeeded");
     let err = res.unwrap_err();
-    assert_eq!(err.kind(), std::io::ErrorKind::Other);
-    assert!(
-        err.to_string()
-            .contains("Remote system error: Addition failed")
-    );
+
+    // Match on the specific error variant for a robust test.
+    match err {
+        // Corrected: Use the 'Rpc' variant, not 'Remote'.
+        RpcServiceError::Rpc(payload) => {
+            assert_eq!(payload.code, RpcServiceErrorCode::System);
+            assert_eq!(payload.message, "Addition failed");
+        }
+        other_error => {
+            panic!("Expected a RpcServiceError::Rpc, but got a different error: {other_error:?}",);
+        }
+    }
 }
 
 #[tokio::test]
@@ -217,15 +232,15 @@ async fn test_large_prebuffered_payload_roundtrip_wasm() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
     let server_url = format!("ws://{addr}/ws");
-    let server = Arc::new(RpcServer::new());
+    let server = Arc::new(RpcServer::new(None));
     let endpoint = server.endpoint();
 
     // Register a simple "echo" handler on the server for our test to call.
     endpoint
-        .register_prebuffered(Echo::METHOD_ID, |_, bytes: Vec<u8>| async move {
+        .register_prebuffered(Echo::METHOD_ID, |request_bytes: Vec<u8>, _ctx| async move {
             // The handler simply returns the bytes it received.
-            let params = Echo::decode_request(&bytes)?;
-            Ok(Echo::encode_response(params)?)
+            let request_params = Echo::decode_request(&request_bytes)?;
+            Ok(Echo::encode_response(request_params)?)
         })
         .await
         .unwrap();
@@ -247,6 +262,9 @@ async fn test_large_prebuffered_payload_roundtrip_wasm() {
         .expect("Failed to connect to server");
     let (mut ws_sender, mut ws_receiver) = ws_stream.split();
 
+    // This mimics the JavaScript glue code calling 'onopen'.
+    client.handle_connect().await;
+
     // Bridge from WasmClient to real WebSocket
     tokio::spawn(async move {
         while let Some(bytes) = to_bridge_rx.recv().await {
@@ -266,7 +284,7 @@ async fn test_large_prebuffered_payload_roundtrip_wasm() {
         async move {
             while let Some(Ok(WsMessage::Binary(bytes))) = ws_receiver.next().await {
                 let dispatcher = client.get_dispatcher();
-                task::spawn_blocking(move || dispatcher.lock().unwrap().read_bytes(&bytes))
+                task::spawn_blocking(move || dispatcher.blocking_lock().read_bytes(&bytes))
                     .await
                     .unwrap()
                     .unwrap();

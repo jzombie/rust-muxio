@@ -1,5 +1,5 @@
 use super::static_muxio_write_bytes;
-use crate::{RpcTransportState, RpcWasmClient};
+use crate::RpcWasmClient;
 use js_sys::Promise;
 use std::cell::RefCell;
 use std::sync::Arc;
@@ -22,7 +22,7 @@ thread_local! {
 /// # Usage
 /// This should be called once during WASM startup, typically from a JS
 /// `init()` or entrypoint wrapper, **before** any RPC calls are issued.
-pub fn init_static_client() {
+pub fn init_static_client() -> Option<Arc<RpcWasmClient>> {
     MUXIO_STATIC_RPC_CLIENT_REF.with(|cell| {
         if cell.borrow().is_none() {
             let rpc_wasm_client =
@@ -31,6 +31,8 @@ pub fn init_static_client() {
             *cell.borrow_mut() = Some(rpc_wasm_client);
         }
     });
+
+    get_static_client()
 }
 
 /// Asynchronously executes a closure with the static `RpcWasmClient`, returning
@@ -69,31 +71,11 @@ where
     })
 }
 
-/// Notifies the static Rust client of a transport state change.
-/// This should be called from the JavaScript host environment (e.g., in
-/// a WebSocket's `onopen` or `onclose` event listeners).
+/// Returns the current static `RpcWasmClient`, if initialized.
 ///
-/// # JS-side State Mapping:
-/// - `0`: Connecting
-/// - `1`: Connected
-/// - `2`: Disconnected
-#[wasm_bindgen]
-pub fn notify_static_client_transport_state_change(state_code: u8) -> Result<(), JsValue> {
-    let state = match state_code {
-        0 => RpcTransportState::Connecting,
-        1 => RpcTransportState::Connected,
-        2 => RpcTransportState::Disconnected,
-        _ => return Err(JsValue::from_str("Invalid state code provided.")),
-    };
-
-    MUXIO_STATIC_RPC_CLIENT_REF.with(|cell| {
-        if let Some(client) = cell.borrow().as_ref() {
-            // Acquire the lock and invoke the handler if it's set.
-            if let Some(handler) = client.state_change_handler().lock().unwrap().as_ref() {
-                handler(state);
-            }
-        }
-        // It's not an error if the client isn't initialized or no handler is set.
-        Ok(())
-    })
+/// # Returns
+/// - `Some(Arc<RpcWasmClient>)` if the client has been initialized
+/// - `None` otherwise
+pub fn get_static_client() -> Option<Arc<RpcWasmClient>> {
+    MUXIO_STATIC_RPC_CLIENT_REF.with(|cell| cell.borrow().clone())
 }

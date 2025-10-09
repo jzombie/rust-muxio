@@ -44,7 +44,7 @@ Muxio is engineered to solve specific challenges in building modern, distributed
 
 - **Low-Latency, High-Performance Communication**: Muxio is built for speed. It uses a compact, **low-overhead binary protocol** (instead of text-based formats like JSON). This significantly reduces the size of data sent over the network and minimizes the CPU cycles needed for serialization and deserialization. By avoiding complex parsing, Muxio lowers end-to-end latency, making it well-suited for real-time applications such as financial data streaming, multiplayer games, and interactive remote tooling.
 
-- **Cross-Platform Code with Agnostic Frontends**: Write your core application logic once and deploy it across multiple platforms. Muxio achieves this through its generic [`RpcServiceCallerInterface` trait](./extensions/muxio-rpc-service-caller/src/caller_interface.rs), which abstracts away the underlying transport. The same application code that calls an RPC method can run on a native [`RpcClient`](./extensions/muxio-tokio-rpc-client/) using Tokio or a RpcWasmClient in a web browser with no changes, while additional client types can be added with minimal code, provided they implement the same aformentioned `RpcServiceCallerInterface`. This design ensures that improvements to the core service logic benefit all clients simultaneously, even custom-built clients.
+- **Cross-Platform Code with Agnostic Frontends**: Write your core application logic once and deploy it across multiple platforms. Muxio achieves this through its generic [`RpcServiceCallerInterface` trait](./extensions/muxio-rpc-service-caller/src/caller_interface.rs), which abstracts away the underlying transport. The same application code that calls an RPC method using the native [`RpcClient`](./extensions/muxio-tokio-rpc-client/) can also be utilized in a browser with the [`RpcWasmClient`](./extensions/muxio-wasm-rpc-client/) with minimal changes, while additional client types can also be added, provided they implement the same aformentioned `RpcServiceCallerInterface`. This design ensures that improvements to the core service logic benefit all clients simultaneously, even custom-built clients.
 
 - **Shared Service Definitions for Type-Safe APIs**: Enforce integrity between your server and client by defining RPC methods, inputs, and outputs in a shared crate. By implementing the [`RpcMethodPrebuffered` trait](./extensions/muxio-rpc-service-caller/src/prebuffered/) , both client and server depend on a single source of truth for the API contract. This completely eliminates a common class of runtime errors, as any mismatch in data structures between the client and server will result in a compile-time error.
 
@@ -64,7 +64,7 @@ This provides the low-level functionality, but [Muxio extensions](./extensions/)
 
 Let's build a simple sample app which spins up a Tokio-based WebSocket server, adds some routes, then spins up a client, performs some requests, then shuts everything down.
 
-This example code was taken from the [`example-muxio-ws-rpc-app`](./example-muxio-ws-rpc-app/) crate.
+This example code was taken from the [`example-muxio-ws-rpc-app`](./examples/example-muxio-ws-rpc-app/) crate.
 
 ```rust
 use example_muxio_rpc_service_definition::{
@@ -91,28 +91,28 @@ async fn main() {
     // This block sets up and spawns the server
     {
         // Create the server and immediately wrap it in an Arc for sharing
-        let server = Arc::new(RpcServer::new());
+        let server = Arc::new(RpcServer::new(None));
 
         //  Get a handle to the endpoint to register handlers
         let endpoint = server.endpoint();
 
         // Register server methods on the endpoint
         let _ = join!(
-            endpoint.register_prebuffered(Add::METHOD_ID, |_, bytes: Vec<u8>| async move {
-                let params = Add::decode_request(&bytes)?;
-                let sum = params.iter().sum();
+            endpoint.register_prebuffered(Add::METHOD_ID, |request_bytes: Vec<u8>, _ctx| async move {
+                let request_params = Add::decode_request(&request_bytes)?;
+                let sum = request_params.iter().sum();
                 let response_bytes = Add::encode_response(sum)?;
                 Ok(response_bytes)
             }),
-            endpoint.register_prebuffered(Mult::METHOD_ID, |_, bytes: Vec<u8>| async move {
-                let params = Mult::decode_request(&bytes)?;
-                let product = params.iter().product();
+            endpoint.register_prebuffered(Mult::METHOD_ID, |request_bytes: Vec<u8>, _ctx| async move {
+                let request_params = Mult::decode_request(&request_bytes)?;
+                let product = request_params.iter().product();
                 let response_bytes = Mult::encode_response(product)?;
                 Ok(response_bytes)
             }),
-            endpoint.register_prebuffered(Echo::METHOD_ID, |_, bytes: Vec<u8>| async move {
-                let params = Echo::decode_request(&bytes)?;
-                let response_bytes = Echo::encode_response(params)?;
+            endpoint.register_prebuffered(Echo::METHOD_ID, |request_bytes: Vec<u8>, _ctx| async move {
+                let request_params = Echo::decode_request(&request_bytes)?;
+                let response_bytes = Echo::encode_response(request_params)?;
                 Ok(response_bytes)
             })
         );
@@ -138,16 +138,16 @@ async fn main() {
         rpc_client.set_state_change_handler(move |new_state: RpcTransportState| {
             // This code will run every time the connection state changes
             tracing::info!("[Callback] Transport state changed to: {:?}", new_state);
-        });
+        }).await;
 
         // `join!` will await all responses before proceeding
         let (res1, res2, res3, res4, res5, res6) = join!(
-            Add::call(&rpc_client, vec![1.0, 2.0, 3.0]),
-            Add::call(&rpc_client, vec![8.0, 3.0, 7.0]),
-            Mult::call(&rpc_client, vec![8.0, 3.0, 7.0]),
-            Mult::call(&rpc_client, vec![1.5, 2.5, 8.5]),
-            Echo::call(&rpc_client, b"testing 1 2 3".into()),
-            Echo::call(&rpc_client, b"testing 4 5 6".into()),
+            Add::call(&*rpc_client, vec![1.0, 2.0, 3.0]),
+            Add::call(&*rpc_client, vec![8.0, 3.0, 7.0]),
+            Mult::call(&*rpc_client, vec![8.0, 3.0, 7.0]),
+            Mult::call(&*rpc_client, vec![1.5, 2.5, 8.5]),
+            Echo::call(&*rpc_client, b"testing 1 2 3".into()),
+            Echo::call(&*rpc_client, b"testing 4 5 6".into()),
         );
 
         assert_eq!(res1.unwrap(), 6.0);

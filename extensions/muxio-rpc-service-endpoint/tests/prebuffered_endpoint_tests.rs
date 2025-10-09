@@ -1,9 +1,10 @@
 use muxio::rpc::{RpcDispatcher, RpcRequest, RpcResponse, rpc_internals::RpcStreamEvent};
 use muxio_rpc_service::RpcResultStatus;
 use muxio_rpc_service::constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE;
+use muxio_rpc_service::error::{RpcServiceErrorCode, RpcServiceErrorPayload};
 use muxio_rpc_service_endpoint::{
     RpcServiceEndpoint, RpcServiceEndpointInterface,
-    error::{HandlerPayloadError, RpcServiceEndpointError},
+    error::{RpcServiceEndpointError, RpcServiceEndpointHandlerError},
 };
 use std::sync::{Arc, Mutex};
 
@@ -58,11 +59,11 @@ async fn perform_request_response_cycle_with_request(
     for chunk in request_bytes_chunks.chunks(512) {
         let endpoint_on_emit = {
             let client_bound_buffer = client_bound_buffer.clone();
-            move |resp_chunk: &[u8]| {
+            move |response_chunk: &[u8]| {
                 client_bound_buffer
                     .lock()
                     .unwrap()
-                    .extend_from_slice(resp_chunk);
+                    .extend_from_slice(response_chunk);
             }
         };
 
@@ -108,11 +109,11 @@ fn client_get_finalized_response(
 async fn test_handler_registration() {
     let endpoint = RpcServiceEndpoint::<()>::new();
     let result1 = endpoint
-        .register_prebuffered(101, |_, _: Vec<u8>| async { Ok(vec![]) })
+        .register_prebuffered(101, |_request_bytes: Vec<u8>, _ctx| async { Ok(vec![]) })
         .await;
     assert!(result1.is_ok());
     let result2 = endpoint
-        .register_prebuffered(101, |_, _: Vec<u8>| async { Ok(vec![]) })
+        .register_prebuffered(101, |_request_bytes: Vec<u8>, _ctx| async { Ok(vec![]) })
         .await;
     assert!(matches!(result2, Err(RpcServiceEndpointError::Handler(_))));
 }
@@ -122,8 +123,8 @@ async fn test_read_bytes_success() {
     let endpoint = Arc::new(RpcServiceEndpoint::<()>::new());
     const METHOD_ID: u64 = 202;
     endpoint
-        .register_prebuffered(METHOD_ID, |_, req_bytes: Vec<u8>| async move {
-            let num = u32::from_le_bytes(req_bytes.try_into().unwrap());
+        .register_prebuffered(METHOD_ID, |request_bytes: Vec<u8>, _ctx| async move {
+            let num = u32::from_le_bytes(request_bytes.try_into().unwrap());
             Ok((num * 2).to_le_bytes().to_vec())
         })
         .await
@@ -145,7 +146,7 @@ async fn test_read_bytes_handler_system_error() {
     let error_message = "a specific internal error occurred";
 
     endpoint
-        .register_prebuffered(METHOD_ID, move |_, _: Vec<u8>| async move {
+        .register_prebuffered(METHOD_ID, move |_request_bytes: Vec<u8>, _ctx| async move {
             Err(error_message.into())
         })
         .await
@@ -161,31 +162,42 @@ async fn test_read_bytes_handler_system_error() {
 }
 
 #[tokio::test]
-async fn test_read_bytes_handler_fail_payload() {
+async fn test_read_bytes_handler_structured_fail_error() {
     let endpoint = Arc::new(RpcServiceEndpoint::<()>::new());
     const METHOD_ID: u64 = 304;
-    let error_payload = b"INVALID_ARGUMENT".to_vec();
+
+    // 1. Define the structured error payload you expect to send.
+    let error_payload = RpcServiceErrorPayload {
+        code: RpcServiceErrorCode::Fail,
+        message: "INVALID_ARGUMENT".to_string(),
+    };
 
     endpoint
         .register_prebuffered(METHOD_ID, {
-            let error_payload = error_payload.clone();
-            move |_, _: Vec<u8>| {
-                let error_payload = error_payload.clone();
+            // Clone the payload to move it into the async handler.
+            let error_payload_clone = error_payload.clone();
+            move |_request_bytes: Vec<u8>, _ctx| {
+                let error_payload = error_payload_clone.clone();
                 async move {
-                    Err(Box::new(HandlerPayloadError(error_payload))
+                    // 2. Wrap the payload in `RpcServiceEndpointHandlerError`, then box it.
+                    Err(Box::new(RpcServiceEndpointHandlerError(error_payload))
                         as Box<dyn std::error::Error + Send + Sync>)
                 }
             }
         })
         .await
         .unwrap();
+
     let response = perform_request_response_cycle(&endpoint, METHOD_ID, &[]).await;
+
+    // 3. The response payload should now be the JSON-serialized version of your struct.
+    let expected_serialized_payload = bitcode::encode(&error_payload);
 
     let status = RpcResultStatus::try_from(response.rpc_result_status.unwrap()).unwrap();
     assert_eq!(status, RpcResultStatus::Fail);
     assert_eq!(
         response.rpc_prebuffered_payload_bytes.as_deref(),
-        Some(&error_payload[..])
+        Some(expected_serialized_payload.as_slice())
     );
 }
 
@@ -215,11 +227,11 @@ async fn test_large_payload_request_response_cycle() {
     endpoint
         .register_prebuffered(LARGE_PAYLOAD_METHOD_ID, {
             let expected_response = expected_response_payload.clone();
-            move |_, req_bytes: Vec<u8>| {
-                let mut resp_bytes = req_bytes.clone();
-                resp_bytes.extend_from_slice(b"_processed");
-                assert_eq!(resp_bytes, expected_response);
-                async move { Ok(resp_bytes) }
+            move |request_bytes: Vec<u8>, _ctx| {
+                let mut response_bytes = request_bytes.clone();
+                response_bytes.extend_from_slice(b"_processed");
+                assert_eq!(response_bytes, expected_response);
+                async move { Ok(response_bytes) }
             }
         })
         .await

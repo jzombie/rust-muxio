@@ -24,21 +24,21 @@ impl RpcMethodPrebuffered for Add {
         Ok(bitcode::encode(&AddRequestParams { numbers }))
     }
 
-    fn decode_request(bytes: &[u8]) -> Result<Self::Input, io::Error> {
-        let req_params = bitcode::decode::<AddRequestParams>(bytes)
+    fn decode_request(request_bytes: &[u8]) -> Result<Self::Input, io::Error> {
+        let request_params = bitcode::decode::<AddRequestParams>(request_bytes)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
-        Ok(req_params.numbers)
+        Ok(request_params.numbers)
     }
 
     fn encode_response(sum: Self::Output) -> Result<Vec<u8>, io::Error> {
         Ok(bitcode::encode(&AddResponseParams { sum }))
     }
 
-    fn decode_response(bytes: &[u8]) -> Result<Self::Output, io::Error> {
-        let resp_params = bitcode::decode::<AddResponseParams>(bytes)
+    fn decode_response(response_bytes: &[u8]) -> Result<Self::Output, io::Error> {
+        let response_params = bitcode::decode::<AddResponseParams>(response_bytes)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
-        Ok(resp_params.sum)
+        Ok(response_params.sum)
     }
 }
