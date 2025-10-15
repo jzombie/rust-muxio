@@ -19,6 +19,7 @@ publish.workspace = true # Inherit from workspace
 [workspace]
 members = [
     ".",
+    "extensions/muxio-ext-test",
     "extensions/muxio-rpc-service",
     "extensions/muxio-rpc-service-caller",
     "extensions/muxio-rpc-service-endpoint",

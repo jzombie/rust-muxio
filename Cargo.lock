@@ -839,6 +839,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "muxio-ext-test"
+version = "0.10.0-alpha"
+dependencies = [
+ "bytemuck",
+ "example-muxio-rpc-service-definition",
+ "muxio-rpc-service",
+ "muxio-rpc-service-caller",
+ "muxio-rpc-service-endpoint",
+ "muxio-tokio-rpc-client",
+ "muxio-tokio-rpc-server",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "muxio-rpc-service"
 version = "0.10.0-alpha"
 dependencies = [
@@ -904,19 +920,15 @@ version = "0.10.0-alpha"
 dependencies = [
  "async-trait",
  "axum",
- "bytemuck",
  "bytes",
- "example-muxio-rpc-service-definition",
  "futures-util",
  "muxio",
  "muxio-rpc-service",
  "muxio-rpc-service-caller",
  "muxio-rpc-service-endpoint",
- "muxio-tokio-rpc-client",
  "tokio",
  "tokio-tungstenite",
  "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
