@@ -19,6 +19,7 @@ publish.workspace = true # Inherit from workspace
 [workspace]
 members = [
     ".",
+    "extensions/muxio-ext-test",
     "extensions/muxio-rpc-service",
     "extensions/muxio-rpc-service-caller",
     "extensions/muxio-rpc-service-endpoint",
@@ -49,6 +50,7 @@ muxio-tokio-rpc-client = { path = "extensions/muxio-tokio-rpc-client", version =
 async-trait = "0.1.88"
 axum = { version = "0.8.4", features = ["ws"] }
 bitcode = "0.6.6"
+bytemuck = "1.23.1"
 criterion = { version = "0.6.0" }
 doc-comment = "0.3.3"
 bytes = "1.10.1"

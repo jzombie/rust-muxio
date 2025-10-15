@@ -1,8 +1,8 @@
-//! This integration test verifies error propagation through a proxy server.
-//!
-//! Scenario: Client A -> Server (Proxy) -> Client B (Provider).
-//! When Client B disconnects (crashes) while a call from Client A is pending,
-//! the error must propagate back through Server to Client A.
+// This integration test verifies error propagation through a proxy server.
+//
+// Scenario: Client A -> Server (Proxy) -> Client B (Provider).
+// When Client B disconnects (crashes) while a call from Client A is pending,
+// the error must propagate back through Server to Client A.
 
 use example_muxio_rpc_service_definition::prebuffered::Echo;
 use muxio_rpc_service::{

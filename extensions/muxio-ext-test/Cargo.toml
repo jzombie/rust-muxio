@@ -1,0 +1,20 @@
+[package]
+name = "muxio-ext-test"
+authors.workspace = true
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+publish = false
+
+[dev-dependencies]
+bytemuck.workspace = true
+tracing-subscriber = { workspace = true, features = ["fmt"] }
+muxio-tokio-rpc-client = { workspace = true }
+example-muxio-rpc-service-definition.workspace = true
+muxio-tokio-rpc-server = { workspace = true }
+muxio-rpc-service = { workspace = true }
+muxio-rpc-service-caller = { workspace = true }
+muxio-rpc-service-endpoint = { workspace = true, features = ["tokio_support"] }
+tracing = { workspace = true }
+tokio = { workspace = true, features = ["full"] }

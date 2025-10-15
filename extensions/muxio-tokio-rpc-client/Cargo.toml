@@ -22,6 +22,9 @@ futures = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
-muxio-tokio-rpc-server = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+tokio-tungstenite = { workspace = true }
 example-muxio-rpc-service-definition = { workspace = true }
+futures-util = { workspace = true }
 axum = { workspace = true }
+muxio-tokio-rpc-server = { workspace = true }
