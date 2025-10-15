@@ -21,9 +21,6 @@ muxio-rpc-service-endpoint = { workspace = true }
 tracing = { workspace = true }
 tokio = { workspace = true, features = ["sync"] }
 
-[package.metadata]
-# dev-dependencies intentionally removed — integration tests were moved to a non-publishable harness.
-
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }
 muxio-tokio-rpc-server = { workspace = true }
