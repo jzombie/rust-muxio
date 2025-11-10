@@ -1,0 +1,80 @@
+name: Build and Deploy Documentation
+
+on:
+  schedule:
+    # Run weekly on Sundays at midnight UTC
+    - cron: "0 0 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Resolve repository and book title
+        id: resolve
+        run: |
+          set -eo pipefail
+
+          REPO_INPUT="${{ github.event.inputs.repo }}"
+          if [ -n "$REPO_INPUT" ]; then
+            REPO_VALUE="$REPO_INPUT"
+          else
+            REPO_VALUE="${{ github.repository }}"
+          fi
+
+          TITLE_INPUT="${{ github.event.inputs.book_title }}"
+          if [ -n "$TITLE_INPUT" ]; then
+            TITLE_VALUE="$TITLE_INPUT"
+          else
+            REPO_NAME="${REPO_VALUE#*/}"
+            if [ -z "$REPO_NAME" ]; then
+              TITLE_VALUE="Documentation"
+            else
+              TITLE_VALUE="$REPO_NAME Documentation"
+            fi
+          fi
+
+          echo "repo_value=$REPO_VALUE" >> "$GITHUB_OUTPUT"
+          echo "title_value=$TITLE_VALUE" >> "$GITHUB_OUTPUT"
+          echo "Using repository: $REPO_VALUE"
+          echo "Using book title: $TITLE_VALUE"
+
+      - name: Prepare output directory
+        run: |
+          rm -rf output
+          mkdir -p output
+
+      - name: Generate DeepWiki docs
+        uses: jzombie/deepwiki-to-mdbook@main
+        with:
+          repo: ${{ steps.resolve.outputs.repo_value }}
+          book_title: ${{ steps.resolve.outputs.title_value }}
+          output_dir: ./output
+
+      - name: Upload artifact for Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./output/book
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
