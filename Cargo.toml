@@ -57,7 +57,7 @@ bytes = "1.10.1"
 futures = "0.3.31"
 futures-util = "0.3.31"
 num_enum = "0.7.3"
-tokio = { version = "1.45.1" }
+tokio = { version = "1.48.0" }
 tokio-tungstenite = "0.26.2"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
