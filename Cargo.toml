@@ -52,7 +52,7 @@ axum = { version = "0.8.4", features = ["ws"] }
 bitcode = "0.6.6"
 bytemuck = "1.23.1"
 criterion = { version = "0.6.0" }
-doc-comment = "0.3.3"
+doc-comment = "0.3.4"
 bytes = "1.10.1"
 futures = "0.3.31"
 futures-util = "0.3.31"
