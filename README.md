@@ -3,11 +3,11 @@
 </div>
 
 <div align="center">
-  <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/Made%20with-Rust-black?&logo=Rust" alt="made-with-rust"></a>
+  <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/Made%20with-Rust-black?&logo=Rust" alt="Made with Rust"></a>
   <a href="https://crates.io/crates/muxio"><img src="https://img.shields.io/crates/v/muxio.svg" alt="crates.io"></a>
   <a href="https://docs.rs/muxio"><img src="https://docs.rs/muxio/badge.svg" alt="Documentation"></a>
-  <a href="https://deepwiki.com/jzombie/rust-muxio"><img src="https://deepwiki.com/badge.svg"></a>
-  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="license"></a>
+  <a href="https://deepwiki.com/jzombie/rust-muxio"><img src="https://deepwiki.com/badge.svg" alt="DeepWiki"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="Apache 2.0 License"></a>
 </div>
 
 # Muxio: A High-Performance Multiplexing and RPC Framework for Rust
