@@ -53,7 +53,7 @@ bitcode = "0.6.6"
 bytemuck = "1.23.1"
 criterion = { version = "0.6.0" }
 doc-comment = "0.3.3"
-bytes = "1.10.1"
+bytes = "1.11.1"
 futures = "0.3.31"
 futures-util = "0.3.31"
 num_enum = "0.7.3"
