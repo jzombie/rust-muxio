@@ -10,8 +10,8 @@ publish.workspace = true # Inherit from workspace
 
 [dependencies]
 async-trait = { workspace = true }
+bitcode = { workspace = true }
 futures = { workspace = true }
 muxio = { workspace = true }
 num_enum = { workspace = true }
 xxhash-rust = { workspace = true }
-bitcode = { workspace = true }

@@ -8,5 +8,5 @@ license.workspace = true # Inherit from workspace
 publish.workspace = true # Inherit from workspace
 
 [dependencies]
-bitcode = "0.6.6"
+bitcode = "0.6.9"
 muxio-rpc-service = { workspace = true }
