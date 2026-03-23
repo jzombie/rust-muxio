@@ -39,11 +39,6 @@ cargo modules dependencies --no-externs --no-fns --no-sysroot --no-traits --no-t
 dot -Tsvg mods.dot -o mods.svg
 ```
 
-## Release
-
-```sh
- cargo release --workspace 0.10.0-alpha --dry-run
-```
 
 ## Runtime Model (Draft)
 
