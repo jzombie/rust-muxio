@@ -11,20 +11,20 @@ publish.workspace = true # Inherit from workspace
 [dependencies]
 async-trait = { workspace = true }
 bytes = { workspace = true }
+futures = { workspace = true }
 futures-util = { workspace = true }
-tokio = { workspace = true, features = ["full"] }
-tokio-tungstenite = { workspace = true }
 muxio = { workspace = true }
 muxio-rpc-service = { workspace = true }
 muxio-rpc-service-caller = { workspace = true }
 muxio-rpc-service-endpoint = { workspace = true }
-futures = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+tokio-tungstenite = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["full"] }
-tokio-tungstenite = { workspace = true }
+axum = { workspace = true }
 example-muxio-rpc-service-definition = { workspace = true }
 futures-util = { workspace = true }
-axum = { workspace = true }
 muxio-tokio-rpc-server = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+tokio-tungstenite = { workspace = true }

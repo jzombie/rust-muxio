@@ -9,14 +9,14 @@ license.workspace = true # Inherit from workspace
 publish.workspace = true # Inherit from workspace
 
 [dependencies]
+async-trait = { workspace = true }
 axum = { workspace = true }
 bytes = { workspace = true }
 futures-util = { workspace = true }
+muxio = { workspace = true }
+muxio-rpc-service = { workspace = true }
+muxio-rpc-service-caller = { workspace = true }
+muxio-rpc-service-endpoint = { workspace = true, features = ["tokio_support"] }
 tokio = { workspace = true, features = ["full"] }
 tokio-tungstenite = { workspace = true }
-muxio = { workspace = true }
-muxio-rpc-service-caller = { workspace = true }
-muxio-rpc-service = { workspace = true }
-muxio-rpc-service-endpoint = { workspace = true, features=["tokio_support"] }
-async-trait = { workspace = true }
 tracing = { workspace = true }
