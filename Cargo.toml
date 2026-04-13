@@ -51,7 +51,7 @@ muxio-tokio-rpc-client = { path = "extensions/muxio-tokio-rpc-client", version =
 muxio-tokio-rpc-server = { path = "extensions/muxio-tokio-rpc-server", version = "0.10.1-alpha" }
 num_enum = "0.7.6"
 once_cell = "1.21.4"
-rand = "0.10.0"
+rand = "0.10.1"
 tokio = { version = "1.51.0" }
 tokio-tungstenite = "0.29.0"
 tracing = "0.1.44"
