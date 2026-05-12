@@ -439,7 +439,7 @@ dependencies = [
 
 [[package]]
 name = "example-muxio-rpc-service-definition"
-version = "0.10.1-alpha"
+version = "0.10.2-alpha"
 dependencies = [
  "bitcode",
  "muxio-rpc-service",
@@ -447,7 +447,7 @@ dependencies = [
 
 [[package]]
 name = "example-muxio-ws-rpc-app"
-version = "0.10.1-alpha"
+version = "0.10.2-alpha"
 dependencies = [
  "async-trait",
  "criterion",
@@ -867,7 +867,7 @@ dependencies = [
 
 [[package]]
 name = "muxio"
-version = "0.10.1-alpha"
+version = "0.10.2-alpha"
 dependencies = [
  "bitcode",
  "chrono",
@@ -879,7 +879,7 @@ dependencies = [
 
 [[package]]
 name = "muxio-ext-test"
-version = "0.10.1-alpha"
+version = "0.10.2-alpha"
 dependencies = [
  "bytemuck",
  "example-muxio-rpc-service-definition",
@@ -895,7 +895,7 @@ dependencies = [
 
 [[package]]
 name = "muxio-rpc-service"
-version = "0.10.1-alpha"
+version = "0.10.2-alpha"
 dependencies = [
  "async-trait",
  "bitcode",
@@ -907,7 +907,7 @@ dependencies = [
 
 [[package]]
 name = "muxio-rpc-service-caller"
-version = "0.10.1-alpha"
+version = "0.10.2-alpha"
 dependencies = [
  "async-trait",
  "example-muxio-rpc-service-definition",
@@ -920,7 +920,7 @@ dependencies = [
 
 [[package]]
 name = "muxio-rpc-service-endpoint"
-version = "0.10.1-alpha"
+version = "0.10.2-alpha"
 dependencies = [
  "async-trait",
  "bitcode",
@@ -935,7 +935,7 @@ dependencies = [
 
 [[package]]
 name = "muxio-tokio-rpc-client"
-version = "0.10.1-alpha"
+version = "0.10.2-alpha"
 dependencies = [
  "async-trait",
  "axum",
@@ -955,7 +955,7 @@ dependencies = [
 
 [[package]]
 name = "muxio-tokio-rpc-server"
-version = "0.10.1-alpha"
+version = "0.10.2-alpha"
 dependencies = [
  "async-trait",
  "axum",
@@ -972,7 +972,7 @@ dependencies = [
 
 [[package]]
 name = "muxio-wasm-rpc-client"
-version = "0.10.1-alpha"
+version = "0.10.2-alpha"
 dependencies = [
  "async-trait",
  "example-muxio-rpc-service-definition",
