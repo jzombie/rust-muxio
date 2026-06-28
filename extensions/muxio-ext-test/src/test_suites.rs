@@ -1,7 +1,9 @@
 use example_muxio_rpc_service_definition::prebuffered::{Add, Echo, Mult};
+use futures_util::StreamExt;
 use muxio::rpc::RpcRequest;
 use muxio_rpc_service::error::{RpcServiceError, RpcServiceErrorCode};
 use muxio_rpc_service::prebuffered::RpcMethodPrebuffered;
+use muxio_rpc_service_caller::dynamic_channel::DynamicChannelType;
 use muxio_rpc_service_caller::prebuffered::RpcCallPrebuffered;
 use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
 use muxio_rpc_service_endpoint::RpcServiceEndpointInterface;
@@ -190,66 +192,58 @@ pub async fn server_to_client_echo<H, C, E>(
 }
 
 // ------------------------------------------------------------------
-// TODO: Server-to-client streaming (disabled — `call_rpc_streaming`
-// deadlocks for this direction because the readiness signal waits for
-// a response header before returning the encoder, but the server can't
-// send chunks (needs the encoder) and the client can't send a response
-// (hasn't received the full request yet).  Once `call_rpc_streaming`
-// supports server-initiated streaming, add the test body below and
-// uncomment the `test_server_to_client_streaming_echo` test in the
-// `server_to_client_tests` macro.
-//
-// ```rust,ignore
-// pub async fn server_to_client_streaming_echo<H, C, E>(
-//     _client: &C,
-//     client_endpoint: &impl RpcServiceEndpointInterface<E>,
-//     ctx_handle: &H,
-//     label: &str,
-// ) where
-//     H: RpcServiceCallerInterface,
-//     C: RpcServiceCallerInterface,
-//     E: Send + Sync + Clone + 'static,
-// {
-//     client_endpoint
-//         .register_prebuffered(Echo::METHOD_ID, |request_bytes, _ctx| async move {
-//             let request = Echo::decode_request(&request_bytes)?;
-//             Echo::encode_response(request)
-//                 .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>)
-//         })
-//         .await
-//         .unwrap();
-//
-//     let payload =
-//         format!("hello from server to {label} client via stream").into_bytes();
-//
-//     let request = RpcRequest {
-//         rpc_method_id: Echo::METHOD_ID,
-//         rpc_param_bytes: None,
-//         rpc_prebuffered_payload_bytes: None,
-//         is_finalized: false,
-//     };
-//     let (mut encoder, mut receiver) = ctx_handle
-//         .call_rpc_streaming(request, DynamicChannelType::Unbounded)
-//         .await
-//         .expect("server-to-client streaming call failed");
-//
-//     for chunk in payload.chunks(16) {
-//         encoder.write_bytes(chunk).expect("write_bytes failed");
-//     }
-//     encoder.flush().expect("flush failed");
-//     encoder.end_stream().expect("end_stream failed");
-//
-//     let mut response = Vec::new();
-//     while let Some(chunk) = receiver.next().await {
-//         match chunk {
-//             Ok(bytes) => response.extend_from_slice(&bytes),
-//             Err(e) => panic!("{label} streaming response error: {e:?}"),
-//         }
-//     }
-//
-//     assert_eq!(response, payload, "{label} streaming echo mismatch");
-// }
-// ```
+/// Run a server-to-client streaming Echo roundtrip.
+/// The server sends data in multiple chunks, the client reassembles them
+/// and echoes the complete payload back.
+pub async fn server_to_client_streaming_echo<H, C, E>(
+    _client: &C,
+    client_endpoint: &impl RpcServiceEndpointInterface<E>,
+    ctx_handle: &H,
+    label: &str,
+) where
+    H: RpcServiceCallerInterface,
+    C: RpcServiceCallerInterface,
+    E: Send + Sync + Clone + 'static,
+{
+    client_endpoint
+        .register_prebuffered(Echo::METHOD_ID, |request_bytes, _ctx| async move {
+            let request = Echo::decode_request(&request_bytes)?;
+            Echo::encode_response(request)
+                .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>)
+        })
+        .await
+        .unwrap();
+
+    let payload =
+        format!("hello from server to {label} client via stream").into_bytes();
+
+    let request = RpcRequest {
+        rpc_method_id: Echo::METHOD_ID,
+        rpc_param_bytes: None,
+        rpc_prebuffered_payload_bytes: None,
+        is_finalized: false,
+    };
+    let (mut encoder, mut receiver) = ctx_handle
+        .call_rpc_streaming(request, DynamicChannelType::Unbounded)
+        .await
+        .expect("server-to-client streaming call failed");
+
+    for chunk in payload.chunks(16) {
+        encoder.write_bytes(chunk).expect("write_bytes failed");
+    }
+    encoder.flush().expect("flush failed");
+    encoder.end_stream().expect("end_stream failed");
+
+    let mut response = Vec::new();
+    while let Some(chunk) = receiver.next().await {
+        match chunk {
+            Ok(bytes) => response.extend_from_slice(&bytes),
+            Err(e) => panic!("{label} streaming response error: {e:?}"),
+        }
+    }
+
+    assert_eq!(response, payload, "{label} streaming echo mismatch");
+}
 
 // ------------------------------------------------------------------
 // Pending requests fail on disconnect
