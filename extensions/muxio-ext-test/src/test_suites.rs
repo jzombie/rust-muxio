@@ -358,6 +358,91 @@ pub async fn concurrent_bidirectional_streaming<H, C, E>(
     );
 }
 
+/// Send a large number of tiny messages through a single stream and
+/// report throughput — simulating a stream of mouse or keyboard events.
+/// The server opens a stream, writes N small payloads (one per "event"),
+/// finalizes, and reads the echo.
+pub async fn stream_small_messages_throughput<H, C, E>(
+    _client: &C,
+    client_endpoint: &impl RpcServiceEndpointInterface<E>,
+    ctx_handle: H,
+    label: &str,
+) where
+    H: RpcServiceCallerInterface + Send + Sync + 'static,
+    C: RpcServiceCallerInterface + Send + Sync + 'static,
+    E: Send + Sync + Clone + 'static,
+{
+    client_endpoint
+        .register_prebuffered(Echo::METHOD_ID, |request_bytes, _ctx| async move {
+            let request = Echo::decode_request(&request_bytes)?;
+            Echo::encode_response(request).map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>)
+        })
+        .await
+        .unwrap();
+
+    // Simulate 10,000 mouse events at 8 bytes each
+    let num_events = 10_000u32;
+    let event_size = 8usize;
+    let total_bytes = num_events as usize * event_size;
+
+    let request = RpcRequest {
+        rpc_method_id: Echo::METHOD_ID,
+        rpc_param_bytes: None,
+        rpc_prebuffered_payload_bytes: None,
+        is_finalized: false,
+    };
+    let (mut encoder, mut receiver) = ctx_handle
+        .call_rpc_streaming(request, DynamicChannelType::Unbounded)
+        .await
+        .expect("streaming call failed");
+
+    let start = std::time::Instant::now();
+    let mut event_buf = vec![0u8; event_size];
+    for i in 0..num_events {
+        // Pack an 8-byte "mouse event"
+        event_buf[0..4].copy_from_slice(&i.to_le_bytes());
+        // event_buf[4..8] reserved for flags
+        encoder.write_bytes(&event_buf).expect("write_bytes failed");
+        if i % 100 == 0 {
+            tokio::task::yield_now().await;
+        }
+    }
+    encoder.flush().expect("flush failed");
+    encoder.end_stream().expect("end_stream failed");
+
+    let mut response = Vec::new();
+    while let Some(chunk) = receiver.next().await {
+        match chunk {
+            Ok(bytes) => response.extend_from_slice(&bytes),
+            Err(e) => panic!("response error: {e:?}"),
+        }
+    }
+
+    let elapsed = start.elapsed();
+    let events_per_sec = num_events as f64 / elapsed.as_secs_f64();
+    let mbps = (total_bytes as f64 / (1024.0 * 1024.0)) / elapsed.as_secs_f64();
+
+    assert_eq!(
+        response.len(),
+        total_bytes,
+        "{label} throughput data size mismatch: expected {total_bytes}, got {}",
+        response.len()
+    );
+
+    // Rate-limited to avoid CI noise; just verify every event ID
+    for i in 0..num_events {
+        let offset = i as usize * event_size;
+        let id = u32::from_le_bytes(response[offset..offset + 4].try_into().unwrap());
+        assert_eq!(id, i, "{label} event {i} out of order at offset {offset}");
+    }
+
+    println!(
+        "[{label}] {num_events} × {event_size}B events via stream: \
+         {:.0} events/s, {:.2} MB/s, {elapsed:.2?}",
+        events_per_sec, mbps,
+    );
+}
+
 // ------------------------------------------------------------------
 // Pending requests fail on disconnect
 // ------------------------------------------------------------------

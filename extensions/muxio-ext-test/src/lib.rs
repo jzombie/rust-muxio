@@ -92,6 +92,20 @@ macro_rules! server_to_client_tests {
                 )
                 .await;
             }
+
+            #[tokio::test]
+            async fn test_stream_small_messages_throughput() {
+                let (client, endpoint, handle) =
+                    <$transport as $crate::test_transport::TestTransport>::connect_s2c().await;
+                let label = <$transport as $crate::test_transport::TestTransport>::name();
+                $crate::test_suites::stream_small_messages_throughput(
+                    client.as_ref(),
+                    &*endpoint,
+                    handle,
+                    label,
+                )
+                .await;
+            }
         }
     };
 }
