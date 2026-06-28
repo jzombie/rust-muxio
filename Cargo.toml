@@ -9,41 +9,6 @@ repository.workspace = true # Inherit from workspace
 license.workspace = true # Inherit from workspace
 publish.workspace = true # Inherit from workspace
 
-[dependencies]
-muxio-core = { workspace = true }
-
-# Optional extension re-exports (behind feature flags)
-muxio-rpc-service = { workspace = true, optional = true }
-muxio-rpc-service-caller = { workspace = true, optional = true }
-muxio-rpc-service-endpoint = { workspace = true, optional = true }
-muxio-tokio-ipc-client = { workspace = true, optional = true }
-muxio-tokio-ipc-server = { workspace = true, optional = true }
-muxio-tokio-rpc-client = { workspace = true, optional = true }
-muxio-tokio-rpc-server = { workspace = true, optional = true }
-muxio-wasm-rpc-client = { workspace = true, optional = true }
-
-[dev-dependencies]
-bitcode = { workspace = true }
-rand.workspace = true
-tracing.workspace = true
-
-[features]
-default = []
-rpc-service = ["dep:muxio-rpc-service"]
-rpc-service-caller = ["dep:muxio-rpc-service-caller"]
-rpc-service-endpoint = ["dep:muxio-rpc-service-endpoint"]
-tokio-ipc-client = ["dep:muxio-tokio-ipc-client"]
-tokio-ipc-server = ["dep:muxio-tokio-ipc-server"]
-tokio-rpc-client = ["dep:muxio-tokio-rpc-client"]
-tokio-rpc-server = ["dep:muxio-tokio-rpc-server"]
-wasm-rpc-client = ["dep:muxio-wasm-rpc-client"]
-full = [
-    "rpc-service", "rpc-service-caller", "rpc-service-endpoint",
-    "tokio-ipc-client", "tokio-ipc-server",
-    "tokio-rpc-client", "tokio-rpc-server",
-    "wasm-rpc-client",
-]
-
 [workspace]
 members = [
     ".",
@@ -100,3 +65,42 @@ tokio-tungstenite = "0.29.0"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 xxhash-rust = { version = "0.8.15", features = ["xxh3", "const_xxh3"] }
+
+[features]
+default = []
+rpc-service = ["dep:muxio-rpc-service"]
+rpc-service-caller = ["dep:muxio-rpc-service-caller"]
+rpc-service-endpoint = ["dep:muxio-rpc-service-endpoint"]
+tokio-ipc-client = ["dep:muxio-tokio-ipc-client"]
+tokio-ipc-server = ["dep:muxio-tokio-ipc-server"]
+tokio-rpc-client = ["dep:muxio-tokio-rpc-client"]
+tokio-rpc-server = ["dep:muxio-tokio-rpc-server"]
+wasm-rpc-client = ["dep:muxio-wasm-rpc-client"]
+full = [
+    "rpc-service",
+    "rpc-service-caller",
+    "rpc-service-endpoint",
+    "tokio-ipc-client",
+    "tokio-ipc-server",
+    "tokio-rpc-client",
+    "tokio-rpc-server",
+    "wasm-rpc-client",
+]
+
+[dependencies]
+muxio-core = { workspace = true }
+
+# Optional extension re-exports (behind feature flags)
+muxio-rpc-service = { workspace = true, optional = true }
+muxio-rpc-service-caller = { workspace = true, optional = true }
+muxio-rpc-service-endpoint = { workspace = true, optional = true }
+muxio-tokio-ipc-client = { workspace = true, optional = true }
+muxio-tokio-ipc-server = { workspace = true, optional = true }
+muxio-tokio-rpc-client = { workspace = true, optional = true }
+muxio-tokio-rpc-server = { workspace = true, optional = true }
+muxio-wasm-rpc-client = { workspace = true, optional = true }
+
+[dev-dependencies]
+bitcode = { workspace = true }
+rand.workspace = true
+tracing.workspace = true
