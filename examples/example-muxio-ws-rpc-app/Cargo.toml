@@ -13,6 +13,8 @@ example-muxio-rpc-service-definition = { workspace = true }
 muxio = { workspace = true }
 muxio-rpc-service-caller = { workspace = true }
 muxio-tokio-rpc-client = { workspace = true }
+muxio-tokio-ipc-client = { workspace = true }
+muxio-tokio-ipc-server = { workspace = true }
 muxio-tokio-rpc-server = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tracing = { workspace = true }

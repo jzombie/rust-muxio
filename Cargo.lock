@@ -462,6 +462,8 @@ dependencies = [
  "futures",
  "muxio",
  "muxio-rpc-service-caller",
+ "muxio-tokio-ipc-client",
+ "muxio-tokio-ipc-server",
  "muxio-tokio-rpc-client",
  "muxio-tokio-rpc-server",
  "tokio",
