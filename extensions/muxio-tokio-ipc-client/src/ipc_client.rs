@@ -11,7 +11,7 @@ use std::{
     },
 };
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
+    io::AsyncReadExt,
     sync::{Mutex as TokioMutex, mpsc},
     task::JoinHandle,
 };
@@ -82,8 +82,16 @@ impl IpcClient {
             .map_err(|e| io::Error::new(io::ErrorKind::ConnectionRefused, e))?;
         tracing::debug!("Connected to IPC server at {:?}", socket_path);
 
-        let (mut read_half, mut write_half) = tokio::io::split(stream);
-        let (app_tx, mut app_rx) = mpsc::unbounded_channel::<Vec<u8>>();
+        let (mut read_half, write_half) = tokio::io::split(stream);
+        let write_half = std::sync::Arc::new(tokio::sync::Mutex::new(write_half));
+        let (app_tx, send_handle) =
+            muxio_rpc_service_caller::write_channel::spawn_write_loop(move |msg: Vec<u8>| {
+                let w = write_half.clone();
+                async move {
+                    use tokio::io::AsyncWriteExt;
+                    w.lock().await.write_all(&msg).await.map_err(|_| ())
+                }
+            });
 
         let client = Arc::new_cyclic(|weak_client: &Weak<IpcClient>| {
             let state_change_handler: RpcTransportStateChangeHandler =
@@ -93,19 +101,6 @@ impl IpcClient {
             let endpoint = Arc::new(RpcServiceEndpoint::new());
             let mut task_handles = Vec::new();
 
-            // Send loop: drains the mpsc channel and writes bytes to the socket.
-            let is_connected_send = is_connected.clone();
-            let send_handle = tokio::spawn(async move {
-                while let Some(msg) = app_rx.recv().await {
-                    if !is_connected_send.load(Ordering::Acquire) {
-                        break;
-                    }
-                    if write_half.write_all(&msg).await.is_err() {
-                        tracing::error!("IPC send loop: write error.");
-                        break;
-                    }
-                }
-            });
             task_handles.push(send_handle);
 
             // Receive loop: reads bytes from the socket and feeds them through the endpoint.
