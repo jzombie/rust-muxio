@@ -10,7 +10,7 @@
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="Apache 2.0 License"></a>
 </div>
 
-<p align="center"><strong>Examples:</strong> <a href="#usage-example">WebSocket RPC</a> · <a href="#ipc-usage-example">IPC</a> · <a href="#streaming-rpc-example">Streaming RPC</a></p>
+<p align="center"><strong>Examples:</strong> <a href="#websocket-usage-example">WebSocket RPC</a> · <a href="#ipc-usage-example">IPC</a> · <a href="#streaming-rpc-example">Streaming RPC</a></p>
 
 
 
@@ -88,7 +88,7 @@ cargo add muxio
 
 This provides the low-level functionality, but [Muxio extensions](./extensions/) are likely more desirable for most use cases.
 
-## Usage Example
+## WebSocket Usage Example
 
 Let's build a simple sample app which spins up a Tokio-based WebSocket server, adds some routes, then spins up a client, performs some requests, then shuts everything down.
 
