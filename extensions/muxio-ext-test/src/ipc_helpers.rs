@@ -1,6 +1,6 @@
 use crate::endpoint_helpers::register_standard_handlers;
-use muxio_tokio_ipc_client::IpcClient;
-use muxio_tokio_ipc_server::{IpcServer, IpcServerEvent};
+use muxio_tokio_rpc_ipc_client::RpcIpcClient;
+use muxio_tokio_rpc_ipc_server::{RpcIpcServer, RpcIpcServerEvent};
 use std::sync::Arc;
 use tokio::time::{Duration, sleep};
 
@@ -10,7 +10,7 @@ pub fn temp_socket_name(name: &str) -> String {
 
 pub async fn setup_ipc_server(test_name: &str) -> String {
     let name = temp_socket_name(test_name);
-    let server = IpcServer::new(None);
+    let server = RpcIpcServer::new(None);
     register_standard_handlers(&*server.endpoint()).await;
     let server_name = name.clone();
     tokio::spawn(async move {
@@ -22,10 +22,10 @@ pub async fn setup_ipc_server(test_name: &str) -> String {
 
 pub async fn setup_ipc_server_with_events(
     test_name: &str,
-) -> (tokio::sync::mpsc::UnboundedReceiver<IpcServerEvent>, String) {
+) -> (tokio::sync::mpsc::UnboundedReceiver<RpcIpcServerEvent>, String) {
     let name = temp_socket_name(test_name);
     let (event_tx, event_rx) = tokio::sync::mpsc::unbounded_channel();
-    let server = IpcServer::new(Some(event_tx));
+    let server = RpcIpcServer::new(Some(event_tx));
     register_standard_handlers(&*server.endpoint()).await;
     let server_name = name.clone();
     tokio::spawn(async move {
@@ -35,6 +35,6 @@ pub async fn setup_ipc_server_with_events(
     (event_rx, name)
 }
 
-pub async fn connect_ipc_client(socket_path: &str) -> Arc<IpcClient> {
-    IpcClient::new(socket_path).await.unwrap()
+pub async fn connect_ipc_client(socket_path: &str) -> Arc<RpcIpcClient> {
+    RpcIpcClient::new(socket_path).await.unwrap()
 }

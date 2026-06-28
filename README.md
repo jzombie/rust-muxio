@@ -41,7 +41,7 @@ On top of this multiplexing layer, Muxio offers a minimal, unopinionated RPC fra
 
   - **Tokio-based WebSocket [Server](./extensions/muxio-tokio-rpc-server/)/[Client](./extensions/muxio-tokio-rpc-client/)**: For native, multi-threaded environments.
   - **[WASM-based Web Client](./extensions/muxio-wasm-rpc-client/)**: For seamless integration into web applications, communicating with a JavaScript host via a simple byte-passing bridge.
-  - **Tokio-based IPC [Server](./extensions/muxio-tokio-ipc-server/)/[Client](./extensions/muxio-tokio-ipc-client/)**: For local inter-process communication over Unix domain sockets or Windows named pipes.
+  - **Tokio-based IPC [Server](./extensions/muxio-tokio-rpc-ipc-server/)/[Client](./extensions/muxio-tokio-rpc-ipc-client/)**: For local inter-process communication over Unix domain sockets or Windows named pipes.
 
 ## How Muxio Compares
 
@@ -213,8 +213,8 @@ use example_muxio_rpc_service_definition::{
     RpcMethodPrebuffered,
     prebuffered::{Add, Echo, Mult},
 };
-use muxio_tokio_ipc_client::{IpcClient, RpcCallPrebuffered, RpcServiceCallerInterface, RpcTransportState};
-use muxio_tokio_ipc_server::{IpcServer, RpcServiceEndpointInterface};
+use muxio_tokio_rpc_ipc_client::{RpcIpcClient, RpcCallPrebuffered, RpcServiceCallerInterface, RpcTransportState};
+use muxio_tokio_rpc_ipc_server::{RpcIpcServer, RpcServiceEndpointInterface};
 use tokio::join;
 
 #[tokio::main]
@@ -226,7 +226,7 @@ async fn main() {
 
     // This block sets up and spawns the server
     {
-        let server = IpcServer::new(None);
+        let server = RpcIpcServer::new(None);
         let endpoint = server.endpoint();
 
         // Register server methods on the endpoint
@@ -261,7 +261,7 @@ async fn main() {
     {
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
-        let rpc_client = IpcClient::new(&socket_name).await.unwrap();
+        let rpc_client = RpcIpcClient::new(&socket_name).await.unwrap();
 
         rpc_client
             .set_state_change_handler(move |new_state: RpcTransportState| {
