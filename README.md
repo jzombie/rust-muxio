@@ -371,6 +371,8 @@ Streams are multiplexed over a single connection. Each stream is unidirectional,
 A single bidirectional stream would interleave both directions in one channel, coupling their backpressure, error handling, and lifecycle; two (or more) unidirectional streams keep each direction isolated and individually cancellable.
 
 ```text
+Single connection, multiple streams.
+
 Client                          Server
   │                               │
   ├─ call_rpc_streaming ────────► │     stream A open
