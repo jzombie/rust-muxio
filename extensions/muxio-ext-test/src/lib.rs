@@ -1,3 +1,4 @@
+pub mod endpoint_helpers;
 pub mod ipc_helpers;
 pub mod test_assertions;
 pub mod test_suites;

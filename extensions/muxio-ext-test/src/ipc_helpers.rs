@@ -1,4 +1,4 @@
-use crate::ws_helpers::register_standard_handlers;
+use crate::endpoint_helpers::register_standard_handlers;
 use muxio_tokio_ipc_client::IpcClient;
 use muxio_tokio_ipc_server::{IpcServer, IpcServerEvent};
 use std::sync::Arc;
