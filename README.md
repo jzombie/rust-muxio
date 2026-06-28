@@ -374,7 +374,7 @@ A single bidirectional stream would interleave both directions in one channel, c
 Client                          Server
   │                               │
   ├─ call_rpc_streaming ────────► │     stream A open
-  │ ◄──── call_rpc_streaming ──── ├     stream B open
+  │ ◄──── call_rpc_streaming ──── │     stream B open
   │ ── chunk A ─────────────────► │
   │ ◄──── chunk B ─────────────── │     interleaved
   │ ── chunk A ─────────────────► │     writes
@@ -386,7 +386,7 @@ Client                          Server
   │ ── response B (echo) ───────► │
 ```
 
-This is exactly what the [`concurrent_bidirectional_streaming`](./extensions/muxio-ext-test/src/test_suites.rs) integration test exercises — it spawns two `tokio::spawn` tasks that write chunks in opposite directions and **yield between each chunk** so the writes are truly interleaved at the application level, not buffered and sent in one burst per direction.
+This is exactly what the [`concurrent_bidirectional_streaming`](./extensions/muxio-ext-test/src/test_suites.rs) integration test exercises. It spawns two `tokio::spawn` tasks that write chunks in opposite directions and **yield between each chunk** so the writes are truly interleaved at the application level, not buffered and sent in one burst per direction.
 
 ## License
 
