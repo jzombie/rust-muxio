@@ -161,6 +161,93 @@ async fn main() {
 }
 ```
 
+## Streaming RPC
+
+Muxio supports streaming requests over any transport. Each stream is **half-duplex**: the sender writes chunks and ends the stream, then reads the single response. True bidirectional messaging is achieved with **two independent concurrent streams** (one per direction).
+
+### Streaming a request from the client
+
+```rust
+use muxio_rpc_service_caller::dynamic_channel::DynamicChannelType;
+use muxio::rpc::RpcRequest;
+use futures_util::StreamExt;
+
+// Build a streaming request (not finalized, no payload yet)
+let request = RpcRequest {
+    rpc_method_id: Echo::METHOD_ID,
+    rpc_param_bytes: None,
+    rpc_prebuffered_payload_bytes: None,
+    is_finalized: false,
+};
+
+// Initiate the stream — the encoder is returned immediately
+let (mut encoder, mut receiver) = rpc_client
+    .call_rpc_streaming(request, DynamicChannelType::Unbounded)
+    .await?;
+
+// Write chunks
+for chunk in large_payload.chunks(4096) {
+    encoder.write_bytes(chunk)?;
+}
+encoder.flush()?;
+encoder.end_stream()?;
+
+// Read the single response from the server
+while let Some(chunk) = receiver.next().await {
+    match chunk {
+        Ok(bytes) => response.extend_from_slice(&bytes),
+        Err(e) => eprintln!("stream error: {e:?}"),
+    }
+}
+```
+
+### Streaming from the server to the client (server-initiated calls)
+
+Any handle that implements `RpcServiceCallerInterface` — such as the
+`ConnectionContextHandle` obtained from a `ClientConnected` event —
+can initiate streaming calls:
+
+```rust
+use muxio_tokio_rpc_server::RpcServerEvent;
+
+// Server event channel received during setup
+while let Some(event) = event_rx.recv().await {
+    if let RpcServerEvent::ClientConnected(handle) = event {
+        // handle: ConnectionContextHandle — implements RpcServiceCallerInterface
+        tokio::spawn(async move {
+            let (mut encoder, mut receiver) = handle
+                .call_rpc_streaming(stream_request, DynamicChannelType::Unbounded)
+                .await?;
+            encoder.write_bytes(pty_output)?;
+            encoder.end_stream()?;
+            // ... read response if needed
+        });
+    }
+}
+```
+
+### Concurrent bidirectional streaming
+
+Because each stream is half-duplex, both sides can stream simultaneously
+by opening their own independent streams. The transport multiplexes them
+over a single connection:
+
+```text
+Client                          Server
+  │                               │
+  ├─ call_rpc_streaming ────────► │  (client pushes keystrokes)
+  │                               ├─ call_rpc_streaming ────────► Client  (server pushes terminal output)
+  │ ◄──── chunks + End ────────── │
+  │ ◄──── response ────────────── │
+  │ ──── chunks + End ──────────► │
+  │ ◄──── response ────────────── │
+```
+
+This is exactly what the `concurrent_bidirectional_streaming` integration
+test exercises — it spawns two `tokio::spawn` tasks that write chunks
+in opposite directions simultaneously and validates that both sides
+receive the correct data.
+
 ## License
 
 Licensed under the [Apache-2.0 License](./LICENSE).

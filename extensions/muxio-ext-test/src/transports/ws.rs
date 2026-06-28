@@ -1,6 +1,7 @@
 use crate::test_transport::TestTransport;
 use crate::ws_helpers;
 use async_trait::async_trait;
+use muxio_rpc_service::prebuffered::RpcMethodPrebuffered;
 use muxio_rpc_service_endpoint::RpcServiceEndpoint;
 use muxio_tokio_rpc_client::RpcClient;
 use muxio_tokio_rpc_server::{
@@ -90,7 +91,24 @@ impl TestTransport for RpcClient {
         Arc<RpcServiceEndpoint<()>>,
         Self::S2cHandle,
     ) {
-        let (_server, mut event_rx, host, port) = ws_helpers::setup_ws_server_with_events().await;
+        let (server, mut event_rx, host, port) = ws_helpers::setup_ws_server_with_events().await;
+        // Register Echo on the server endpoint so client-initiated calls work
+        let server_endpoint = server.endpoint();
+        let _ = server_endpoint
+            .register_prebuffered(
+                example_muxio_rpc_service_definition::prebuffered::Echo::METHOD_ID,
+                |request_bytes, _ctx| async move {
+                    let request =
+                        example_muxio_rpc_service_definition::prebuffered::Echo::decode_request(
+                            &request_bytes,
+                        )?;
+                    example_muxio_rpc_service_definition::prebuffered::Echo::encode_response(
+                        request,
+                    )
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
+                },
+            )
+            .await;
         let client = ws_helpers::connect_ws_client(&host, port).await;
         let endpoint = client.get_endpoint();
 

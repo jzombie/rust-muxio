@@ -47,6 +47,7 @@ macro_rules! prebuffered_roundtrip_tests {
 /// Current tests:
 /// - `test_server_to_client_echo` — prebuffered request/response
 /// - `test_server_to_client_streaming_echo` — chunked streaming
+/// - `test_concurrent_bidirectional_streaming` — simultaneous streams both ways
 #[macro_export]
 macro_rules! server_to_client_tests {
     ($module:ident, $transport:ty) => {
@@ -73,6 +74,20 @@ macro_rules! server_to_client_tests {
                     client.as_ref(),
                     &*endpoint,
                     &handle,
+                    label,
+                )
+                .await;
+            }
+
+            #[tokio::test]
+            async fn test_concurrent_bidirectional_streaming() {
+                let (client, endpoint, handle) =
+                    <$transport as $crate::test_transport::TestTransport>::connect_s2c().await;
+                let label = <$transport as $crate::test_transport::TestTransport>::name();
+                $crate::test_suites::concurrent_bidirectional_streaming(
+                    client.clone(),
+                    &*endpoint,
+                    handle.clone(),
                     label,
                 )
                 .await;

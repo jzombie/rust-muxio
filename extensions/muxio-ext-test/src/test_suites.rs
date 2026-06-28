@@ -245,6 +245,110 @@ pub async fn server_to_client_streaming_echo<H, C, E>(
     assert_eq!(response, payload, "{label} streaming echo mismatch");
 }
 
+/// Run concurrent bidirectional streaming — server pushes to client and
+/// client pushes to server simultaneously.  Each side sends a payload
+/// in chunks, reads the echoed response, and verifies integrity.
+/// This proves the transport does not deadlock when streams flow in
+/// both directions at the same time.
+pub async fn concurrent_bidirectional_streaming<H, C, E>(
+    client: Arc<C>,
+    client_endpoint: &impl RpcServiceEndpointInterface<E>,
+    ctx_handle: H,
+    label: &str,
+) where
+    H: RpcServiceCallerInterface + Clone + Send + Sync + 'static,
+    C: RpcServiceCallerInterface + Send + Sync + 'static,
+    E: Send + Sync + Clone + 'static,
+{
+    // Register Echo on the client endpoint (for server-initiated calls).
+    // The server endpoint already has Echo registered by connect_s2c().
+    client_endpoint
+        .register_prebuffered(Echo::METHOD_ID, |request_bytes, _ctx| async move {
+            let request = Echo::decode_request(&request_bytes)?;
+            Echo::encode_response(request)
+                .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>)
+        })
+        .await
+        .unwrap();
+
+    let server_payload =
+        format!("server→{label} payload {:?}", std::time::Instant::now()).into_bytes();
+    let client_payload =
+        format!("client→{label} payload {:?}", std::time::Instant::now()).into_bytes();
+
+    // Spawn both directions concurrently
+    let handle = ctx_handle;
+    let sp = server_payload.clone();
+    let server_task = tokio::spawn(async move {
+        let request = RpcRequest {
+            rpc_method_id: Echo::METHOD_ID,
+            rpc_param_bytes: None,
+            rpc_prebuffered_payload_bytes: None,
+            is_finalized: false,
+        };
+        let (mut encoder, mut receiver) = handle
+            .call_rpc_streaming(request, DynamicChannelType::Unbounded)
+            .await
+            .expect("server-side streaming call failed");
+
+        for chunk in sp.chunks(32) {
+            encoder.write_bytes(chunk).expect("server write_bytes failed");
+        }
+        encoder.flush().expect("server flush failed");
+        encoder.end_stream().expect("server end_stream failed");
+
+        let mut response = Vec::new();
+        while let Some(chunk) = receiver.next().await {
+            match chunk {
+                Ok(bytes) => response.extend_from_slice(&bytes),
+                Err(e) => panic!("server streaming response error: {e:?}"),
+            }
+        }
+        response
+    });
+
+    let cp = client_payload.clone();
+    let client_task = tokio::spawn(async move {
+        let request = RpcRequest {
+            rpc_method_id: Echo::METHOD_ID,
+            rpc_param_bytes: None,
+            rpc_prebuffered_payload_bytes: None,
+            is_finalized: false,
+        };
+        let (mut encoder, mut receiver) = client
+            .call_rpc_streaming(request, DynamicChannelType::Unbounded)
+            .await
+            .expect("client-side streaming call failed");
+
+        for chunk in cp.chunks(32) {
+            encoder.write_bytes(chunk).expect("client write_bytes failed");
+        }
+        encoder.flush().expect("client flush failed");
+        encoder.end_stream().expect("client end_stream failed");
+
+        let mut response = Vec::new();
+        while let Some(chunk) = receiver.next().await {
+            match chunk {
+                Ok(bytes) => response.extend_from_slice(&bytes),
+                Err(e) => panic!("client streaming response error: {e:?}"),
+            }
+        }
+        response
+    });
+
+    let (server_result, client_result) = tokio::join!(server_task, client_task);
+    assert_eq!(
+        server_result.expect("server task panicked"),
+        server_payload,
+        "{label} server→client data mismatch"
+    );
+    assert_eq!(
+        client_result.expect("client task panicked"),
+        client_payload,
+        "{label} client→server data mismatch"
+    );
+}
+
 // ------------------------------------------------------------------
 // Pending requests fail on disconnect
 // ------------------------------------------------------------------
