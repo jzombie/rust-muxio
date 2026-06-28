@@ -10,11 +10,11 @@
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="Apache 2.0 License"></a>
 </div>
 
+<p align="center"><strong>Examples:</strong> <a href="#websocket-usage-example">WebSocket RPC</a> · <a href="#ipc-usage-example">IPC RPC</a> · <a href="#wasm-rpc">WASM RPC</a> · <a href="#streaming-rpc-example">Streaming RPC</a></p>
+
 # Muxio: A High-Performance Multiplexing and RPC Framework for Rust
 
 **DRAFT -- WORK IN PROGRESS**
-
-<p align="center"><strong>Examples:</strong> <a href="#websocket-usage-example">WebSocket RPC</a> · <a href="#ipc-usage-example">IPC RPC</a> · <a href="#wasm-rpc">WASM RPC</a> · <a href="#streaming-rpc-example">Streaming RPC</a></p>
 
 Muxio provides a robust and flexible foundation for building high-performance, transport-agnostic, and runtime-agnostic services in Rust. It offers a layered architecture that cleanly separates low-level binary stream multiplexing from high-level RPC logic, enabling you to create custom-tailored communication protocols.
 
