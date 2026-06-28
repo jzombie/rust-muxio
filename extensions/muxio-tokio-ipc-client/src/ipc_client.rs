@@ -110,7 +110,7 @@ impl IpcClient {
                     if n == 0 {
                         None
                     } else {
-                        Some((buf[..n].to_vec(), (r, buf)))
+                        Some((bytes::Bytes::copy_from_slice(&buf[..n]), (r, buf)))
                     }
                 },
             );

@@ -1,4 +1,5 @@
 use crate::{RpcServiceEndpoint, RpcServiceEndpointInterface};
+use bytes::Bytes;
 use muxio::rpc::RpcDispatcher;
 use std::sync::{Arc, Weak};
 use tokio::sync::Mutex;
@@ -27,7 +28,7 @@ pub fn spawn_client_read_loop<C, S, E>(
 ) -> tokio::task::JoinHandle<()>
 where
     C: ClientReadTarget,
-    S: futures::Stream<Item = Vec<u8>> + Unpin + Send + 'static,
+    S: futures::Stream<Item = Bytes> + Unpin + Send + 'static,
     E: Fn(Vec<u8>) + Clone + Send + Sync + 'static,
 {
     use futures::StreamExt;

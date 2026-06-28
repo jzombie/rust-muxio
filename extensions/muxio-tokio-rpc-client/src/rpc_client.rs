@@ -165,7 +165,7 @@ impl RpcClient {
                 let tx = read_tx.clone();
                 async move {
                     match msg_result {
-                        Ok(WsMessage::Binary(bytes)) => Some(bytes.to_vec()),
+                        Ok(WsMessage::Binary(bytes)) => Some(bytes),
                         Ok(WsMessage::Ping(data)) => {
                             let _ = tx.send(WsMessage::Pong(data));
                             None
