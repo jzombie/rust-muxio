@@ -1,3 +1,8 @@
+#![doc = include_str!("../README.md")]
+
+// TODO: Validate docs
+// #![warn(missing_docs)]
+
 pub use muxio_core::{constants, frame, rpc, utils};
 
 #[cfg(feature = "rpc-service")]
