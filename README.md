@@ -49,6 +49,13 @@ On top of this multiplexing layer, Muxio offers a minimal, unopinionated RPC fra
 
 **No protobuf dependency:** You choose your serialization — bitcode, bincode, manual encoding, or anything else. The framework handles framing and dispatch; it doesn't mandate a schema format.
 
+**Tradeoffs:**
+
+- **No built-in backpressure or flow control.** The write channel between encoder and transport I/O is unbounded by design — switching to a bounded channel without per-stream flow control (like HTTP/2 `WINDOW_UPDATE`) would cause head-of-line blocking. Under sustained producer > consumer load, memory can grow. Real applications should either size their chunks conservatively or implement application-level backpressure.
+- **No service discovery, load balancing, TLS, or auth.** These are left entirely to the user. gRPC and Tonic ship them out of the box.
+- **No formal protocol spec.** The framing format is documented only in the source. Writing interop clients in other languages requires reading the Rust code.
+- **Smaller ecosystem.** Muxio has one primary author. Tonic/gRPC have broad adoption, protobuf tooling, interceptors, and reflection.
+
 ## Core Use Cases & Design Philosophy
 
 Muxio is engineered to solve specific challenges in building modern, distributed systems. Its architecture and features are guided by the following principles:
