@@ -1,7 +1,7 @@
-use futures_util::{SinkExt, StreamExt};
+use futures_util::StreamExt;
 use muxio::{frame::FrameDecodeError, rpc::RpcDispatcher};
 use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
-use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface};
+use muxio_rpc_service_endpoint::RpcServiceEndpoint;
 use std::{
     fmt, io,
     net::{IpAddr, SocketAddr},
@@ -124,9 +124,16 @@ impl RpcClient {
             response.status()
         );
 
-        let (mut ws_sender, mut ws_receiver) = ws_stream.split();
-        let (app_tx, mut app_rx) = mpsc::unbounded_channel::<WsMessage>();
-        tracing::debug!("WebSocket stream split and MPSC channel created.");
+        let (ws_sender, ws_receiver) = ws_stream.split();
+        let ws_sender = std::sync::Arc::new(tokio::sync::Mutex::new(ws_sender));
+        let (app_tx, ws_sender_handle) =
+            muxio_rpc_service_caller::write_channel::spawn_write_loop(move |msg: WsMessage| {
+                let s = ws_sender.clone();
+                async move {
+                    use futures_util::SinkExt;
+                    s.lock().await.send(msg).await.map_err(|_| ())
+                }
+            });
 
         let client = Arc::new_cyclic(|weak_client: &Weak<RpcClient>| {
             let state_change_handler: RpcTransportStateChangeHandler =
@@ -153,108 +160,33 @@ impl RpcClient {
             });
             task_handles.push(heartbeat_handle);
 
-            // Receive loop
-            let client_weak_recv = weak_client.clone();
-            let recv_handle = tokio::spawn(async move {
-                tracing::debug!("Starting receive loop.");
-                while let Some(msg_result) = ws_receiver.next().await {
-                    if let Some(client) = client_weak_recv.upgrade() {
-                        match msg_result {
-                            Ok(WsMessage::Binary(bytes)) => {
-                                tracing::debug!("Received binary message ({} bytes).", bytes.len());
-                                let mut dispatcher = client.dispatcher.lock().await;
-                                let on_emit = |chunk: &[u8]| {
-                                    let _ =
-                                        client.tx.send(WsMessage::Binary(chunk.to_vec().into()));
-                                    tracing::debug!(
-                                        "Emitted binary chunk ({} bytes).",
-                                        chunk.len()
-                                    );
-                                };
-                                let _ = client
-                                    .endpoint
-                                    .read_bytes(&mut dispatcher, (), &bytes, on_emit)
-                                    .await;
-                            }
-                            Ok(WsMessage::Ping(data)) => {
-                                tracing::debug!("Received Ping message.");
-                                let _ = client.tx.send(WsMessage::Pong(data));
-                            }
-                            Ok(msg) => {
-                                tracing::debug!("Received other WebSocket message: {:?}", msg);
-                            }
-                            Err(e) => {
-                                tracing::debug!("WebSocket receive error: {:?}", e);
-                                // An error here often means the connection is broken.
-                                if let Some(client) = client_weak_recv.upgrade() {
-                                    tracing::error!(
-                                        "Upgraded client, spawning shutdown_async due to receive error."
-                                    );
-                                    tokio::spawn(async move {
-                                        client.shutdown_async().await;
-                                    });
-                                }
-                                break; // Exit loop on error
-                            }
+            let read_tx = app_tx.clone();
+            let read_stream = ws_receiver.filter_map(move |msg_result| {
+                let tx = read_tx.clone();
+                async move {
+                    match msg_result {
+                        Ok(WsMessage::Binary(bytes)) => Some(bytes),
+                        Ok(WsMessage::Ping(data)) => {
+                            let _ = tx.send(WsMessage::Pong(data));
+                            None
                         }
-                    } else {
-                        tracing::warn!("Client Arc dropped while in loop. Exiting.");
-                        break;
+                        Ok(_) => None,
+                        Err(_) => None,
                     }
                 }
-                // This block is executed when ws_receiver.next().await returns None (stream ended)
-                // or if client_weak_recv.upgrade() fails in a subsequent loop iteration, or break is hit.
-                tracing::debug!(
-                    "`ws_receiver` stream ended or loop broke. Attempting final `shutdown_async`."
+            });
+            let weak_for_read = weak_client.clone();
+            let emit_tx = app_tx.clone();
+            let recv_handle =
+                muxio_rpc_service_endpoint::client_read_channel::spawn_client_read_loop(
+                    weak_for_read,
+                    Box::pin(read_stream),
+                    move |bytes: Vec<u8>| {
+                        let _ = emit_tx.send(WsMessage::Binary(bytes.into()));
+                    },
                 );
-                if let Some(client) = client_weak_recv.upgrade() {
-                    tracing::debug!("Client upgraded for final `shutdown_async`.");
-                    tokio::spawn(async move {
-                        client.shutdown_async().await;
-                    });
-                } else {
-                    tracing::debug!(
-                        "Client Arc already dropped at end of loop, cannot call `shutdown_async`."
-                    );
-                }
-                tracing::debug!("Receive loop finished.");
-            });
             task_handles.push(recv_handle);
-
-            // Send loop
-            let client_weak_send = weak_client.clone();
-            let is_connected_send = is_connected.clone(); // Clone is_connected for this task
-            let send_handle = tokio::spawn(async move {
-                tracing::debug!("Starting send loop.");
-                while let Some(msg) = app_rx.recv().await {
-                    // Check if client is still considered connected before attempting to send
-                    if !is_connected_send.load(Ordering::Acquire) {
-                        // Use Acquire for strong ordering
-                        tracing::warn!("Client is disconnected. Dropping message: {:?}", msg);
-                        // Don't try to send, just break or continue to drain if necessary
-                        break; // Exit loop if disconnected
-                    }
-
-                    tracing::trace!("Sending message: {:?}", msg);
-                    if ws_sender.send(msg).await.is_err() {
-                        tracing::error!(
-                            "`ws_sender` failed to send message. Attempting `shutdown_async`."
-                        );
-                        if let Some(client) = client_weak_send.upgrade() {
-                            tokio::spawn(async move {
-                                client.shutdown_async().await;
-                            });
-                        } else {
-                            tracing::error!(
-                                "Client Arc already dropped, cannot call `shutdown_async`."
-                            );
-                        }
-                        break; // Break loop on send error
-                    }
-                }
-                tracing::debug!("Send loop finished.");
-            });
-            task_handles.push(send_handle);
+            task_handles.push(ws_sender_handle);
 
             Self {
                 dispatcher,
@@ -272,6 +204,19 @@ impl RpcClient {
 
     pub fn get_endpoint(&self) -> Arc<RpcServiceEndpoint<()>> {
         self.endpoint.clone()
+    }
+}
+
+#[async_trait::async_trait]
+impl muxio_rpc_service_endpoint::client_read_channel::ClientReadTarget for RpcClient {
+    fn dispatcher(&self) -> Arc<TokioMutex<RpcDispatcher<'static>>> {
+        self.dispatcher.clone()
+    }
+    fn endpoint(&self) -> Arc<muxio_rpc_service_endpoint::RpcServiceEndpoint<()>> {
+        self.endpoint.clone()
+    }
+    async fn shutdown(&self) {
+        self.shutdown_async().await;
     }
 }
 
