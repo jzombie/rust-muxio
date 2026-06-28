@@ -11,8 +11,13 @@ use std::sync::Arc;
 use tokio::sync::oneshot;
 use tokio::time::{Duration, sleep};
 
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static IPC_COUNTER: AtomicU64 = AtomicU64::new(0);
+
 fn temp_name(name: &str) -> String {
-    format!("muxio-ipc-test-{}", name)
+    let n = IPC_COUNTER.fetch_add(1, Ordering::SeqCst);
+    format!("muxio-ipc-test-{name}-{n}")
 }
 
 #[async_trait]

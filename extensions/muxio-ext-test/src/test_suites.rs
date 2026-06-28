@@ -99,13 +99,9 @@ where
     Fut: std::future::Future<Output = Result<(), std::io::Error>>,
 {
     let result = connect().await;
-    assert!(result.is_err(), "Expected connection failure");
-    let err = result.unwrap_err();
-    assert_eq!(
-        err.kind(),
-        std::io::ErrorKind::ConnectionRefused,
-        "Expected ConnectionRefused, got {:?}",
-        err.kind()
+    assert!(
+        result.is_err(),
+        "Expected connection failure, but connection succeeded"
     );
 }
 

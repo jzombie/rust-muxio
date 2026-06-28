@@ -5,7 +5,7 @@ use muxio_rpc_service_endpoint::RpcServiceEndpoint;
 use muxio_tokio_rpc_client::RpcClient;
 use muxio_tokio_rpc_server::{
     ConnectionContextHandle, RpcServerEvent, RpcServiceEndpointInterface as _,
-    utils::{bind_tcp_listener_on_random_port, tcp_listener_to_host_port},
+    utils::tcp_listener_to_host_port,
 };
 use std::sync::Arc;
 use tokio::net::TcpListener;
@@ -39,9 +39,13 @@ impl TestTransport for RpcClient {
     }
 
     async fn connect_fail() -> Result<(), std::io::Error> {
-        let (_listener, port) = bind_tcp_listener_on_random_port().await.unwrap();
-        drop(_listener);
-        RpcClient::new("127.0.0.1", port + 1).await.map(|_| ())
+        // Bind to a random port, drop it, then try connecting to it.
+        // The OS should return ConnectionRefused since the port is no longer bound.
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        drop(listener);
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        RpcClient::new("127.0.0.1", port).await.map(|_| ())
     }
 
     async fn connect_with_disconnect() -> (Arc<Self::Client>, oneshot::Sender<()>) {
