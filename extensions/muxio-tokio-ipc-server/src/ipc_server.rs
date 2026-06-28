@@ -9,7 +9,7 @@ use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
 use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::AsyncReadExt;
 use tokio::sync::{Mutex, mpsc};
 
 static NEXT_CONN_ID: AtomicUsize = AtomicUsize::new(1);
@@ -90,8 +90,16 @@ impl IpcServer {
     }
 
     async fn handle_connection(self: Arc<Self>, conn: LocalSocketStream) {
-        let (mut read_half, mut write_half) = tokio::io::split(conn);
-        let (tx_mpsc, mut rx_mpsc) = mpsc::unbounded_channel::<Vec<u8>>();
+        let (mut read_half, write_half) = tokio::io::split(conn);
+        let write_half = std::sync::Arc::new(tokio::sync::Mutex::new(write_half));
+        let (tx_mpsc, writer_handle) =
+            muxio_rpc_service_caller::write_channel::spawn_write_loop(move |msg: Vec<u8>| {
+                let w = write_half.clone();
+                async move {
+                    use tokio::io::AsyncWriteExt;
+                    w.lock().await.write_all(&msg).await.map_err(|_| ())
+                }
+            });
         let is_connected = Arc::new(AtomicBool::new(true));
         let conn_id = NEXT_CONN_ID.fetch_add(1, Ordering::Relaxed);
         let peer_label = conn_id;
@@ -108,14 +116,6 @@ impl IpcServer {
                 context.clone(),
             )));
         }
-
-        let writer_handle = tokio::spawn(async move {
-            while let Some(bytes) = rx_mpsc.recv().await {
-                if write_half.write_all(&bytes).await.is_err() {
-                    break;
-                }
-            }
-        });
 
         let context_for_reader = context.clone();
         let self_for_reader = self.clone();

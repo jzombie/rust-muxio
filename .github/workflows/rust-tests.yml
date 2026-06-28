@@ -1,29 +1,202 @@
-name: Rust Tests
+name: rust-tests
+
+permissions:
+    contents: read
 
 on:
-  push:
-    branches: [main]
-    tags: ["v*"]
-  pull_request:
-    branches: [main]
+    push:
+        branches: [main]
+    pull_request:
+    workflow_dispatch:
+
+# Ensure only one run per branch/PR at a time. If new commits are pushed,
+# older jobs will be automatically canceled.
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
 
 jobs:
-  test:
-    name: Run Rust Tests (OS = ${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+    test_matrix:
+        name: test (OS=${{ matrix.os }}, Features=${{ matrix.name }})
+        runs-on: ${{ matrix.os }}
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ubuntu-latest, macos-latest, windows-latest]
+                include:
+                    - name: "All Features"
+                      flags: "--all-features"
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v6
 
-      - name: Install cargo-all-features
-        run: cargo install cargo-all-features
+            - name: Install Rust
+              uses: dtolnay/rust-toolchain@stable
 
-      - name: Run tests with all feature combinations
-        run: cargo all-features test --workspace --all-targets --verbose
+            - name: Capture rustc commit hash
+              id: rustc
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  rustc -Vv
+                  echo "hash=$(rustc -Vv | sed -n 's/^commit-hash: //p')" >> "$GITHUB_OUTPUT"
+
+            # Workaround for macOS error when using `hashFiles`:
+            # "Error: The template is not valid....Fail to hash files under directory"
+            - name: Calculate lockfile hash
+              id: lockfile
+              shell: bash
+              run: |
+                  if command -v sha256sum >/dev/null 2>&1; then
+                    HASH=$(sha256sum Cargo.lock | awk '{print $1}')
+                  elif command -v shasum >/dev/null 2>&1; then
+                    HASH=$(shasum -a 256 Cargo.lock | awk '{print $1}')
+                  else
+                    echo "No hashing utility found"
+                    exit 1
+                  fi
+                  echo "hash=$HASH" >> "$GITHUB_OUTPUT"
+
+            # Added caching step to speed up dependency builds.
+            # NOTE: ~/.cargo/bin/ excluded from cache to avoid flaky macOS
+            # issue where cached binaries overwrite freshly-installed toolchain.
+            - name: Cache Cargo dependencies
+              uses: actions/cache@v4
+              with:
+                  path: |
+                      ~/.cargo/registry/index/
+                      ~/.cargo/registry/cache/
+                      ~/.cargo/git/db/
+                      target/
+                  key: ${{ runner.os }}-cargo-${{ steps.rustc.outputs.hash }}-${{ steps.lockfile.outputs.hash }}-${{ matrix.flags }}
+                  restore-keys: |
+                      ${{ runner.os }}-cargo-${{ steps.rustc.outputs.hash }}-${{ steps.lockfile.outputs.hash }}-
+
+            - name: Test
+              run: cargo test --workspace --all-features --lib --bins --tests --examples -- --include-ignored
+
+            - name: Ensure .cache was not created by tests
+              shell: bash
+              run: |
+                  if [ -e ".cache" ]; then
+                    echo "ERROR: .cache directory was created during tests" >&2
+                    find .cache -mindepth 1 >&2
+                    exit 1
+                  fi
+
+    test:
+        name: test
+        runs-on: ubuntu-latest
+        needs: test_matrix
+        if: ${{ always() }}
+        steps:
+            - name: Evaluate matrix results
+              run: |
+                  result="${{ needs.test_matrix.result }}"
+                  echo "Matrix job concluded with: ${result}"
+                  if [ "${result}" != "success" ]; then
+                    exit 1
+                  fi
+                  echo "All platform combinations succeeded."
+
+    # TODO: Enable
+    # coverage:
+    #   name: coverage (cargo-llvm-cov)
+    #   runs-on: ubuntu-latest
+    #   needs: test_matrix
+    #   outputs:
+    #     line_coverage: ${{ steps.cov-summary.outputs.line_percent }}
+    #   steps:
+    #     - name: Checkout repository
+    #       uses: actions/checkout@v6
+
+    #     - name: Install Rust with llvm-tools
+    #       uses: dtolnay/rust-toolchain@stable
+    #       with:
+    #         components: llvm-tools-preview
+
+    #     - name: Install cargo-llvm-cov
+    #       uses: taiki-e/install-action@v2
+    #       with:
+    #         tool: cargo-llvm-cov
+
+    #     - name: Capture rustc commit hash
+    #       id: rustc-cov
+    #       shell: bash
+    #       run: |
+    #         set -euo pipefail
+    #         rustc -Vv
+    #         echo "hash=$(rustc -Vv | sed -n 's/^commit-hash: //p')" >> "$GITHUB_OUTPUT"
+
+    #     - name: Calculate lockfile hash
+    #       id: lockfile-cov
+    #       shell: bash
+    #       run: |
+    #         if command -v sha256sum >/dev/null 2>&1; then
+    #           HASH=$(sha256sum Cargo.lock | awk '{print $1}')
+    #         elif command -v shasum >/dev/null 2>&1; then
+    #           HASH=$(shasum -a 256 Cargo.lock | awk '{print $1}')
+    #         else
+    #           echo "No hashing utility found"
+    #           exit 1
+    #         fi
+    #         echo "hash=$HASH" >> "$GITHUB_OUTPUT"
+
+    #     - name: Cache Cargo dependencies
+    #       uses: actions/cache@v4
+    #       with:
+    #         path: |
+    #           ~/.cargo/bin/
+    #           ~/.cargo/registry/index/
+    #           ~/.cargo/registry/cache/
+    #           ~/.cargo/git/db/
+    #           target/
+    #         key: cov-${{ runner.os }}-${{ steps.rustc-cov.outputs.hash }}-${{ steps.lockfile-cov.outputs.hash }}
+    #         restore-keys: |
+    #           cov-${{ runner.os }}-${{ steps.rustc-cov.outputs.hash }}-
+
+    #     - name: Generate coverage data
+    #       env:
+    #         HF_TOKEN: ${{ secrets.HF_TOKEN }}
+    #         TRIPLETS_HF_TOKEN_TEST_DATASET: ${{ secrets.TRIPLETS_HF_TOKEN_TEST_DATASET }}
+    #         TRIPLETS_SKIP_LIVE_TESTS: ${{ secrets.HF_TOKEN == '' && '1' || '' }}
+    #       shell: bash
+    #       run: |
+    #         set -euo pipefail
+    #         cargo llvm-cov clean --workspace
+    #         cargo llvm-cov --workspace --all-features --lcov --output-path lcov.info
+    #         cargo llvm-cov --workspace --all-features --summary-only > coverage-summary.txt
+    #         cat coverage-summary.txt
+
+    #     - name: Parse coverage summary
+    #       id: cov-summary
+    #       shell: bash
+    #       run: |
+    #         set -euo pipefail
+    #         percent=$(awk '/^TOTAL/ {print $10}' coverage-summary.txt | tr -d '%' | head -n1)
+    #         if [ -z "$percent" ]; then
+    #           percent="0"
+    #         fi
+    #         echo "line_percent=${percent}" >> "$GITHUB_OUTPUT"
+
+    #     - name: Upload coverage summary
+    #       if: always()
+    #       shell: bash
+    #       run: |
+    #         if [ -f coverage-summary.txt ]; then
+    #           {
+    #             echo "### Coverage summary"
+    #             echo
+    #             cat coverage-summary.txt
+    #           } >> "$GITHUB_STEP_SUMMARY"
+    #         fi
+
+    #     - name: Upload to Coveralls
+    #       uses: coverallsapp/github-action@v2
+    #       # Coveralls.io is down a lot, so don't fail the workflow if upload fails.
+    #       continue-on-error: true
+    #       with:
+    #         github-token: ${{ secrets.GITHUB_TOKEN }}
+    #         path-to-lcov: lcov.info
