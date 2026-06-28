@@ -11,14 +11,26 @@ use tokio::sync::mpsc;
 /// A bounded channel would push backpressure into the emit closure, which
 /// is called synchronously from `write_bytes` inside `FrameStreamEncoder`.
 /// Making the emit closure async would stall the producer (e.g. a PTY
-/// reader) whenever the I/O task falls behind, causing head-of-line
-/// blocking — one slow stream stalls **all** streams on this connection.
+/// reader) whenever the I/O task falls behind — and because there's one
+/// channel per **connection**, that stall blocks **all** streams on that
+/// connection, not just the slow one.
 ///
-/// The proper fix is per-stream flow control (like HTTP/2 `WINDOW_UPDATE`):
-/// the encoder checks a per-stream byte budget and queues frames when the
-/// window closes while other streams keep flowing.  Simply switching to a
-/// bounded channel here will cause latency spikes and can hang the producer
-/// under load — do not do it without adding stream-level flow control first.
+/// # How to fix properly
+///
+/// Per-stream byte budgets in `FrameStreamEncoder`.  When a stream exceeds
+/// its budget, `write_bytes` queues the frame locally instead of emitting
+/// it — other streams' frames still pass through the unbounded channel
+/// unaffected.  The framing layer already has `stream_id` on every frame;
+/// the missing piece is:
+///
+/// 1. A per-stream credit counter in `RpcSession` or `FrameStreamEncoder`.
+/// 2. A `WINDOW_UPDATE`-style message type so the receiver can grant more
+///    credits when it has consumed data.
+/// 3. A queue in the encoder for frames that couldn't be sent yet.
+///
+/// Simply switching this channel to bounded will cause latency spikes and
+/// can hang the producer under load — do not do it without adding
+/// per-stream budgets first.
 pub fn spawn_write_loop<M, F, Fut>(
     handler: F,
 ) -> (mpsc::UnboundedSender<M>, tokio::task::JoinHandle<()>)

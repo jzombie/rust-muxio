@@ -53,7 +53,7 @@ On top of this multiplexing layer, Muxio offers a minimal, unopinionated RPC fra
 
 - **No built-in backpressure or flow control.** The write channel between encoder and transport I/O is unbounded by design — switching to a bounded channel without per-stream flow control (like HTTP/2 `WINDOW_UPDATE`) would cause head-of-line blocking. Under sustained producer > consumer load, memory can grow. Real applications should either size their chunks conservatively or implement application-level backpressure.
 
-> _Note: Why not just use a bounded channel? A bounded channel stalls the sender for **all** streams when any one consumer falls behind. Per-stream budgets are better because only the slow stream stalls; the rest keep flowing. Not implemented yet._
+> _Note: The proper fix is likely per-stream byte budgets at the encoder. When a stream exceeds its budget, `write_bytes` pauses that stream's frames without blocking others going through the same channel. The framing layer already has `stream_id` on every frame; what's missing is the budget tracking. Not implemented yet._
 
 - **No service discovery, load balancing, TLS, or auth.** These are left entirely to the user. gRPC and Tonic ship them out of the box.
 - **Smaller ecosystem.** Muxio has one primary author. Tonic/gRPC have broad adoption, protobuf tooling, interceptors, and reflection.
