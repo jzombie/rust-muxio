@@ -161,7 +161,7 @@ where
 /// The test registers an Echo handler on the client endpoint, then the
 /// server calls Echo via the `ConnectionContextHandle` / `IpcConnectionContextHandle`
 /// and asserts the response matches.
-pub async fn server_to_client_echo<'a, H, C, E>(
+pub async fn server_to_client_echo<H, C, E>(
     _client: &C,
     client_endpoint: &impl RpcServiceEndpointInterface<E>,
     ctx_handle: &H,

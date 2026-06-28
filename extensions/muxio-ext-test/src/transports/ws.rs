@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use muxio_rpc_service_endpoint::RpcServiceEndpoint;
 use muxio_tokio_rpc_client::RpcClient;
 use muxio_tokio_rpc_server::{
-    ConnectionContextHandle, RpcServer, RpcServerEvent, RpcServiceEndpointInterface as _,
+    ConnectionContextHandle, RpcServerEvent, RpcServiceEndpointInterface as _,
     utils::{bind_tcp_listener_on_random_port, tcp_listener_to_host_port},
 };
 use std::sync::Arc;
@@ -29,10 +29,8 @@ impl TestTransport for RpcClient {
         // Pre-register a test error handler for the roundtrip_error test
         let _ = server_endpoint
             .register_prebuffered(0xBAD, |_request_bytes, _ctx| async move {
-                Err(
-                    Box::new(std::io::Error::new(std::io::ErrorKind::Other, "test error"))
-                        as Box<dyn std::error::Error + Send + Sync>,
-                )
+                Err(Box::new(std::io::Error::other("test error"))
+                    as Box<dyn std::error::Error + Send + Sync>)
             })
             .await;
         let client = ws_helpers::connect_ws_client(&host, port).await;

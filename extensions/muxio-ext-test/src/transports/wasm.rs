@@ -30,10 +30,8 @@ impl TestTransport for RpcWasmClient {
         ws_helpers::register_standard_handlers(&*server_endpoint).await;
         let _ = server_endpoint
             .register_prebuffered(0xBAD, |_request_bytes, _ctx| async move {
-                Err(
-                    Box::new(std::io::Error::new(std::io::ErrorKind::Other, "test error"))
-                        as Box<dyn std::error::Error + Send + Sync>,
-                )
+                Err(Box::new(std::io::Error::other("test error"))
+                    as Box<dyn std::error::Error + Send + Sync>)
             })
             .await;
         let server_clone = server.clone();
