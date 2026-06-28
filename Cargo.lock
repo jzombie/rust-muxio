@@ -953,6 +953,7 @@ version = "0.10.2-alpha"
 dependencies = [
  "async-trait",
  "bitcode",
+ "bytes",
  "example-muxio-rpc-service-definition",
  "futures",
  "muxio",
