@@ -271,10 +271,10 @@ pub async fn concurrent_bidirectional_streaming<H, C, E>(
         .await
         .unwrap();
 
-    // Large payloads ensure many chunks and exercise the full streaming
-    // pipeline: interleaved framing, concurrent transport I/O, backpressure.
-    let server_payload = vec![b'A'; 64 * 1024];
-    let client_payload = vec![b'B'; 64 * 1024];
+    // ~5 MB per direction — forces genuine multi-buffer streaming through
+    // the framing layer, transport I/O, and reassembly on the receiving side.
+    let server_payload = vec![b'A'; 5 * 1024 * 1024];
+    let client_payload = vec![b'B'; 5 * 1024 * 1024];
 
     // Spawn both directions concurrently
     let handle = ctx_handle;
