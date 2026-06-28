@@ -208,14 +208,12 @@ pub async fn server_to_client_streaming_echo<H, C, E>(
     client_endpoint
         .register_prebuffered(Echo::METHOD_ID, |request_bytes, _ctx| async move {
             let request = Echo::decode_request(&request_bytes)?;
-            Echo::encode_response(request)
-                .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>)
+            Echo::encode_response(request).map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>)
         })
         .await
         .unwrap();
 
-    let payload =
-        format!("hello from server to {label} client via stream").into_bytes();
+    let payload = format!("hello from server to {label} client via stream").into_bytes();
 
     let request = RpcRequest {
         rpc_method_id: Echo::METHOD_ID,
@@ -265,8 +263,7 @@ pub async fn concurrent_bidirectional_streaming<H, C, E>(
     client_endpoint
         .register_prebuffered(Echo::METHOD_ID, |request_bytes, _ctx| async move {
             let request = Echo::decode_request(&request_bytes)?;
-            Echo::encode_response(request)
-                .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>)
+            Echo::encode_response(request).map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>)
         })
         .await
         .unwrap();
@@ -294,7 +291,9 @@ pub async fn concurrent_bidirectional_streaming<H, C, E>(
         // Yield every few chunks so the opposite task can interleave
         // its writes — proving true concurrent bidirectional streaming.
         for (i, chunk) in sp.chunks(512).enumerate() {
-            encoder.write_bytes(chunk).expect("server write_bytes failed");
+            encoder
+                .write_bytes(chunk)
+                .expect("server write_bytes failed");
             if i % 8 == 0 {
                 tokio::task::yield_now().await;
             }
@@ -326,7 +325,9 @@ pub async fn concurrent_bidirectional_streaming<H, C, E>(
             .expect("client-side streaming call failed");
 
         for (i, chunk) in cp.chunks(512).enumerate() {
-            encoder.write_bytes(chunk).expect("client write_bytes failed");
+            encoder
+                .write_bytes(chunk)
+                .expect("client write_bytes failed");
             if i % 8 == 0 {
                 tokio::task::yield_now().await;
             }
