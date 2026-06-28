@@ -1,8 +1,6 @@
-# muxio-rpc-service-caller
+# muxio-core
 
-Generic, runtime-agnostic interface and logic for building Muxio RPC clients.
-
-> **Work in Progress**
+Core abstractions and types for Muxio multiplexing and RPC.
 
 For more information, visit [crates.io/crates/muxio](https://crates.io/crates/muxio).
 

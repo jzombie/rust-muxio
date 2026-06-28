@@ -1,8 +1,6 @@
-# muxio-rpc-service-caller
+# example-muxio-rpc-service-definition
 
-Generic, runtime-agnostic interface and logic for building Muxio RPC clients.
-
-> **Work in Progress**
+Example service definitions for Muxio RPC servicing.
 
 For more information, visit [crates.io/crates/muxio](https://crates.io/crates/muxio).
 

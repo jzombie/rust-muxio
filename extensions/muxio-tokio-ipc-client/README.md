@@ -1,8 +1,6 @@
-# muxio-rpc-service-caller
+# muxio-tokio-ipc-client
 
-Generic, runtime-agnostic interface and logic for building Muxio RPC clients.
-
-> **Work in Progress**
+A Tokio-based Muxio IPC (local socket) RPC client implementation.
 
 For more information, visit [crates.io/crates/muxio](https://crates.io/crates/muxio).
 
