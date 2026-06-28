@@ -1,8 +1,7 @@
-use bytes::Bytes;
 use interprocess::local_socket::{GenericNamespaced, ToNsName, tokio::prelude::*};
 use muxio::{frame::FrameDecodeError, rpc::RpcDispatcher};
 use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
-use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface};
+use muxio_rpc_service_endpoint::RpcServiceEndpoint;
 use std::{
     fmt, io,
     sync::{
@@ -82,7 +81,7 @@ impl IpcClient {
             .map_err(|e| io::Error::new(io::ErrorKind::ConnectionRefused, e))?;
         tracing::debug!("Connected to IPC server at {:?}", socket_path);
 
-        let (mut read_half, write_half) = tokio::io::split(stream);
+        let (read_half, write_half) = tokio::io::split(stream);
         let write_half = std::sync::Arc::new(tokio::sync::Mutex::new(write_half));
         let (app_tx, send_handle) =
             muxio_rpc_service_caller::write_channel::spawn_write_loop(move |msg: Vec<u8>| {
@@ -103,48 +102,27 @@ impl IpcClient {
 
             task_handles.push(send_handle);
 
-            // Receive loop: reads bytes from the socket and feeds them through the endpoint.
-            let client_weak_recv = weak_client.clone();
-            let recv_handle = tokio::spawn(async move {
-                let mut buf = vec![0u8; 64 * 1024];
-                loop {
-                    match read_half.read(&mut buf).await {
-                        Ok(0) => {
-                            tracing::debug!("IPC receive loop: connection closed (EOF).");
-                            break;
-                        }
-                        Ok(n) => {
-                            let bytes = Bytes::copy_from_slice(&buf[..n]);
-                            if let Some(client) = client_weak_recv.upgrade() {
-                                let mut dispatcher = client.dispatcher.lock().await;
-                                let on_emit = |chunk: &[u8]| {
-                                    let _ = client.tx.send(chunk.to_vec());
-                                };
-                                let _ = client
-                                    .endpoint
-                                    .read_bytes(&mut dispatcher, (), &bytes, on_emit)
-                                    .await;
-                            } else {
-                                break;
-                            }
-                        }
-                        Err(e) => {
-                            tracing::error!("IPC receive loop: read error: {:?}", e);
-                            if let Some(client) = client_weak_recv.upgrade() {
-                                tokio::spawn(async move {
-                                    client.shutdown_async().await;
-                                });
-                            }
-                            break;
-                        }
+            let weak_for_read = weak_client.clone();
+            let read_stream = futures_util::stream::unfold(
+                (read_half, vec![0u8; 64 * 1024]),
+                |(mut r, mut buf)| async {
+                    let n = r.read(&mut buf).await.ok()?;
+                    if n == 0 {
+                        None
+                    } else {
+                        Some((buf[..n].to_vec(), (r, buf)))
                     }
-                }
-                if let Some(client) = client_weak_recv.upgrade() {
-                    tokio::spawn(async move {
-                        client.shutdown_async().await;
-                    });
-                }
-            });
+                },
+            );
+            let emit_tx = app_tx.clone();
+            let recv_handle =
+                muxio_rpc_service_endpoint::client_read_channel::spawn_client_read_loop(
+                    weak_for_read,
+                    Box::pin(read_stream),
+                    move |bytes: Vec<u8>| {
+                        let _ = emit_tx.send(bytes);
+                    },
+                );
             task_handles.push(recv_handle);
 
             Self {
@@ -162,6 +140,19 @@ impl IpcClient {
 
     pub fn get_endpoint(&self) -> Arc<RpcServiceEndpoint<()>> {
         self.endpoint.clone()
+    }
+}
+
+#[async_trait::async_trait]
+impl muxio_rpc_service_endpoint::client_read_channel::ClientReadTarget for IpcClient {
+    fn dispatcher(&self) -> Arc<TokioMutex<RpcDispatcher<'static>>> {
+        self.dispatcher.clone()
+    }
+    fn endpoint(&self) -> Arc<muxio_rpc_service_endpoint::RpcServiceEndpoint<()>> {
+        self.endpoint.clone()
+    }
+    async fn shutdown(&self) {
+        self.shutdown_async().await;
     }
 }
 

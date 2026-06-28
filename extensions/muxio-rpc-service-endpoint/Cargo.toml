@@ -21,7 +21,7 @@ muxio-rpc-service = { workspace = true }
 muxio-rpc-service-caller = { workspace = true }
 
 # Optional dependencies
-tokio = { workspace = true, features = ["sync"], optional = true }
+tokio = { workspace = true, features = ["rt", "sync"], optional = true }
 tracing = { workspace = true }
 
 [dev-dependencies]

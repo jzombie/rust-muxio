@@ -11,6 +11,18 @@ pub enum FrameEncodeError {
     WriteAfterCancel,
 }
 
+impl fmt::Display for FrameEncodeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            FrameEncodeError::CorruptFrame => write!(f, "Corrupt frame"),
+            FrameEncodeError::WriteAfterEnd => write!(f, "Write after stream ended"),
+            FrameEncodeError::WriteAfterCancel => write!(f, "Write after stream cancelled"),
+        }
+    }
+}
+
+impl std::error::Error for FrameEncodeError {}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum FrameDecodeError {
     CorruptFrame,

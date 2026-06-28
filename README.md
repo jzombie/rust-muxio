@@ -178,36 +178,41 @@ Muxio supports streaming requests over any transport. Each stream is **half-dupl
 ### Streaming a request from the client
 
 ```rust
-use muxio_rpc_service_caller::dynamic_channel::DynamicChannelType;
+use futures::StreamExt;
 use muxio::rpc::RpcRequest;
-use futures_util::StreamExt;
+use muxio_rpc_service_caller::dynamic_channel::DynamicChannelType;
+use muxio_tokio_rpc_client::{RpcClient, RpcServiceCallerInterface};
 
-// Build a streaming request (not finalized, no payload yet)
-let request = RpcRequest {
-    rpc_method_id: Echo::METHOD_ID,
-    rpc_param_bytes: None,
-    rpc_prebuffered_payload_bytes: None,
-    is_finalized: false,
-};
+async fn streaming_example(rpc_client: &RpcClient) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let large_payload = vec![42u8; 100_000];
 
-// Initiate the stream — the encoder is returned immediately
-let (mut encoder, mut receiver) = rpc_client
-    .call_rpc_streaming(request, DynamicChannelType::Unbounded)
-    .await?;
+    let request = RpcRequest {
+        rpc_method_id: 0x01,
+        rpc_param_bytes: None,
+        rpc_prebuffered_payload_bytes: None,
+        is_finalized: false,
+    };
 
-// Write chunks
-for chunk in large_payload.chunks(4096) {
-    encoder.write_bytes(chunk)?;
-}
-encoder.flush()?;
-encoder.end_stream()?;
+    let (mut encoder, mut receiver) = rpc_client
+        .call_rpc_streaming(request, DynamicChannelType::Unbounded)
+        .await
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
 
-// Read the single response from the server
-while let Some(chunk) = receiver.next().await {
-    match chunk {
-        Ok(bytes) => response.extend_from_slice(&bytes),
-        Err(e) => eprintln!("stream error: {e:?}"),
+    for chunk in large_payload.chunks(4096) {
+        encoder.write_bytes(chunk).map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
     }
+    encoder.flush().map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+    encoder.end_stream().map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+
+    // Read the single response from the server
+    let mut response = Vec::new();
+    while let Some(chunk) = receiver.next().await {
+        match chunk {
+            Ok(bytes) => response.extend_from_slice(&bytes),
+            Err(e) => eprintln!("stream error: {e:?}"),
+        }
+    }
+    Ok(())
 }
 ```
 
@@ -218,21 +223,38 @@ Any handle that implements `RpcServiceCallerInterface` — such as the
 can initiate streaming calls:
 
 ```rust
+use std::error::Error;
+use muxio::rpc::RpcRequest;
+use muxio_rpc_service_caller::dynamic_channel::DynamicChannelType;
+use muxio_rpc_service_caller::RpcServiceCallerInterface;
 use muxio_tokio_rpc_server::RpcServerEvent;
 
-// Server event channel received during setup
-while let Some(event) = event_rx.recv().await {
-    if let RpcServerEvent::ClientConnected(handle) = event {
-        // handle: ConnectionContextHandle — implements RpcServiceCallerInterface
-        tokio::spawn(async move {
-            let (mut encoder, mut receiver) = handle
-                .call_rpc_streaming(stream_request, DynamicChannelType::Unbounded)
-                .await?;
-            encoder.write_bytes(pty_output)?;
-            encoder.end_stream()?;
-            // ... read response if needed
-        });
+async fn server_streaming_example(
+    mut event_rx: tokio::sync::mpsc::UnboundedReceiver<RpcServerEvent>,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let pty_output: Vec<u8> = b"terminal output chunk".to_vec();
+
+    while let Some(event) = event_rx.recv().await {
+        if let RpcServerEvent::ClientConnected(handle) = event {
+            let po = pty_output.clone();
+            tokio::spawn(async move {
+                let stream_request = RpcRequest {
+                    rpc_method_id: 0x02,
+                    rpc_param_bytes: None,
+                    rpc_prebuffered_payload_bytes: None,
+                    is_finalized: false,
+                };
+                let (mut encoder, _receiver) = handle
+                    .call_rpc_streaming(stream_request, DynamicChannelType::Unbounded)
+                    .await
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+                encoder.write_bytes(&po).map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+                encoder.end_stream().map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+                Ok::<_, Box<dyn std::error::Error + Send + Sync>>(())
+            });
+        }
     }
+    Ok(())
 }
 ```
 

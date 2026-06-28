@@ -13,7 +13,7 @@ async-trait = "0.1.89"
 futures = "0.3.32"
 muxio.workspace = true
 muxio-rpc-service.workspace = true
-tokio = { version = "1.52.3", features = ["sync", "io-util"] }
+tokio = { version = "1.52.3", features = ["rt", "sync", "io-util"] }
 tracing.workspace = true
 
 [dev-dependencies]
