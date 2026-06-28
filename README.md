@@ -10,7 +10,7 @@
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="Apache 2.0 License"></a>
 </div>
 
-<p align="center"><strong>Examples:</strong> <a href="#websocket-usage-example">WebSocket RPC</a> · <a href="#ipc-usage-example">IPC</a> · <a href="#wasm">WASM</a> · <a href="#streaming-rpc-example">Streaming RPC</a></p>
+<p align="center"><strong>Examples:</strong> <a href="#websocket-usage-example">WebSocket RPC</a> · <a href="#wasm">WASM</a> · <a href="#ipc-usage-example">IPC</a> · <a href="#streaming-rpc-example">Streaming RPC</a></p>
 
 
 
