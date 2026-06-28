@@ -10,7 +10,7 @@
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="Apache 2.0 License"></a>
 </div>
 
-<p align="center"><strong>Examples:</strong> <a href="#websocket-usage-example">WebSocket RPC</a> · <a href="#ipc-usage-example">IPC</a> · <a href="#streaming-rpc-example">Streaming RPC</a></p>
+<p align="center"><strong>Examples:</strong> <a href="#websocket-usage-example">WebSocket RPC</a> · <a href="#ipc-usage-example">IPC</a> · <a href="#wasm-example">WASM</a> · <a href="#streaming-rpc-example">Streaming RPC</a></p>
 
 
 
@@ -273,6 +273,10 @@ async fn main() {
     }
 }
 ```
+
+## WASM Example
+
+The [WASM client](./extensions/muxio-wasm-rpc-client/) follows a callback-driven pattern: the browser owns the WebSocket, and Rust is called on events. The [`static_lib`](./extensions/muxio-wasm-rpc-client/src/static_lib/) module provides `#[wasm_bindgen]` exports that JS calls on `onopen`, `onmessage`, and `onclose`. The core [`RpcWasmClient`](./extensions/muxio-wasm-rpc-client/src/rpc_wasm_client.rs) implements the same `RpcServiceCallerInterface` used by the WebSocket and IPC examples, so calling methods like `Add::call(...)` works identically across all transports.
 
 ## Streaming RPC Example
 
