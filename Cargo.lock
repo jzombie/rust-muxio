@@ -902,14 +902,22 @@ dependencies = [
 name = "muxio-ext-test"
 version = "0.10.2-alpha"
 dependencies = [
+ "async-trait",
  "bytemuck",
  "example-muxio-rpc-service-definition",
+ "futures-util",
+ "interprocess",
+ "muxio",
  "muxio-rpc-service",
  "muxio-rpc-service-caller",
  "muxio-rpc-service-endpoint",
+ "muxio-tokio-ipc-client",
+ "muxio-tokio-ipc-server",
  "muxio-tokio-rpc-client",
  "muxio-tokio-rpc-server",
+ "muxio-wasm-rpc-client",
  "tokio",
+ "tokio-tungstenite",
  "tracing",
  "tracing-subscriber",
 ]
