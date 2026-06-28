@@ -1,5 +1,5 @@
+use crate::endpoint_helpers;
 use crate::test_transport::TestTransport;
-use crate::ws_helpers;
 use async_trait::async_trait;
 use futures_util::{SinkExt, StreamExt};
 use muxio_rpc_service_endpoint::RpcServiceEndpoint;
@@ -27,7 +27,7 @@ impl TestTransport for RpcWasmClient {
         let server_url = format!("ws://{addr}/ws");
         let server = Arc::new(RpcServer::new(None));
         let server_endpoint = server.endpoint();
-        ws_helpers::register_standard_handlers(&*server_endpoint).await;
+        endpoint_helpers::register_standard_handlers(&*server_endpoint).await;
         let _ = server_endpoint
             .register_prebuffered(0xBAD, |_request_bytes, _ctx| async move {
                 Err(Box::new(std::io::Error::other("test error"))
@@ -90,7 +90,8 @@ impl TestTransport for RpcWasmClient {
         let server_url = format!("ws://{addr}/ws");
         let (event_tx, mut event_rx) = tokio::sync::mpsc::unbounded_channel();
         let server = Arc::new(RpcServer::new(Some(event_tx)));
-        let _server_endpoint = server.endpoint();
+        // Register Echo on the server endpoint so client-initiated calls work
+        endpoint_helpers::register_echo_handler(&*server.endpoint()).await;
         let server_clone = server.clone();
         tokio::spawn(async move {
             let _ = server_clone.serve_with_listener(listener).await;

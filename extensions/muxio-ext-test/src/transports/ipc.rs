@@ -1,5 +1,5 @@
+use crate::endpoint_helpers;
 use crate::test_transport::TestTransport;
-use crate::ws_helpers;
 use async_trait::async_trait;
 use interprocess::local_socket::{GenericNamespaced, ListenerOptions, ToNsName, tokio::prelude::*};
 use muxio_rpc_service_endpoint::RpcServiceEndpoint;
@@ -33,7 +33,7 @@ impl TestTransport for IpcClient {
         let socket_name = temp_name("roundtrip");
         let server = IpcServer::new(None);
         let endpoint = server.endpoint();
-        ws_helpers::register_standard_handlers(&*endpoint).await;
+        endpoint_helpers::register_standard_handlers(&*endpoint).await;
         // Pre-register a test error handler for the roundtrip_error test
         let _ = endpoint
             .register_prebuffered(0xBAD, |_request_bytes, _ctx| async move {
@@ -89,6 +89,8 @@ impl TestTransport for IpcClient {
         let socket_name = temp_name("s2c");
         let (event_tx, mut event_rx) = tokio::sync::mpsc::unbounded_channel();
         let server = IpcServer::new(Some(event_tx));
+        // Register Echo on the server endpoint so client-initiated calls work
+        endpoint_helpers::register_echo_handler(&*server.endpoint()).await;
         let name = socket_name.clone();
         tokio::spawn(async move {
             let _ = server.serve(&name).await;

@@ -286,14 +286,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
             })
         };
 
-        let encoder;
-        let rx_result: Result<
-            (
-                RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>,
-                DynamicReceiver,
-            ),
-            RpcServiceError,
-        >;
+        let encoder: RpcStreamEncoder<Box<dyn RpcEmit + Send + Sync>>;
 
         {
             let dispatcher_arc_clone = self.get_dispatcher();
@@ -304,7 +297,7 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                 request.rpc_method_id
             );
 
-            let result_encoder = dispatcher_guard
+            encoder = dispatcher_guard
                 .call(
                     request,
                     DEFAULT_SERVICE_MAX_CHUNK_SIZE,
@@ -314,26 +307,27 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                 )
                 .map_err(|e| {
                     tracing::error!("Dispatcher.call failed: {e:?}");
-                    io::Error::other(format!("{e:?}"))
-                });
-
-            match result_encoder {
-                Ok(enc) => {
-                    encoder = enc;
-                    rx_result = Ok((encoder, rx));
-                }
-                Err(e) => {
-                    rx_result = Err(RpcServiceError::Transport(e));
-                }
-            }
+                    RpcServiceError::Transport(io::Error::other(format!("{e:?}")))
+                })?;
 
             tracing::trace!("`Dispatcher.call` returned encoder.");
+        }
+
+        // Signal readiness immediately — the call has been initiated.
+        // For finalized (prebuffered) calls the response arrives later;
+        // for non-finalized (streaming) calls the caller can now write
+        // chunks and finalize without waiting for the response header.
+        {
+            let mut ready_tx_guard = ready_tx_arc.lock().unwrap();
+            if let Some(tx_sender) = ready_tx_guard.take() {
+                let _ = tx_sender.send(Ok(()));
+            }
         }
 
         match ready_rx.await {
             Ok(Ok(())) => {
                 tracing::trace!("Readiness signal received. Returning encoder and receiver.");
-                rx_result
+                Ok((encoder, rx))
             }
             Ok(Err(err)) => {
                 tracing::trace!("Readiness signal received with error: {:?}", err);

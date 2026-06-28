@@ -1,3 +1,4 @@
+pub mod endpoint_helpers;
 pub mod ipc_helpers;
 pub mod test_assertions;
 pub mod test_suites;
@@ -46,12 +47,8 @@ macro_rules! prebuffered_roundtrip_tests {
 ///
 /// Current tests:
 /// - `test_server_to_client_echo` — prebuffered request/response
-///
-/// TODO: Server-to-client streaming (`test_server_to_client_streaming_echo`)
-/// is blocked by a deadlock in `call_rpc_streaming`: the readiness signal
-/// waits for a response header before returning the encoder, but the server
-/// needs the encoder to send chunks, and the client needs the full request
-/// before it can send a response.  Uncomment once that's resolved.
+/// - `test_server_to_client_streaming_echo` — chunked streaming
+/// - `test_concurrent_bidirectional_streaming` — simultaneous streams both ways
 #[macro_export]
 macro_rules! server_to_client_tests {
     ($module:ident, $transport:ty) => {
@@ -69,20 +66,47 @@ macro_rules! server_to_client_tests {
                 )
                 .await;
             }
-            // TODO: uncomment once streaming server-to-client works
-            // #[tokio::test]
-            // async fn test_server_to_client_streaming_echo() {
-            //     let (client, endpoint, handle) =
-            //         <$transport as $crate::test_transport::TestTransport>::connect_s2c().await;
-            //     let label = <$transport as $crate::test_transport::TestTransport>::name();
-            //     $crate::test_suites::server_to_client_streaming_echo(
-            //         client.as_ref(),
-            //         &*endpoint,
-            //         &handle,
-            //         label,
-            //     )
-            //     .await;
-            // }
+            #[tokio::test]
+            async fn test_server_to_client_streaming_echo() {
+                let (client, endpoint, handle) =
+                    <$transport as $crate::test_transport::TestTransport>::connect_s2c().await;
+                let label = <$transport as $crate::test_transport::TestTransport>::name();
+                $crate::test_suites::server_to_client_streaming_echo(
+                    client.as_ref(),
+                    &*endpoint,
+                    &handle,
+                    label,
+                )
+                .await;
+            }
+
+            #[tokio::test]
+            async fn test_concurrent_bidirectional_streaming() {
+                let (client, endpoint, handle) =
+                    <$transport as $crate::test_transport::TestTransport>::connect_s2c().await;
+                let label = <$transport as $crate::test_transport::TestTransport>::name();
+                $crate::test_suites::concurrent_bidirectional_streaming(
+                    client.clone(),
+                    &*endpoint,
+                    handle.clone(),
+                    label,
+                )
+                .await;
+            }
+
+            #[tokio::test]
+            async fn test_stream_small_messages_throughput() {
+                let (client, endpoint, handle) =
+                    <$transport as $crate::test_transport::TestTransport>::connect_s2c().await;
+                let label = <$transport as $crate::test_transport::TestTransport>::name();
+                $crate::test_suites::stream_small_messages_throughput(
+                    client.as_ref(),
+                    &*endpoint,
+                    handle,
+                    label,
+                )
+                .await;
+            }
         }
     };
 }

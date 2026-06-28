@@ -1,3 +1,4 @@
+use crate::endpoint_helpers;
 use crate::test_transport::TestTransport;
 use crate::ws_helpers;
 use async_trait::async_trait;
@@ -25,7 +26,7 @@ impl TestTransport for RpcClient {
         let (server, host, port) = ws_helpers::setup_ws_server().await;
         // Register handlers on the SERVER endpoint (where requests are processed)
         let server_endpoint = server.endpoint();
-        ws_helpers::register_standard_handlers(&*server_endpoint).await;
+        endpoint_helpers::register_standard_handlers(&*server_endpoint).await;
         // Pre-register a test error handler for the roundtrip_error test
         let _ = server_endpoint
             .register_prebuffered(0xBAD, |_request_bytes, _ctx| async move {
@@ -90,7 +91,9 @@ impl TestTransport for RpcClient {
         Arc<RpcServiceEndpoint<()>>,
         Self::S2cHandle,
     ) {
-        let (_server, mut event_rx, host, port) = ws_helpers::setup_ws_server_with_events().await;
+        let (server, mut event_rx, host, port) = ws_helpers::setup_ws_server_with_events().await;
+        // Register Echo on the server endpoint so client-initiated calls work
+        endpoint_helpers::register_echo_handler(&*server.endpoint()).await;
         let client = ws_helpers::connect_ws_client(&host, port).await;
         let endpoint = client.get_endpoint();
 
