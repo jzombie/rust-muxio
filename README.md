@@ -296,7 +296,7 @@ Muxio supports streaming requests over any transport. Each stream is **half-dupl
 
 ```rust
 use futures::StreamExt;
-use muxio::rpc::RpcRequest;
+use muxio_core::rpc::RpcRequest;
 use muxio_rpc_service_caller::dynamic_channel::DynamicChannelType;
 use muxio_tokio_rpc_client::{RpcClient, RpcServiceCallerInterface};
 
@@ -341,7 +341,7 @@ can initiate streaming calls:
 
 ```rust
 use std::error::Error;
-use muxio::rpc::RpcRequest;
+use muxio_core::rpc::RpcRequest;
 use muxio_rpc_service_caller::dynamic_channel::DynamicChannelType;
 use muxio_rpc_service_caller::RpcServiceCallerInterface;
 use muxio_tokio_rpc_server::RpcServerEvent;

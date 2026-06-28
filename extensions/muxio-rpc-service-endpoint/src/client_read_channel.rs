@@ -1,6 +1,6 @@
 use crate::{RpcServiceEndpoint, RpcServiceEndpointInterface};
 use bytes::Bytes;
-use muxio::rpc::RpcDispatcher;
+use muxio_core::rpc::RpcDispatcher;
 use std::sync::{Arc, Weak};
 use tokio::sync::Mutex;
 

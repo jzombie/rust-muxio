@@ -1,6 +1,6 @@
 use example_muxio_rpc_service_definition::prebuffered::{Add, Echo, Mult};
 use futures_util::StreamExt;
-use muxio::rpc::RpcRequest;
+use muxio_core::rpc::RpcRequest;
 use muxio_rpc_service::error::{RpcServiceError, RpcServiceErrorCode};
 use muxio_rpc_service::prebuffered::RpcMethodPrebuffered;
 use muxio_rpc_service_caller::dynamic_channel::DynamicChannelType;

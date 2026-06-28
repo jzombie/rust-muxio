@@ -1,4 +1,4 @@
-use muxio::rpc::{RpcDispatcher, RpcRequest, RpcResponse, rpc_internals::RpcStreamEvent};
+use muxio_core::rpc::{RpcDispatcher, RpcRequest, RpcResponse, rpc_internals::RpcStreamEvent};
 use muxio_rpc_service::RpcResultStatus;
 use muxio_rpc_service::constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE;
 use muxio_rpc_service::error::{RpcServiceErrorCode, RpcServiceErrorPayload};

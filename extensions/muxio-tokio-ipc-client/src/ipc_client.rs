@@ -1,5 +1,5 @@
 use interprocess::local_socket::{GenericNamespaced, ToNsName, tokio::prelude::*};
-use muxio::{frame::FrameDecodeError, rpc::RpcDispatcher};
+use muxio_core::{frame::FrameDecodeError, rpc::RpcDispatcher};
 use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
 use muxio_rpc_service_endpoint::RpcServiceEndpoint;
 use std::{

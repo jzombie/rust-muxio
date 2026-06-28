@@ -1,5 +1,5 @@
 use super::{error::RpcServiceEndpointHandlerError, with_handlers_trait::WithHandlers};
-use muxio::rpc::{RpcRequest, RpcResponse};
+use muxio_core::rpc::{RpcRequest, RpcResponse};
 use muxio_rpc_service::{RpcResultStatus, error::RpcServiceErrorCode};
 use std::sync::Arc;
 
