@@ -48,12 +48,32 @@ impl TestTransport for RpcClient {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let (host, port) = tcp_listener_to_host_port(&listener).unwrap();
         let (tx, rx) = oneshot::channel();
+        let mut rx = Some(rx);
 
         tokio::spawn(async move {
-            if let Ok((socket, _)) = listener.accept().await {
-                let _ws = tokio_tungstenite::accept_async(socket).await;
-                let _ = rx.await;
-            }
+            if let Ok((socket, _)) = listener.accept().await
+                && let Ok(ws_stream) = tokio_tungstenite::accept_async(socket).await
+            {
+                    use futures_util::{SinkExt, StreamExt};
+                    let (mut ws_sender, mut ws_receiver) = ws_stream.split();
+                    // Drive the WebSocket I/O until disconnect signal
+                    loop {
+                        tokio::select! {
+                            biased;
+                            _ = rx.as_mut().unwrap() => { break; }
+                            msg = ws_receiver.next() => {
+                                match msg {
+                                    Some(Ok(tokio_tungstenite::tungstenite::Message::Ping(payload))) => {
+                                        let _ = ws_sender.send(tokio_tungstenite::tungstenite::Message::Pong(payload)).await;
+                                    }
+                                    Some(Ok(tokio_tungstenite::tungstenite::Message::Close(_))) | None => { break; }
+                                    _ => {}
+                                }
+                            }
+                        }
+                    }
+                    let _ = ws_sender.close().await;
+                }
         });
 
         sleep(Duration::from_millis(100)).await;
