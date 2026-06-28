@@ -12,6 +12,7 @@ publish.workspace = true # Inherit from workspace
 [workspace]
 members = [
     ".",
+    "core",
     "examples/example-muxio-rpc-service-definition",
     "examples/example-muxio-ws-rpc-app",
     "extensions/muxio-ext-test",
@@ -47,6 +48,7 @@ futures = "0.3.32"
 futures-util = "0.3.32"
 interprocess = { version = "2.4.2", features = ["tokio"] }
 muxio = { path = ".", version = "0.11.0-alpha" }
+muxio-core = { path = "core", version = "0.11.0-alpha" }
 muxio-rpc-service = { path = "extensions/muxio-rpc-service", version = "0.11.0-alpha" }
 muxio-rpc-service-caller = { path = "extensions/muxio-rpc-service-caller", version = "0.11.0-alpha" }
 muxio-rpc-service-endpoint = { path = "extensions/muxio-rpc-service-endpoint", version = "0.11.0-alpha" }
@@ -63,13 +65,3 @@ tokio-tungstenite = "0.29.0"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 xxhash-rust = { version = "0.8.15", features = ["xxh3", "const_xxh3"] }
-
-[dependencies]
-chrono.workspace = true
-once_cell.workspace = true
-tracing.workspace = true
-
-[dev-dependencies]
-bitcode = { workspace = true }
-rand.workspace = true
-tokio = { workspace = true, features = ["full"] }

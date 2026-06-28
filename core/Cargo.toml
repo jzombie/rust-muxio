@@ -1,0 +1,19 @@
+[package]
+name = "muxio-core"
+description = "Core abstractions and types for Muxio multiplexing and RPC."
+authors.workspace = true
+edition.workspace = true
+version.workspace = true
+repository.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+chrono.workspace = true
+once_cell.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+bitcode = { workspace = true }
+rand.workspace = true
+tokio = { workspace = true, features = ["full"] }
