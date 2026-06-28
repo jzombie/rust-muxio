@@ -1,16 +1,16 @@
+use crate::test_transport::TestTransport;
+use crate::ws_helpers;
 use async_trait::async_trait;
 use futures_util::{SinkExt, StreamExt};
 use muxio_rpc_service_endpoint::RpcServiceEndpoint;
-use muxio_tokio_rpc_server::{RpcServer, RpcServerEvent, ConnectionContextHandle};
 use muxio_tokio_rpc_server::RpcServiceEndpointInterface as _;
+use muxio_tokio_rpc_server::{ConnectionContextHandle, RpcServer, RpcServerEvent};
 use muxio_wasm_rpc_client::RpcWasmClient;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 use tokio::time::{Duration, sleep};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message as WsMessage};
-use crate::test_transport::TestTransport;
-use crate::ws_helpers;
 
 #[async_trait]
 impl TestTransport for RpcWasmClient {
@@ -30,10 +30,10 @@ impl TestTransport for RpcWasmClient {
         ws_helpers::register_standard_handlers(&*server_endpoint).await;
         let _ = server_endpoint
             .register_prebuffered(0xBAD, |_request_bytes, _ctx| async move {
-                Err(Box::new(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "test error",
-                )) as Box<dyn std::error::Error + Send + Sync>)
+                Err(
+                    Box::new(std::io::Error::new(std::io::ErrorKind::Other, "test error"))
+                        as Box<dyn std::error::Error + Send + Sync>,
+                )
             })
             .await;
         let server_clone = server.clone();
@@ -55,9 +55,7 @@ impl TestTransport for RpcWasmClient {
         connect_async(&url)
             .await
             .map(|_| ())
-            .map_err(|e| {
-                std::io::Error::new(std::io::ErrorKind::ConnectionRefused, e.to_string())
-            })
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::ConnectionRefused, e.to_string()))
     }
 
     async fn connect_with_disconnect() -> (Arc<Self::Client>, oneshot::Sender<()>) {

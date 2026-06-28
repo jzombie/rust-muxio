@@ -1,13 +1,15 @@
-use async_trait::async_trait;
-use muxio_rpc_service_endpoint::RpcServiceEndpoint;
-use muxio_tokio_ipc_client::IpcClient;
-use muxio_tokio_ipc_server::{IpcServer, IpcServerEvent, IpcConnectionContextHandle, RpcServiceEndpointInterface};
-use std::sync::Arc;
-use interprocess::local_socket::{GenericNamespaced, ListenerOptions, ToNsName, tokio::prelude::*};
-use tokio::sync::oneshot;
-use tokio::time::{Duration, sleep};
 use crate::test_transport::TestTransport;
 use crate::ws_helpers;
+use async_trait::async_trait;
+use interprocess::local_socket::{GenericNamespaced, ListenerOptions, ToNsName, tokio::prelude::*};
+use muxio_rpc_service_endpoint::RpcServiceEndpoint;
+use muxio_tokio_ipc_client::IpcClient;
+use muxio_tokio_ipc_server::{
+    IpcConnectionContextHandle, IpcServer, IpcServerEvent, RpcServiceEndpointInterface,
+};
+use std::sync::Arc;
+use tokio::sync::oneshot;
+use tokio::time::{Duration, sleep};
 
 fn temp_name(name: &str) -> String {
     format!("muxio-ipc-test-{}", name)
@@ -28,15 +30,14 @@ impl TestTransport for IpcClient {
         let endpoint = server.endpoint();
         ws_helpers::register_standard_handlers(&*endpoint).await;
         // Pre-register a test error handler for the roundtrip_error test
-        let _ = endpoint.register_prebuffered(
-            0xBAD,
-            |_request_bytes, _ctx| async move {
-                Err(Box::new(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "test error",
-                )) as Box<dyn std::error::Error + Send + Sync>)
-            },
-        ).await;
+        let _ = endpoint
+            .register_prebuffered(0xBAD, |_request_bytes, _ctx| async move {
+                Err(
+                    Box::new(std::io::Error::new(std::io::ErrorKind::Other, "test error"))
+                        as Box<dyn std::error::Error + Send + Sync>,
+                )
+            })
+            .await;
         drop(endpoint);
         let name = socket_name.clone();
         tokio::spawn(async move {
@@ -52,12 +53,14 @@ impl TestTransport for IpcClient {
         IpcClient::new(&temp_name("conn-fail")).await.map(|_| ())
     }
 
-    async fn connect_with_disconnect(
-    ) -> (Arc<Self::Client>, oneshot::Sender<()>) {
+    async fn connect_with_disconnect() -> (Arc<Self::Client>, oneshot::Sender<()>) {
         let socket_name = temp_name("disconnect");
         let (tx, rx) = oneshot::channel();
 
-        let ns_name = socket_name.clone().to_ns_name::<GenericNamespaced>().unwrap();
+        let ns_name = socket_name
+            .clone()
+            .to_ns_name::<GenericNamespaced>()
+            .unwrap();
         let listener = ListenerOptions::new()
             .name(ns_name)
             .try_overwrite(true)
@@ -75,8 +78,7 @@ impl TestTransport for IpcClient {
         (client, tx)
     }
 
-    async fn connect_s2c(
-    ) -> (
+    async fn connect_s2c() -> (
         Arc<Self::Client>,
         Arc<RpcServiceEndpoint<()>>,
         Self::S2cHandle,

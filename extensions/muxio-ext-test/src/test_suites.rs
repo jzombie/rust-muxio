@@ -1,6 +1,6 @@
 use example_muxio_rpc_service_definition::prebuffered::{Add, Echo, Mult};
 use muxio::rpc::RpcRequest;
-use muxio_rpc_service::error::{RpcServiceErrorCode, RpcServiceError};
+use muxio_rpc_service::error::{RpcServiceError, RpcServiceErrorCode};
 use muxio_rpc_service::prebuffered::RpcMethodPrebuffered;
 use muxio_rpc_service_caller::prebuffered::RpcCallPrebuffered;
 use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
@@ -144,7 +144,10 @@ where
     let final_states = received_states.lock().unwrap();
     assert_eq!(
         *final_states,
-        vec![RpcTransportState::Connected, RpcTransportState::Disconnected],
+        vec![
+            RpcTransportState::Connected,
+            RpcTransportState::Disconnected
+        ],
         "Expected [Connected, Disconnected], got {:?}",
         *final_states
     );
@@ -171,8 +174,7 @@ pub async fn server_to_client_echo<'a, H, C, E>(
     client_endpoint
         .register_prebuffered(Echo::METHOD_ID, |request_bytes, _ctx| async move {
             let request = Echo::decode_request(&request_bytes)?;
-            Echo::encode_response(request)
-                .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>)
+            Echo::encode_response(request).map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>)
         })
         .await
         .unwrap();
@@ -184,7 +186,11 @@ pub async fn server_to_client_echo<'a, H, C, E>(
         "Server-to-{label}-client Echo failed: {:?}",
         result.err()
     );
-    assert_eq!(result.unwrap(), test_message, "{label} client echo mismatch");
+    assert_eq!(
+        result.unwrap(),
+        test_message,
+        "{label} client echo mismatch"
+    );
 }
 
 // ------------------------------------------------------------------
@@ -192,10 +198,8 @@ pub async fn server_to_client_echo<'a, H, C, E>(
 // ------------------------------------------------------------------
 
 /// Assert that pending RPC calls fail when the transport disconnects.
-pub async fn pending_requests_fail_on_disconnect<C, D, Dfut>(
-    client: Arc<C>,
-    trigger_disconnect: D,
-) where
+pub async fn pending_requests_fail_on_disconnect<C, D, Dfut>(client: Arc<C>, trigger_disconnect: D)
+where
     C: RpcServiceCallerInterface + 'static,
     D: FnOnce() -> Dfut,
     Dfut: std::future::Future<Output = ()>,

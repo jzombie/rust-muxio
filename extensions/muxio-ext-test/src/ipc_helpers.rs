@@ -1,8 +1,8 @@
+use crate::ws_helpers::register_standard_handlers;
 use muxio_tokio_ipc_client::IpcClient;
 use muxio_tokio_ipc_server::{IpcServer, IpcServerEvent};
 use std::sync::Arc;
 use tokio::time::{Duration, sleep};
-use crate::ws_helpers::register_standard_handlers;
 
 pub fn temp_socket_name(name: &str) -> String {
     format!("muxio-ipc-test-{}", name)

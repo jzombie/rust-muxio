@@ -18,5 +18,9 @@ pub trait TestTransport: Sized {
 
     async fn connect_fail() -> Result<(), std::io::Error>;
     async fn connect_with_disconnect() -> (Arc<Self::Client>, tokio::sync::oneshot::Sender<()>);
-    async fn connect_s2c() -> (Arc<Self::Client>, Arc<RpcServiceEndpoint<()>>, Self::S2cHandle);
+    async fn connect_s2c() -> (
+        Arc<Self::Client>,
+        Arc<RpcServiceEndpoint<()>>,
+        Self::S2cHandle,
+    );
 }

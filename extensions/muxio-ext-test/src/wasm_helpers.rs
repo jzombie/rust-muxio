@@ -36,7 +36,11 @@ pub async fn setup_wasm_client_bridge(
 
     let ws_send_handle = tokio::spawn(async move {
         while let Some(bytes) = to_bridge_rx.recv().await {
-            if ws_sender.send(WsMessage::Binary(bytes.into())).await.is_err() {
+            if ws_sender
+                .send(WsMessage::Binary(bytes.into()))
+                .await
+                .is_err()
+            {
                 break;
             }
         }

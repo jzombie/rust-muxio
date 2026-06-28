@@ -13,25 +13,29 @@ macro_rules! prebuffered_roundtrip_tests {
         mod $module {
             #[tokio::test]
             async fn test_success() {
-                let (client, _) = <$transport as $crate::test_transport::TestTransport>::connect().await;
+                let (client, _) =
+                    <$transport as $crate::test_transport::TestTransport>::connect().await;
                 $crate::test_suites::roundtrip_success(client.as_ref()).await;
             }
 
             #[tokio::test]
             async fn test_error() {
-                let (client, _endpoint) = <$transport as $crate::test_transport::TestTransport>::connect().await;
+                let (client, _endpoint) =
+                    <$transport as $crate::test_transport::TestTransport>::connect().await;
                 $crate::test_suites::roundtrip_error(client.as_ref()).await;
             }
 
             #[tokio::test]
             async fn test_large_payload() {
-                let (client, _) = <$transport as $crate::test_transport::TestTransport>::connect().await;
+                let (client, _) =
+                    <$transport as $crate::test_transport::TestTransport>::connect().await;
                 $crate::test_suites::roundtrip_large_payload(client.as_ref()).await;
             }
 
             #[tokio::test]
             async fn test_method_not_found() {
-                let (client, _) = <$transport as $crate::test_transport::TestTransport>::connect().await;
+                let (client, _) =
+                    <$transport as $crate::test_transport::TestTransport>::connect().await;
                 $crate::test_suites::roundtrip_method_not_found(client.as_ref()).await;
             }
         }
@@ -45,14 +49,16 @@ macro_rules! server_to_client_tests {
         mod $module {
             #[tokio::test]
             async fn test_server_to_client_echo() {
-                let (client, endpoint, handle) = <$transport as $crate::test_transport::TestTransport>::connect_s2c().await;
+                let (client, endpoint, handle) =
+                    <$transport as $crate::test_transport::TestTransport>::connect_s2c().await;
                 let label = <$transport as $crate::test_transport::TestTransport>::name();
                 $crate::test_suites::server_to_client_echo(
                     client.as_ref(),
                     &*endpoint,
                     &handle,
                     label,
-                ).await;
+                )
+                .await;
             }
         }
     };
@@ -76,7 +82,10 @@ macro_rules! transport_state_tests {
 
             #[tokio::test]
             async fn test_state_change_handler() {
-                let (client, _tx) = <$transport as $crate::test_transport::TestTransport>::connect_with_disconnect().await;
+                let (client, _tx) =
+                    <$transport as $crate::test_transport::TestTransport>::connect_with_disconnect(
+                    )
+                    .await;
                 let states = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
                 let notify = std::sync::Arc::new(tokio::sync::Notify::new());
 
@@ -94,11 +103,9 @@ macro_rules! transport_state_tests {
                 tokio::time::sleep(std::time::Duration::from_millis(50)).await;
                 drop(client);
 
-                let notified = tokio::time::timeout(
-                    std::time::Duration::from_secs(5),
-                    notify.notified(),
-                )
-                .await;
+                let notified =
+                    tokio::time::timeout(std::time::Duration::from_secs(5), notify.notified())
+                        .await;
                 assert!(notified.is_ok(), "Timed out waiting for disconnect");
 
                 let final_states = states.lock().unwrap();
@@ -115,7 +122,10 @@ macro_rules! transport_state_tests {
 
             #[tokio::test]
             async fn test_pending_requests_fail_on_disconnect() {
-                let (client, tx) = <$transport as $crate::test_transport::TestTransport>::connect_with_disconnect().await;
+                let (client, tx) =
+                    <$transport as $crate::test_transport::TestTransport>::connect_with_disconnect(
+                    )
+                    .await;
 
                 let client_clone = client.clone();
                 let (tx_result, rx_result) = tokio::sync::oneshot::channel();

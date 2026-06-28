@@ -33,9 +33,7 @@ pub fn assert_rpc_error<T: std::fmt::Debug>(
     }
 }
 
-pub fn assert_method_not_found_error<T: std::fmt::Debug>(
-    result: Result<T, RpcServiceError>,
-) {
+pub fn assert_method_not_found_error<T: std::fmt::Debug>(result: Result<T, RpcServiceError>) {
     let err = result.unwrap_err();
     match err {
         RpcServiceError::Rpc(payload) => {

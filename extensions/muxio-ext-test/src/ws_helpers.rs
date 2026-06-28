@@ -2,9 +2,7 @@ use example_muxio_rpc_service_definition::prebuffered::{Add, Echo, Mult};
 use muxio_rpc_service::prebuffered::RpcMethodPrebuffered;
 use muxio_rpc_service_endpoint::RpcServiceEndpointInterface;
 use muxio_tokio_rpc_client::RpcClient;
-use muxio_tokio_rpc_server::{
-    RpcServer, RpcServerEvent, utils::tcp_listener_to_host_port,
-};
+use muxio_tokio_rpc_server::{RpcServer, RpcServerEvent, utils::tcp_listener_to_host_port};
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::time::{Duration, sleep};
@@ -53,8 +51,7 @@ pub async fn setup_ws_server() -> (Arc<RpcServer>, String, u16) {
     (server, server_host.to_string(), server_port)
 }
 
-pub async fn setup_ws_server_with_events(
-) -> (
+pub async fn setup_ws_server_with_events() -> (
     Arc<RpcServer>,
     tokio::sync::mpsc::UnboundedReceiver<RpcServerEvent>,
     String,
