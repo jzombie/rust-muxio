@@ -38,8 +38,9 @@ On top of this multiplexing layer, Muxio offers a minimal, unopinionated RPC fra
 
 - **Extensible by Design:** Muxio comes with pre-built extensions that demonstrate how to integrate the core library into real-world applications:.
 
-  - **Tokio-based [Server](./extensions/muxio-tokio-rpc-server/)/[Client](./extensions/muxio-tokio-rpc-client/)]**: For native, multi-threaded environments.
+  - **Tokio-based WebSocket [Server](./extensions/muxio-tokio-rpc-server/)/[Client](./extensions/muxio-tokio-rpc-client/)**: For native, multi-threaded environments.
   - **[WASM-based Web Client](./extensions/muxio-wasm-rpc-client/)**: For seamless integration into web applications, communicating with a JavaScript host via a simple byte-passing bridge.
+  - **Tokio-based IPC [Server](./extensions/muxio-tokio-ipc-server/)/[Client](./extensions/muxio-tokio-ipc-client/)**: For local inter-process communication over Unix domain sockets or Windows named pipes.
 
 ## How Muxio Compares
 
