@@ -8,8 +8,9 @@
   <a href="https://docs.rs/muxio"><img src="https://docs.rs/muxio/badge.svg" alt="Documentation"></a>
   <a href="https://deepwiki.com/jzombie/rust-muxio"><img src="https://deepwiki.com/badge.svg" alt="DeepWiki"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="Apache 2.0 License"></a>
-  <div>**Examples:** [`WebSocket RPC`](#usage-example) · [`IPC`](#ipc-usage-example) · [`Streaming RPC`](#streaming-rpc-example)</div>
 </div>
+
+**Examples:** [`WebSocket RPC`](#usage-example) · [`IPC`](#ipc-usage-example) · [`Streaming RPC`](#streaming-rpc-example)
 
 
 
