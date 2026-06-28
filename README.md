@@ -11,7 +11,7 @@
 </div>
 
 <p align="center"><strong>Examples:</strong> <a href="#websocket-usage-example">WebSocket RPC</a> · <a href="#ipc-usage-example">IPC RPC</a> · <a href="#wasm-rpc">WASM RPC</a> · <a href="#streaming-rpc-example">Streaming RPC</a></p>
-
+<p align="center"><em>Same caller interface over multiple transports.</em></p>
 
 
 # Muxio: A High-Performance Multiplexing and RPC Framework for Rust
