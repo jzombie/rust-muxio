@@ -13,10 +13,10 @@ async-trait = { workspace = true }
 bytes = { workspace = true }
 futures = { workspace = true }
 futures-util = { workspace = true }
-muxio = { workspace = true }
+muxio-core = { workspace = true }
 muxio-rpc-service = { workspace = true }
 muxio-rpc-service-caller = { workspace = true }
-muxio-rpc-service-endpoint = { workspace = true }
+muxio-rpc-service-endpoint = { workspace = true, features = ["tokio_support"] }
 tokio = { workspace = true, features = ["full"] }
 tokio-tungstenite = { workspace = true }
 tracing = { workspace = true }

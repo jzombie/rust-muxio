@@ -12,6 +12,6 @@ publish.workspace = true # Inherit from workspace
 async-trait = { workspace = true }
 bitcode = { workspace = true }
 futures = { workspace = true }
-muxio = { workspace = true }
+muxio-core = { workspace = true }
 num_enum = { workspace = true }
 xxhash-rust = { workspace = true }

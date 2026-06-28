@@ -1,0 +1,27 @@
+[package]
+name = "muxio-tokio-rpc-ipc-client"
+description = "A Tokio-based Muxio IPC (local socket) RPC client implementation."
+authors.workspace = true
+edition.workspace = true
+version.workspace = true
+repository.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+async-trait = { workspace = true }
+bytes = { workspace = true }
+futures-util = { workspace = true }
+interprocess = { workspace = true }
+muxio-core = { workspace = true }
+muxio-rpc-service = { workspace = true }
+muxio-rpc-service-caller = { workspace = true }
+muxio-rpc-service-endpoint = { workspace = true, features = ["tokio_support"] }
+tokio = { workspace = true, features = ["full"] }
+tracing = { workspace = true }
+
+[dev-dependencies]
+example-muxio-rpc-service-definition = { workspace = true }
+muxio-rpc-service = { workspace = true }
+muxio-tokio-rpc-ipc-server = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }

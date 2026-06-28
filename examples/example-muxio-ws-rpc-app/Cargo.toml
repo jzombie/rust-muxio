@@ -10,7 +10,7 @@ publish = false # Explcitly false
 [dependencies]
 async-trait = { workspace = true }
 example-muxio-rpc-service-definition = { workspace = true }
-muxio = { workspace = true }
+muxio-core = { workspace = true }
 muxio-rpc-service-caller = { workspace = true }
 muxio-tokio-rpc-client = { workspace = true }
 muxio-tokio-rpc-server = { workspace = true }
@@ -22,6 +22,8 @@ tracing-subscriber = { workspace = true, features = ["env-filter"] }
 criterion = { workspace = true, features = ["async_tokio"] }
 doc-comment = { workspace = true }
 futures = { workspace = true }
+muxio-tokio-rpc-ipc-client = { workspace = true }
+muxio-tokio-rpc-ipc-server = { workspace = true }
 
 [[bench]]
 name = "roundtrip"

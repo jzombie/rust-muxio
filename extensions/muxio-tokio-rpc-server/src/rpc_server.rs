@@ -17,8 +17,8 @@ use futures_util::{
     SinkExt, StreamExt,
     stream::{SplitSink, SplitStream},
 };
-use muxio::frame::FrameDecodeError;
-use muxio::rpc::RpcDispatcher;
+use muxio_core::frame::FrameDecodeError;
+use muxio_core::rpc::RpcDispatcher;
 use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
 use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface};
 use std::net::SocketAddr;
@@ -153,51 +153,42 @@ impl RpcServer {
     async fn handle_socket(self: Arc<Self>, socket: WebSocket, addr: SocketAddr) {
         let (sender_ws, receiver_ws) = socket.split();
 
-        // Create the internal mpsc channel for this connection
-        let (tx_mpsc, rx_mpsc) = mpsc::unbounded_channel::<Message>(); // Renamed for clarity
+        let sender_arc = Arc::new(Mutex::new(sender_ws));
+        let (tx_mpsc, _sender_handle) =
+            muxio_rpc_service_caller::write_channel::spawn_write_loop({
+                let s = sender_arc.clone();
+                move |msg: Message| {
+                    let s = s.clone();
+                    async move { s.lock().await.send(msg).await.map_err(|_| ()) }
+                }
+            });
 
         let is_connected_atomic = Arc::new(AtomicBool::new(true));
 
         let context = Arc::new(ConnectionContext {
-            sender: Arc::new(Mutex::new(sender_ws)), // Renamed for clarity from 'sender'
-            mpsc_tx: tx_mpsc.clone(),                // <--- USE THE CLONED SENDER HERE
+            sender: sender_arc,
+            mpsc_tx: tx_mpsc.clone(),
             is_connected: is_connected_atomic.clone(),
             addr,
             dispatcher: Arc::new(Mutex::new(RpcDispatcher::new())),
         });
 
         if let Some(tx_event) = &self.event_tx {
-            // Renamed for clarity
             let _ = tx_event.send(RpcServerEvent::ClientConnected(ConnectionContextHandle(
                 context.clone(),
             )));
         }
 
-        // Pass the receiver to the sender_task
-        tokio::spawn(Self::sender_task(context.clone(), rx_mpsc));
-
-        // Pass the sender to the receiver_task (for responding to client-initiated calls)
         let event_tx_clone = self.event_tx.clone();
         tokio::spawn(Self::receiver_task(
             self.endpoint.clone(),
             context,
-            receiver_ws, // Renamed for clarity from 'receiver'
-            tx_mpsc,     // <--- Pass tx_mpsc here as well
+            receiver_ws,
+            tx_mpsc,
             addr,
             event_tx_clone,
             is_connected_atomic,
         ));
-    }
-
-    async fn sender_task(
-        context: Arc<ConnectionContext>,
-        mut rx: mpsc::UnboundedReceiver<Message>,
-    ) {
-        while let Some(msg) = rx.recv().await {
-            if context.sender.lock().await.send(msg).await.is_err() {
-                break;
-            }
-        }
     }
 
     async fn receiver_task(

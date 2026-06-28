@@ -1,5 +1,5 @@
 use futures::{StreamExt, channel::mpsc};
-use muxio::rpc::{
+use muxio_core::rpc::{
     RpcDispatcher, RpcRequest,
     rpc_internals::{RpcHeader, RpcMessageType, RpcStreamEncoder, rpc_trait::RpcEmit},
 };

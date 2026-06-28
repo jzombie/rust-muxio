@@ -1,5 +1,5 @@
 use futures::future::join_all;
-use muxio::{frame::FrameDecodeError, rpc::RpcDispatcher};
+use muxio_core::{frame::FrameDecodeError, rpc::RpcDispatcher};
 use muxio_rpc_service::constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE;
 use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
 use muxio_rpc_service_endpoint::RpcServiceEndpointInterface;
@@ -51,7 +51,7 @@ impl RpcWasmClient {
         let emit_fn_arc = self.emit_callback.clone();
 
         // Stage 1: Synchronous Reading from Dispatcher (lock briefly held)
-        let mut requests_to_process: Vec<(u32, muxio::rpc::RpcRequest)> = Vec::new();
+        let mut requests_to_process: Vec<(u32, muxio_core::rpc::RpcRequest)> = Vec::new();
         {
             // Acquire lock to read bytes into the dispatcher
             let mut dispatcher_guard = dispatcher_arc.lock().await;

@@ -1,4 +1,4 @@
-use muxio::frame::{FrameDecodeError, FrameEncodeError};
+use muxio_core::frame::{FrameDecodeError, FrameEncodeError};
 use muxio_rpc_service::error::{RpcServiceErrorCode, RpcServiceErrorPayload};
 use std::fmt;
 use std::io;
