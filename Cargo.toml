@@ -12,14 +12,15 @@ publish.workspace = true # Inherit from workspace
 [workspace]
 members = [
     ".",
+    "core",
     "examples/example-muxio-rpc-service-definition",
     "examples/example-muxio-ws-rpc-app",
     "extensions/muxio-ext-test",
     "extensions/muxio-rpc-service",
     "extensions/muxio-rpc-service-caller",
     "extensions/muxio-rpc-service-endpoint",
-    "extensions/muxio-tokio-ipc-client",
-    "extensions/muxio-tokio-ipc-server",
+    "extensions/muxio-tokio-rpc-ipc-client",
+    "extensions/muxio-tokio-rpc-ipc-server",
     "extensions/muxio-tokio-rpc-client",
     "extensions/muxio-tokio-rpc-server",
     "extensions/muxio-wasm-rpc-client",
@@ -47,11 +48,12 @@ futures = "0.3.32"
 futures-util = "0.3.32"
 interprocess = { version = "2.4.2", features = ["tokio"] }
 muxio = { path = ".", version = "0.11.0-alpha" }
+muxio-core = { path = "core", version = "0.11.0-alpha" }
 muxio-rpc-service = { path = "extensions/muxio-rpc-service", version = "0.11.0-alpha" }
 muxio-rpc-service-caller = { path = "extensions/muxio-rpc-service-caller", version = "0.11.0-alpha" }
 muxio-rpc-service-endpoint = { path = "extensions/muxio-rpc-service-endpoint", version = "0.11.0-alpha" }
-muxio-tokio-ipc-client = { path = "extensions/muxio-tokio-ipc-client", version = "0.11.0-alpha" }
-muxio-tokio-ipc-server = { path = "extensions/muxio-tokio-ipc-server", version = "0.11.0-alpha" }
+muxio-tokio-rpc-ipc-client = { path = "extensions/muxio-tokio-rpc-ipc-client", version = "0.11.0-alpha" }
+muxio-tokio-rpc-ipc-server = { path = "extensions/muxio-tokio-rpc-ipc-server", version = "0.11.0-alpha" }
 muxio-tokio-rpc-client = { path = "extensions/muxio-tokio-rpc-client", version = "0.11.0-alpha" }
 muxio-tokio-rpc-server = { path = "extensions/muxio-tokio-rpc-server", version = "0.11.0-alpha" }
 muxio-wasm-rpc-client = { path = "extensions/muxio-wasm-rpc-client", version = "0.11.0-alpha" }
@@ -64,12 +66,50 @@ tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 xxhash-rust = { version = "0.8.15", features = ["xxh3", "const_xxh3"] }
 
+[features]
+default = []
+rpc-service = ["dep:muxio-rpc-service"]
+rpc-service-caller = ["dep:muxio-rpc-service-caller"]
+rpc-service-endpoint = ["dep:muxio-rpc-service-endpoint"]
+tokio-rpc-ipc-client = ["dep:muxio-tokio-rpc-ipc-client"]
+tokio-rpc-ipc-server = ["dep:muxio-tokio-rpc-ipc-server"]
+tokio-rpc-client = ["dep:muxio-tokio-rpc-client"]
+tokio-rpc-server = ["dep:muxio-tokio-rpc-server"]
+wasm-rpc-client = ["dep:muxio-wasm-rpc-client"]
+full = [
+    "rpc-service",
+    "rpc-service-caller",
+    "rpc-service-endpoint",
+    "tokio-rpc-ipc-client",
+    "tokio-rpc-ipc-server",
+    "tokio-rpc-client",
+    "tokio-rpc-server",
+    "wasm-rpc-client",
+]
+
 [dependencies]
-chrono.workspace = true
-once_cell.workspace = true
-tracing.workspace = true
+muxio-core = { workspace = true }
+
+# Optional extension re-exports (behind feature flags)
+muxio-rpc-service = { workspace = true, optional = true }
+muxio-rpc-service-caller = { workspace = true, optional = true }
+muxio-rpc-service-endpoint = { workspace = true, optional = true }
+muxio-tokio-rpc-ipc-client = { workspace = true, optional = true }
+muxio-tokio-rpc-ipc-server = { workspace = true, optional = true }
+muxio-tokio-rpc-client = { workspace = true, optional = true }
+muxio-tokio-rpc-server = { workspace = true, optional = true }
+muxio-wasm-rpc-client = { workspace = true, optional = true }
 
 [dev-dependencies]
 bitcode = { workspace = true }
+example-muxio-rpc-service-definition = { workspace = true }
+futures = { workspace = true }
+muxio-rpc-service-caller = { workspace = true }
+muxio-tokio-rpc-ipc-client = { workspace = true }
+muxio-tokio-rpc-ipc-server = { workspace = true }
+muxio-tokio-rpc-client = { workspace = true }
+muxio-tokio-rpc-server = { workspace = true }
 rand.workspace = true
 tokio = { workspace = true, features = ["full"] }
+tracing.workspace = true
+tracing-subscriber.workspace = true

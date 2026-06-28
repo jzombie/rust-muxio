@@ -1,6 +1,6 @@
-# muxio-rpc-service-caller
+# {{crate_name}}
 
-Generic, runtime-agnostic interface and logic for building Muxio RPC clients.
+{{description}}
 
 > **Work in Progress**
 

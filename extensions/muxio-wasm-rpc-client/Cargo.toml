@@ -12,7 +12,7 @@ publish.workspace = true # Inherit from workspace
 async-trait = { workspace = true }
 futures = { workspace = true }
 js-sys = "0.3.91"
-muxio = { workspace = true }
+muxio-core = { workspace = true }
 muxio-rpc-service = { workspace = true }
 muxio-rpc-service-caller = { workspace = true }
 muxio-rpc-service-endpoint = { workspace = true }

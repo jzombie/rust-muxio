@@ -3,7 +3,7 @@ use crate::{
     dynamic_channel::{DynamicChannelType, DynamicReceiver, DynamicSender},
 };
 use futures::{StreamExt, channel::mpsc, channel::oneshot};
-use muxio::rpc::{
+use muxio_core::rpc::{
     RpcDispatcher, RpcRequest,
     rpc_internals::{
         RpcStreamEncoder, RpcStreamEvent,

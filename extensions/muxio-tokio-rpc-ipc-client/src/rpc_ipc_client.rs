@@ -1,5 +1,5 @@
 use interprocess::local_socket::{GenericNamespaced, ToNsName, tokio::prelude::*};
-use muxio::{frame::FrameDecodeError, rpc::RpcDispatcher};
+use muxio_core::{frame::FrameDecodeError, rpc::RpcDispatcher};
 use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
 use muxio_rpc_service_endpoint::RpcServiceEndpoint;
 use std::{
@@ -19,7 +19,7 @@ use tracing::{self, instrument};
 type RpcTransportStateChangeHandler =
     Arc<StdMutex<Option<Box<dyn Fn(RpcTransportState) + Send + Sync>>>>;
 
-pub struct IpcClient {
+pub struct RpcIpcClient {
     dispatcher: Arc<TokioMutex<RpcDispatcher<'static>>>,
     endpoint: Arc<RpcServiceEndpoint<()>>,
     tx: mpsc::UnboundedSender<Vec<u8>>,
@@ -28,18 +28,18 @@ pub struct IpcClient {
     task_handles: Vec<JoinHandle<()>>,
 }
 
-impl fmt::Debug for IpcClient {
+impl fmt::Debug for RpcIpcClient {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("IpcClient")
+        f.debug_struct("RpcIpcClient")
             .field("is_connected", &self.is_connected.load(Ordering::Relaxed))
             .finish()
     }
 }
 
-impl Drop for IpcClient {
+impl Drop for RpcIpcClient {
     #[instrument(skip(self))]
     fn drop(&mut self) {
-        tracing::debug!("IpcClient is being dropped. Aborting tasks.");
+        tracing::debug!("RpcIpcClient is being dropped. Aborting tasks.");
         for handle in &self.task_handles {
             handle.abort();
         }
@@ -47,7 +47,7 @@ impl Drop for IpcClient {
     }
 }
 
-impl IpcClient {
+impl RpcIpcClient {
     #[instrument(skip(self))]
     fn shutdown_sync(&self) {
         if self.is_connected.swap(false, Ordering::SeqCst)
@@ -79,7 +79,7 @@ impl IpcClient {
         let stream = LocalSocketStream::connect(name)
             .await
             .map_err(|e| io::Error::new(io::ErrorKind::ConnectionRefused, e))?;
-        tracing::debug!("Connected to IPC server at {:?}", socket_path);
+        tracing::debug!("Connected to RPC-IPC server at {:?}", socket_path);
 
         let (read_half, write_half) = tokio::io::split(stream);
         let write_half = std::sync::Arc::new(tokio::sync::Mutex::new(write_half));
@@ -92,7 +92,7 @@ impl IpcClient {
                 }
             });
 
-        let client = Arc::new_cyclic(|weak_client: &Weak<IpcClient>| {
+        let client = Arc::new_cyclic(|weak_client: &Weak<RpcIpcClient>| {
             let state_change_handler: RpcTransportStateChangeHandler =
                 Arc::new(StdMutex::new(None));
             let is_connected = Arc::new(AtomicBool::new(true));
@@ -144,7 +144,7 @@ impl IpcClient {
 }
 
 #[async_trait::async_trait]
-impl muxio_rpc_service_endpoint::client_read_channel::ClientReadTarget for IpcClient {
+impl muxio_rpc_service_endpoint::client_read_channel::ClientReadTarget for RpcIpcClient {
     fn dispatcher(&self) -> Arc<TokioMutex<RpcDispatcher<'static>>> {
         self.dispatcher.clone()
     }
@@ -157,7 +157,7 @@ impl muxio_rpc_service_endpoint::client_read_channel::ClientReadTarget for IpcCl
 }
 
 #[async_trait::async_trait]
-impl RpcServiceCallerInterface for IpcClient {
+impl RpcServiceCallerInterface for RpcIpcClient {
     fn get_dispatcher(&self) -> Arc<TokioMutex<RpcDispatcher<'static>>> {
         self.dispatcher.clone()
     }
@@ -173,7 +173,7 @@ impl RpcServiceCallerInterface for IpcClient {
             let is_connected_clone = self.is_connected.clone();
             move |chunk: Vec<u8>| {
                 if !is_connected_clone.load(Ordering::Relaxed) {
-                    tracing::warn!("IpcClient is disconnected, dropping outgoing RPC data.");
+                    tracing::warn!("RpcIpcClient is disconnected, dropping outgoing RPC data.");
                     return;
                 }
                 let chunk_len = chunk.len();

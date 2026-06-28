@@ -3,8 +3,8 @@ use interprocess::local_socket::{
     GenericNamespaced, ListenerOptions, ToNsName,
     tokio::{Listener, prelude::*},
 };
-use muxio::frame::FrameDecodeError;
-use muxio::rpc::RpcDispatcher;
+use muxio_core::frame::FrameDecodeError;
+use muxio_core::rpc::RpcDispatcher;
 use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
 use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface};
 use std::sync::Arc;
@@ -14,40 +14,40 @@ use tokio::sync::{Mutex, mpsc};
 
 static NEXT_CONN_ID: AtomicUsize = AtomicUsize::new(1);
 
-/// Represents events that occur on the `IpcServer`.
-pub enum IpcServerEvent {
-    ClientConnected(IpcConnectionContextHandle),
+/// Represents events that occur on the `RpcIpcServer`.
+pub enum RpcIpcServerEvent {
+    ClientConnected(RpcIpcConnectionContextHandle),
     ClientDisconnected(usize),
 }
 
-pub struct IpcConnectionContext {
+pub struct RpcIpcConnectionContext {
     pub write_tx: mpsc::UnboundedSender<Vec<u8>>,
     pub conn_id: usize,
     pub is_connected: Arc<AtomicBool>,
     pub dispatcher: Arc<Mutex<RpcDispatcher<'static>>>,
 }
 
-/// A wrapper around `Arc<IpcConnectionContext>` to satisfy Rust's orphan rule.
+/// A wrapper around `Arc<RpcIpcConnectionContext>` to satisfy Rust's orphan rule.
 #[derive(Clone)]
-pub struct IpcConnectionContextHandle(pub Arc<IpcConnectionContext>);
+pub struct RpcIpcConnectionContextHandle(pub Arc<RpcIpcConnectionContext>);
 
 /// An RPC server that listens for local socket connections and handles RPC calls.
-pub struct IpcServer {
-    endpoint: Arc<RpcServiceEndpoint<Arc<IpcConnectionContext>>>,
-    event_tx: Option<mpsc::UnboundedSender<IpcServerEvent>>,
+pub struct RpcIpcServer {
+    endpoint: Arc<RpcServiceEndpoint<Arc<RpcIpcConnectionContext>>>,
+    event_tx: Option<mpsc::UnboundedSender<RpcIpcServerEvent>>,
 }
 
-impl IpcServer {
-    /// Creates a new `IpcServer`.
-    pub fn new(event_tx: Option<mpsc::UnboundedSender<IpcServerEvent>>) -> Self {
-        IpcServer {
+impl RpcIpcServer {
+    /// Creates a new `RpcIpcServer`.
+    pub fn new(event_tx: Option<mpsc::UnboundedSender<RpcIpcServerEvent>>) -> Self {
+        RpcIpcServer {
             endpoint: Arc::new(RpcServiceEndpoint::new()),
             event_tx,
         }
     }
 
     /// Returns an `Arc` clone of the underlying RPC service endpoint.
-    pub fn endpoint(&self) -> Arc<RpcServiceEndpoint<Arc<IpcConnectionContext>>> {
+    pub fn endpoint(&self) -> Arc<RpcServiceEndpoint<Arc<RpcIpcConnectionContext>>> {
         self.endpoint.clone()
     }
 
@@ -64,7 +64,7 @@ impl IpcServer {
             .name(name)
             .try_overwrite(true)
             .create_tokio()?;
-        tracing::info!("IPC server listening on {:?}", socket_path);
+        tracing::info!("RPC-IPC server listening on {:?}", socket_path);
         let server = Arc::new(self);
         server.serve_with_listener(listener).await
     }
@@ -78,7 +78,7 @@ impl IpcServer {
             let conn = match listener.accept().await {
                 Ok(c) => c,
                 Err(e) => {
-                    tracing::error!("Failed to accept IPC connection: {:?}", e);
+                    tracing::error!("Failed to accept RPC-IPC connection: {:?}", e);
                     continue;
                 }
             };
@@ -104,7 +104,7 @@ impl IpcServer {
         let conn_id = NEXT_CONN_ID.fetch_add(1, Ordering::Relaxed);
         let peer_label = conn_id;
 
-        let context = Arc::new(IpcConnectionContext {
+        let context = Arc::new(RpcIpcConnectionContext {
             write_tx: tx_mpsc.clone(),
             conn_id,
             is_connected: is_connected.clone(),
@@ -112,9 +112,9 @@ impl IpcServer {
         });
 
         if let Some(tx_event) = &self.event_tx {
-            let _ = tx_event.send(IpcServerEvent::ClientConnected(IpcConnectionContextHandle(
-                context.clone(),
-            )));
+            let _ = tx_event.send(RpcIpcServerEvent::ClientConnected(
+                RpcIpcConnectionContextHandle(context.clone()),
+            ));
         }
 
         let context_for_reader = context.clone();
@@ -124,7 +124,7 @@ impl IpcServer {
             loop {
                 match read_half.read(&mut buf).await {
                     Ok(0) => {
-                        tracing::info!("IPC client {} disconnected (EOF).", peer_label);
+                        tracing::info!("RPC-IPC client {} disconnected (EOF).", peer_label);
                         break;
                     }
                     Ok(n) => {
@@ -145,14 +145,14 @@ impl IpcServer {
                             .await
                         {
                             tracing::error!(
-                                "IPC server: error processing bytes from {}: {:?}",
+                                "RPC-IPC server: error processing bytes from {}: {:?}",
                                 peer_label,
                                 err
                             );
                         }
                     }
                     Err(e) => {
-                        tracing::error!("IPC server: read error from {}: {:?}", peer_label, e);
+                        tracing::error!("RPC-IPC server: read error from {}: {:?}", peer_label, e);
                         break;
                     }
                 }
@@ -168,13 +168,13 @@ impl IpcServer {
         let mut dg = context.dispatcher.lock().await;
         dg.fail_all_pending_requests(FrameDecodeError::ReadAfterCancel);
         if let Some(tx_event) = &self.event_tx {
-            let _ = tx_event.send(IpcServerEvent::ClientDisconnected(conn_id));
+            let _ = tx_event.send(RpcIpcServerEvent::ClientDisconnected(conn_id));
         }
     }
 }
 
 #[async_trait::async_trait]
-impl RpcServiceCallerInterface for IpcConnectionContextHandle {
+impl RpcServiceCallerInterface for RpcIpcConnectionContextHandle {
     fn get_dispatcher(&self) -> Arc<Mutex<RpcDispatcher<'static>>> {
         self.0.dispatcher.clone()
     }
@@ -197,7 +197,7 @@ impl RpcServiceCallerInterface for IpcConnectionContextHandle {
         _handler: impl Fn(RpcTransportState) + Send + Sync + 'static,
     ) {
         tracing::warn!(
-            "set_state_change_handler called on server-side IPC connection context; this is a no-op."
+            "set_state_change_handler called on server-side RPC-IPC connection context; this is a no-op."
         );
     }
 }

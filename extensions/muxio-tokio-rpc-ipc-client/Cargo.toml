@@ -1,5 +1,5 @@
 [package]
-name = "muxio-tokio-ipc-client"
+name = "muxio-tokio-rpc-ipc-client"
 description = "A Tokio-based Muxio IPC (local socket) RPC client implementation."
 authors.workspace = true
 edition.workspace = true
@@ -13,7 +13,7 @@ async-trait = { workspace = true }
 bytes = { workspace = true }
 futures-util = { workspace = true }
 interprocess = { workspace = true }
-muxio = { workspace = true }
+muxio-core = { workspace = true }
 muxio-rpc-service = { workspace = true }
 muxio-rpc-service-caller = { workspace = true }
 muxio-rpc-service-endpoint = { workspace = true, features = ["tokio_support"] }
@@ -23,5 +23,5 @@ tracing = { workspace = true }
 [dev-dependencies]
 example-muxio-rpc-service-definition = { workspace = true }
 muxio-rpc-service = { workspace = true }
-muxio-tokio-ipc-server = { workspace = true }
+muxio-tokio-rpc-ipc-server = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }

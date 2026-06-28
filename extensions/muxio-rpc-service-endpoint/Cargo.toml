@@ -17,7 +17,7 @@ async-trait = { workspace = true }
 bitcode = { workspace = true }
 bytes = { workspace = true }
 futures = { workspace = true }
-muxio = { workspace = true }
+muxio-core = { workspace = true }
 muxio-rpc-service = { workspace = true }
 muxio-rpc-service-caller = { workspace = true }
 

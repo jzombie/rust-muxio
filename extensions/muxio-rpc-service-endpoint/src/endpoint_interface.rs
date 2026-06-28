@@ -1,7 +1,7 @@
 use super::endpoint_utils::process_single_prebuffered_request;
 use super::{error::RpcServiceEndpointError, with_handlers_trait::WithHandlers};
 use futures::future::join_all;
-use muxio::rpc::{RpcDispatcher, rpc_internals::rpc_trait::RpcEmit};
+use muxio_core::rpc::{RpcDispatcher, rpc_internals::rpc_trait::RpcEmit};
 use muxio_rpc_service::constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE;
 use std::{collections::hash_map::Entry, future::Future, marker::Send, sync::Arc};
 

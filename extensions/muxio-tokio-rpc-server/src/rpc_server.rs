@@ -17,8 +17,8 @@ use futures_util::{
     SinkExt, StreamExt,
     stream::{SplitSink, SplitStream},
 };
-use muxio::frame::FrameDecodeError;
-use muxio::rpc::RpcDispatcher;
+use muxio_core::frame::FrameDecodeError;
+use muxio_core::rpc::RpcDispatcher;
 use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
 use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface};
 use std::net::SocketAddr;
