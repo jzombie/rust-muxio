@@ -271,10 +271,10 @@ pub async fn concurrent_bidirectional_streaming<H, C, E>(
         .await
         .unwrap();
 
-    let server_payload =
-        format!("server→{label} payload {:?}", std::time::Instant::now()).into_bytes();
-    let client_payload =
-        format!("client→{label} payload {:?}", std::time::Instant::now()).into_bytes();
+    // Large payloads ensure many chunks and exercise the full streaming
+    // pipeline: interleaved framing, concurrent transport I/O, backpressure.
+    let server_payload = vec![b'A'; 64 * 1024];
+    let client_payload = vec![b'B'; 64 * 1024];
 
     // Spawn both directions concurrently
     let handle = ctx_handle;
@@ -291,8 +291,13 @@ pub async fn concurrent_bidirectional_streaming<H, C, E>(
             .await
             .expect("server-side streaming call failed");
 
-        for chunk in sp.chunks(32) {
+        // Yield every few chunks so the opposite task can interleave
+        // its writes — proving true concurrent bidirectional streaming.
+        for (i, chunk) in sp.chunks(512).enumerate() {
             encoder.write_bytes(chunk).expect("server write_bytes failed");
+            if i % 8 == 0 {
+                tokio::task::yield_now().await;
+            }
         }
         encoder.flush().expect("server flush failed");
         encoder.end_stream().expect("server end_stream failed");
@@ -320,8 +325,11 @@ pub async fn concurrent_bidirectional_streaming<H, C, E>(
             .await
             .expect("client-side streaming call failed");
 
-        for chunk in cp.chunks(32) {
+        for (i, chunk) in cp.chunks(512).enumerate() {
             encoder.write_bytes(chunk).expect("client write_bytes failed");
+            if i % 8 == 0 {
+                tokio::task::yield_now().await;
+            }
         }
         encoder.flush().expect("client flush failed");
         encoder.end_stream().expect("client end_stream failed");

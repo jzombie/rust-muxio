@@ -245,8 +245,9 @@ Client                          Server
 
 This is exactly what the `concurrent_bidirectional_streaming` integration
 test exercises — it spawns two `tokio::spawn` tasks that write chunks
-in opposite directions simultaneously and validates that both sides
-receive the correct data.
+in opposite directions and **yield between each chunk** so the
+writes are truly interleaved at the application level, not buffered
+and sent in one burst per direction.
 
 ## License
 
