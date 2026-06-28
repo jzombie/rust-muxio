@@ -112,9 +112,9 @@ impl RpcIpcServer {
         });
 
         if let Some(tx_event) = &self.event_tx {
-            let _ = tx_event.send(RpcIpcServerEvent::ClientConnected(RpcIpcConnectionContextHandle(
-                context.clone(),
-            )));
+            let _ = tx_event.send(RpcIpcServerEvent::ClientConnected(
+                RpcIpcConnectionContextHandle(context.clone()),
+            ));
         }
 
         let context_for_reader = context.clone();

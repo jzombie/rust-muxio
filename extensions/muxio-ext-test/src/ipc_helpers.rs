@@ -22,7 +22,10 @@ pub async fn setup_ipc_server(test_name: &str) -> String {
 
 pub async fn setup_ipc_server_with_events(
     test_name: &str,
-) -> (tokio::sync::mpsc::UnboundedReceiver<RpcIpcServerEvent>, String) {
+) -> (
+    tokio::sync::mpsc::UnboundedReceiver<RpcIpcServerEvent>,
+    String,
+) {
     let name = temp_socket_name(test_name);
     let (event_tx, event_rx) = tokio::sync::mpsc::unbounded_channel();
     let server = RpcIpcServer::new(Some(event_tx));
