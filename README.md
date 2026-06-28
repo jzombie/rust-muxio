@@ -374,7 +374,7 @@ A single bidirectional stream would interleave both directions in one channel, c
 Client                          Server
   │                               │
   ├─ call_rpc_streaming ────────► │     stream A open
-  │ ◄──── call_rpc_streaming ──── │     stream B open
+  │ ◄──── call_rpc_streaming ─────│     stream B open
   │ ── chunk A ─────────────────► │
   │ ◄──── chunk B ─────────────── │     interleaved
   │ ── chunk A ─────────────────► │     writes
