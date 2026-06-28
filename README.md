@@ -10,7 +10,7 @@
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="Apache 2.0 License"></a>
 </div>
 
-<p align="center"><strong>Examples:</strong> <a href="#websocket-usage-example">WebSocket RPC</a> · <a href="#ipc-usage-example">IPC RPC</a> · <a href="#wasm-rpc">WASM RPC</a> · <a href="#streaming-rpc-example">Streaming RPC</a></p>
+<p align="center"><strong>Examples:</strong> <a href="#websocket-usage-example">WebSocket RPC</a> · <a href="#ipc-usage-example">IPC RPC</a> · <a href="#wasm-rpc">WASM RPC</a> · <a href="#streaming-rpc-example">Streaming RPC</a></p> <a href="#concurrent-bidirectional-streaming">Bidrectional Streaming</a></p>
 
 # Muxio: A High-Performance Multiplexing and RPC Framework for Rust
 
@@ -365,25 +365,21 @@ async fn server_streaming_example(
 
 ### Concurrent bidirectional streaming
 
-Because each stream is half-duplex, both sides can stream simultaneously
-by opening their own independent streams. The transport multiplexes them
-over a single connection:
+Streams are multiplexed and unidirectional. For bidirectional streaming,
+each side opens its own stream — the second stream costs nothing extra.
 
 ```text
 Client                          Server
   │                               │
-  ├─ call_rpc_streaming ────────► │  (client pushes keystrokes)
-  │                               ├─ call_rpc_streaming ────────► Client  (server pushes terminal output)
+  ├─ call_rpc_streaming ────────► │
+  │                               ├─ call_rpc_streaming ────────► Client
   │ ◄──── chunks + End ────────── │
   │ ◄──── response ────────────── │
   │ ──── chunks + End ──────────► │
   │ ◄──── response ────────────── │
 ```
 
-This is exactly what the `concurrent_bidirectional_streaming` integration
-test exercises — it spawns two `tokio::spawn` tasks that write chunks
-in opposite directions and **yield between each chunk** so the
-writes are truly interleaved at the application level, not buffered
+This is exactly what the [`concurrent_bidirectional_streaming`](./extensions/muxio-ext-test/src/test_suites.rs) integration test exercises it spawns two `tokio::spawn` tasks that write chunks in opposite directions and **yield between each chunk** so the writes are truly interleaved at the application level, not buffered
 and sent in one burst per direction.
 
 ## License
