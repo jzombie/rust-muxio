@@ -850,6 +850,8 @@ name = "muxio"
 version = "0.11.0-alpha"
 dependencies = [
  "bitcode",
+ "example-muxio-rpc-service-definition",
+ "futures",
  "muxio-core",
  "muxio-rpc-service",
  "muxio-rpc-service-caller",
@@ -860,7 +862,9 @@ dependencies = [
  "muxio-tokio-rpc-server",
  "muxio-wasm-rpc-client",
  "rand 0.10.1",
+ "tokio",
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
