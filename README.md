@@ -365,8 +365,9 @@ async fn server_streaming_example(
 
 ### Concurrent bidirectional streaming
 
-Streams are multiplexed and unidirectional. For bidirectional streaming,
-each side opens its own stream — the second stream costs nothing extra.
+Streams are multiplexed over a single connection. Each stream is unidirectional, so bidirectional communication uses two independent streams without a separate connection per direction. 
+
+A single bidirectional stream would interleave both directions in one channel, coupling their backpressure, error handling, and lifecycle; two (or more) unidirectional streams keep each direction isolated and individually cancellable.
 
 ```text
 Client                          Server
