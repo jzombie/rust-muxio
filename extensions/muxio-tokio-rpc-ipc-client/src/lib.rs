@@ -1,5 +1,5 @@
-mod ipc_client;
-pub use ipc_client::IpcClient;
+mod rpc_ipc_client;
+pub use rpc_ipc_client::RpcIpcClient;
 
 // Re-expose for simplicity
 pub use muxio_rpc_service_caller::{

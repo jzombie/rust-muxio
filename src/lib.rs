@@ -14,11 +14,11 @@ pub use muxio_rpc_service_caller as rpc_service_caller;
 #[cfg(feature = "rpc-service-endpoint")]
 pub use muxio_rpc_service_endpoint as rpc_service_endpoint;
 
-#[cfg(feature = "tokio-ipc-client")]
-pub use muxio_tokio_ipc_client as tokio_ipc_client;
+#[cfg(feature = "tokio-rpc-ipc-client")]
+pub use muxio_tokio_rpc_ipc_client as tokio_rpc_ipc_client;
 
-#[cfg(feature = "tokio-ipc-server")]
-pub use muxio_tokio_ipc_server as tokio_ipc_server;
+#[cfg(feature = "tokio-rpc-ipc-server")]
+pub use muxio_tokio_rpc_ipc_server as tokio_rpc_ipc_server;
 
 #[cfg(feature = "tokio-rpc-client")]
 pub use muxio_tokio_rpc_client as tokio_rpc_client;

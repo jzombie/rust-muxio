@@ -22,8 +22,8 @@ tracing-subscriber = { workspace = true, features = ["env-filter"] }
 criterion = { workspace = true, features = ["async_tokio"] }
 doc-comment = { workspace = true }
 futures = { workspace = true }
-muxio-tokio-ipc-client = { workspace = true }
-muxio-tokio-ipc-server = { workspace = true }
+muxio-tokio-rpc-ipc-client = { workspace = true }
+muxio-tokio-rpc-ipc-server = { workspace = true }
 
 [[bench]]
 name = "roundtrip"
