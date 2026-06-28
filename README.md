@@ -39,6 +39,16 @@ On top of this multiplexing layer, Muxio offers a minimal, unopinionated RPC fra
   - **Tokio-based [Server](./extensions/muxio-tokio-rpc-server/)/[Client](./extensions/muxio-tokio-rpc-client/)]**: For native, multi-threaded environments.
   - **[WASM-based Web Client](./extensions/muxio-wasm-rpc-client/)**: For seamless integration into web applications, communicating with a JavaScript host via a simple byte-passing bridge.
 
+## How Muxio Compares
+
+**Minimal framing overhead:** 17 bytes per frame (stream ID, sequence ID, frame kind, timestamp) vs HTTP/2's 9 bytes or gRPC's ~50+ bytes per protobuf message. For high-frequency small messages — keystrokes, mouse events, terminal output chunks — this overhead difference is significant.
+
+**Transport-agnostic core:** The [`RpcServiceCallerInterface`](./extensions/muxio-rpc-service-caller/src/caller_interface.rs) trait abstracts away the transport so the same application code works over WebSocket, Unix domain sockets, or WASM bridges without modification. Not many (if any) other Rust RPC frameworks offer WASM as a first-class transport.
+
+**FFI-friendly byte model:** The core dispatcher receives and emits raw byte slices, making it straightforward to bridge to C, C++, Python, or JavaScript. The included WASM client demonstrates this pattern with `#[wasm_bindgen]`.
+
+**No protobuf dependency:** You choose your serialization — bitcode, bincode, manual encoding, or anything else. The framework handles framing and dispatch; it doesn't mandate a schema format.
+
 ## Core Use Cases & Design Philosophy
 
 Muxio is engineered to solve specific challenges in building modern, distributed systems. Its architecture and features are guided by the following principles:
