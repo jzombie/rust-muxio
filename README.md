@@ -10,7 +10,7 @@
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="Apache 2.0 License"></a>
 </div>
 
-**Examples:** [`WebSocket RPC`](#usage-example) · [`IPC`](#ipc-usage-example) · [`Streaming RPC`](#streaming-rpc-example)
+<p align="center"><strong>Examples:</strong> <a href="#usage-example">WebSocket RPC</a> · <a href="#ipc-usage-example">IPC</a> · <a href="#streaming-rpc-example">Streaming RPC</a></p>
 
 
 
