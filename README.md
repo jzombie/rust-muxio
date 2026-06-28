@@ -8,7 +8,7 @@
   <a href="https://docs.rs/muxio"><img src="https://docs.rs/muxio/badge.svg" alt="Documentation"></a>
   <a href="https://deepwiki.com/jzombie/rust-muxio"><img src="https://deepwiki.com/badge.svg" alt="DeepWiki"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="Apache 2.0 License"></a>
-  <a href="https://coveralls.io/github/jzombie/rust-triplets?branch=main"><img src="https://coveralls.io/repos/github/jzombie/rust-muxio/badge.svg?branch=main" alt="Coverage Status"></a>
+  <a href="https://coveralls.io/github/jzombie/rust-muxio?branch=main"><img src="https://coveralls.io/repos/github/jzombie/rust-muxio/badge.svg?branch=main" alt="Coverage Status"></a>
 </div>
 
 <p align="center"><strong>Examples:</strong> <a href="#websocket-usage-example">WebSocket RPC</a> · <a href="#wasm-websocket-rpc">WASM WebSocket RPC</a> · <a href="#ipc-usage-example">IPC RPC</a> · <a href="#streaming-rpc-example">Streaming RPC</a> · <a href="#concurrent-bidirectional-streaming">Bidrectional Streaming</a></p>
