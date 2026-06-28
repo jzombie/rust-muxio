@@ -53,8 +53,11 @@ On top of this multiplexing layer, Muxio offers a minimal, unopinionated RPC fra
 
 - **No built-in backpressure or flow control.** The write channel between encoder and transport I/O is unbounded by design — switching to a bounded channel without per-stream flow control (like HTTP/2 `WINDOW_UPDATE`) would cause head-of-line blocking. Under sustained producer > consumer load, memory can grow. Real applications should either size their chunks conservatively or implement application-level backpressure.
 - **No service discovery, load balancing, TLS, or auth.** These are left entirely to the user. gRPC and Tonic ship them out of the box.
-- **No formal protocol spec.** The framing format is documented only in the source. Writing interop clients in other languages requires reading the Rust code.
 - **Smaller ecosystem.** Muxio has one primary author. Tonic/gRPC have broad adoption, protobuf tooling, interceptors, and reflection.
+
+**Other Notes:**
+
+Muxio is designed to be compiled into Rust first. Interop with other languages happens through FFI (PyO3 for Python, `#[wasm_bindgen]` for JavaScript, C ABI for other languages) — you embed the Rust core rather than reimplementing the protocol from a spec. This is the same model as `libnghttp2` or `libssl`: the library is consumed as a compiled dependency, not implemented independently.
 
 ## Core Use Cases & Design Philosophy
 
