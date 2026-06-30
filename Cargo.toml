@@ -9,6 +9,10 @@ repository.workspace = true # Inherit from workspace
 license.workspace = true # Inherit from workspace
 publish.workspace = true # Inherit from workspace
 
+# README doc tests are not automatically handled by cargo-udeps
+[package.metadata.cargo-udeps.ignore]
+development = ["example-muxio-rpc-service-definition", "tracing-subscriber"]
+
 [workspace]
 members = [
     ".",
@@ -115,6 +119,3 @@ rand.workspace = true
 tokio = { workspace = true, features = ["full"] }
 tracing.workspace = true
 tracing-subscriber.workspace = true
-
-[package.metadata.cargo-udeps.ignore]
-development = ["example-muxio-rpc-service-definition", "tracing-subscriber"]

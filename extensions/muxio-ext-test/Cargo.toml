@@ -25,4 +25,6 @@ muxio-wasm-rpc-client = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tokio-tungstenite = { workspace = true }
 tracing = { workspace = true }
+
+[dev-dependencies]
 tracing-subscriber = { workspace = true, features = ["fmt"] }
