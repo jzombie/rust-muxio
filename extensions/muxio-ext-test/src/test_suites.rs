@@ -6,13 +6,13 @@ use example_muxio_rpc_service_definition::prebuffered::{Add, Echo, Mult};
 use futures_util::StreamExt;
 use muxio_core::rpc::RpcRequest;
 use muxio_core::rpc::rpc_internals::RpcStreamEvent;
-use muxio_mpsc_adapter::ChannelCallerExt;
 use muxio_rpc_service::error::{RpcServiceError, RpcServiceErrorCode};
 use muxio_rpc_service::prebuffered::RpcMethodPrebuffered;
 use muxio_rpc_service_caller::dynamic_channel::DynamicChannelType;
 use muxio_rpc_service_caller::prebuffered::RpcCallPrebuffered;
 use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
 use muxio_rpc_service_endpoint::RpcServiceEndpointInterface;
+use muxio_tokio_mpsc_adapter::ChannelCallerExt;
 use std::error::Error;
 use std::sync::{Arc, Mutex};
 use tokio::join;
@@ -823,7 +823,7 @@ pub async fn mpsc_adapter_channel_handler_s2c<C, H>(
     C: RpcServiceCallerInterface + Send + Sync + 'static,
     H: RpcServiceCallerInterface + Clone + Send + Sync + 'static,
 {
-    use muxio_mpsc_adapter::ChannelEndpointExt;
+    use muxio_tokio_mpsc_adapter::ChannelEndpointExt;
     use tokio::sync::mpsc;
 
     let (tx, mut rx) = mpsc::unbounded_channel();

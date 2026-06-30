@@ -18,10 +18,10 @@ example-muxio-rpc-service-definition.workspace = true
 futures-util = { workspace = true }
 interprocess = { workspace = true }
 muxio-core = { workspace = true }
-muxio-mpsc-adapter = { workspace = true }
 muxio-rpc-service = { workspace = true }
 muxio-rpc-service-caller = { workspace = true }
 muxio-rpc-service-endpoint = { workspace = true, features = ["tokio_support"] }
+muxio-tokio-mpsc-adapter = { workspace = true }
 muxio-tokio-rpc-client = { workspace = true }
 muxio-tokio-rpc-ipc-client = { workspace = true }
 muxio-tokio-rpc-ipc-server = { workspace = true }
