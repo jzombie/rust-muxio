@@ -1,6 +1,6 @@
 use super::RpcServiceEndpointInterface;
-use muxio_core::rpc::rpc_internals::rpc_trait::{RpcResponseBuffer, RpcResponseWriter};
 use muxio_core::rpc::rpc_internals::RpcStreamEvent;
+use muxio_core::rpc::rpc_internals::rpc_trait::{RpcResponseBuffer, RpcResponseWriter};
 use std::collections::HashMap;
 use std::sync::Mutex as StdMutex;
 use std::{future::Future, marker::PhantomData, pin::Pin, sync::Arc};
