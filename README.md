@@ -176,7 +176,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
         // Connect to the server
-        // Connect to the server
         let rpc_client = RpcClient::new(&server_host.to_string(), server_port).await?;
 
         rpc_client.set_state_change_handler(move |new_state: RpcTransportState| {
