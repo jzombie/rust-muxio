@@ -1,36 +1,166 @@
-name: Rust Lint
+name: rust-lint
 
-on: [push, pull_request]
+permissions:
+    contents: read
+
+on: [pull_request]
+
+# Ensure only one run per branch/PR at a time. If new commits are pushed,
+# older jobs will be automatically canceled.
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
+    udeps:
+        name: udeps
+        runs-on: ubuntu-latest
 
-    steps:
-      - uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@stable
+        steps:
+            - uses: actions/checkout@v6
 
-      - name: Install tools
-        run: |
-          cargo install cargo-deny
-          cargo install cargo-audit
+            - uses: dtolnay/rust-toolchain@nightly
 
-      # Check formatting across the entire workspace
-      - name: Check formatting
-        run: cargo fmt --all -- --check
+            - name: Calculate lockfile hash
+              id: lockfile
+              shell: bash
+              run: |
+                  if command -v sha256sum >/dev/null 2>&1; then
+                    HASH=$(sha256sum Cargo.lock | awk '{print $1}')
+                  elif command -v shasum >/dev/null 2>&1; then
+                    HASH=$(shasum -a 256 Cargo.lock | awk '{print $1}')
+                  else
+                    echo "No hashing utility found"
+                    exit 1
+                  fi
+                  echo "hash=$HASH" >> "$GITHUB_OUTPUT"
 
-      # Run Clippy with all targets and features across workspace
-      - name: Run Clippy
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+            - name: Cache Cargo dependencies
+              uses: actions/cache@v4
+              with:
+                  path: |
+                      ~/.cargo/bin/
+                      ~/.cargo/registry/index/
+                      ~/.cargo/registry/cache/
+                      ~/.cargo/git/db/
+                      target/
+                  key: ${{ runner.os }}-udeps-${{ steps.lockfile.outputs.hash }}
+                  restore-keys: |
+                      ${{ runner.os }}-udeps-
 
-      # Fail if any documentation warnings occur
-      - name: Check documentation
-        run: RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --document-private-items
+            - name: Install cargo-udeps
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  if ! command -v cargo-udeps >/dev/null 2>&1; then
+                    cargo install cargo-udeps --locked
+                  else
+                    echo "cargo-udeps already installed; skipping"
+                  fi
 
-      # Security: cargo-deny across workspace
-      - name: Run cargo-deny
-        run: cargo deny check # Note: Apparently `-- --workspace` is not valid here
+            - name: Check unused dependencies
+              run: cargo udeps --workspace --all-targets --all-features
 
-      # Security: cargo-audit on root Cargo.lock
-      - name: Run cargo-audit
-        run: cargo audit
+    linux-lint-tools:
+        name: lint (linux tools)
+        runs-on: ubuntu-latest
+        needs: udeps
+
+        steps:
+            - uses: actions/checkout@v6
+
+            - uses: dtolnay/rust-toolchain@stable
+
+            # Workaround for macOS error when using `hashFiles`:
+            # "Error: The template is not valid....Fail to hash files under directory"
+            - name: Calculate lockfile hash
+              id: lockfile
+              shell: bash
+              run: |
+                  if command -v sha256sum >/dev/null 2>&1; then
+                    HASH=$(sha256sum Cargo.lock | awk '{print $1}')
+                  elif command -v shasum >/dev/null 2>&1; then
+                    HASH=$(shasum -a 256 Cargo.lock | awk '{print $1}')
+                  else
+                    echo "No hashing utility found"
+                    exit 1
+                  fi
+                  echo "hash=$HASH" >> "$GITHUB_OUTPUT"
+
+            - name: Cache Cargo dependencies
+              uses: actions/cache@v4
+              with:
+                  path: |
+                      ~/.cargo/bin/
+                      ~/.cargo/registry/index/
+                      ~/.cargo/registry/cache/
+                      ~/.cargo/git/db/
+                      target/
+                  key: ${{ runner.os }}-lint-${{ steps.lockfile.outputs.hash }}
+                  restore-keys: |
+                      ${{ runner.os }}-lint-
+
+            # Note: This is a workaround for an issue that just started appearing in lint checks
+            # and I'm not yet sure if it's due to GitHub Actions having updated something behind
+            # the scenes:
+            # error: 'cargo-fmt' is not installed for the toolchain 'stable-x86_64-unknown-linux-gnu'
+            - name: Install rustfmt
+              run: rustup component add rustfmt clippy
+
+            - name: Install cargo-binstall
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  if ! command -v cargo-binstall >/dev/null 2>&1; then
+                    curl -sSfL https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+                  fi
+
+            - name: Install tools
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  cargo binstall --no-confirm --no-symlinks --force cargo-deny cargo-audit cargo-sort \
+                    || cargo install --locked --force cargo-deny cargo-audit cargo-sort
+
+            # Ensure all Cargo.toml files are sorted
+            - name: Check Cargo manifest sorting
+              run: cargo sort --workspace --check
+
+            # Check formatting across the entire workspace
+            - name: Check formatting
+              run: cargo fmt --all -- --check
+
+            # Run Clippy with all targets and features across workspace
+            - name: Run Clippy
+              run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+            # Fail if any documentation warnings occur
+            - name: Check documentation
+              run: RUSTDOCFLAGS="-D warnings" cargo doc --workspace --all-features --no-deps --document-private-items
+
+            # Security: cargo-deny across workspace
+            - name: Run cargo-deny
+              run: cargo deny check # Note: Apparently `-- --workspace` is not valid here
+
+            # Security: cargo-audit on root Cargo.lock
+            - name: Run cargo-audit
+              run: cargo audit
+
+    # Note: This is already handled by the linux-lint-tools job
+    # clippy-linux
+
+    clippy-windows:
+        name: lint (windows runner)
+        runs-on: windows-latest
+        needs: udeps
+
+        steps:
+            - uses: actions/checkout@v6
+
+            - uses: dtolnay/rust-toolchain@stable
+
+            - name: Install rustfmt/clippy
+              run: rustup component add rustfmt clippy
+
+            - name: Run Clippy on Windows runner
+              run: cargo clippy --workspace --all-targets --all-features -- -D warnings

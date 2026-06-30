@@ -203,3 +203,53 @@ macro_rules! transport_state_tests {
 }
 
 // Keep old test_macros module for backwards compat if it exists
+
+/// Generate `#[tokio::test]` functions for streaming handler tests.
+///
+/// Tests:
+/// - `test_streaming_handler_events_arrive` — send chunks, verify events
+/// - `test_streaming_handler_method_not_found` — call unregistered method
+#[macro_export]
+macro_rules! streaming_handler_tests {
+    ($module:ident, $transport:ty) => {
+        mod $module {
+            #[tokio::test]
+            async fn test_streaming_handler_events_arrive() {
+                let (client, _, events) =
+                    <$transport as $crate::test_transport::TestTransport>::connect_for_streaming()
+                        .await;
+                $crate::test_suites::streaming_handler_events_arrive(client.as_ref(), &events)
+                    .await;
+            }
+
+            #[tokio::test]
+            async fn test_streaming_handler_method_not_found() {
+                let (client, _, _) =
+                    <$transport as $crate::test_transport::TestTransport>::connect_for_streaming()
+                        .await;
+                $crate::test_suites::streaming_handler_method_not_found(client.as_ref()).await;
+            }
+        }
+    };
+}
+
+/// Generate `#[tokio::test]` functions for complex concurrent tests.
+///
+/// Tests:
+/// - `test_complex_concurrent_mixed` — multiple streams both directions with
+///   interleaved prebuffered RPC calls
+#[macro_export]
+macro_rules! complex_concurrent_tests {
+    ($module:ident, $transport:ty) => {
+        mod $module {
+            #[tokio::test]
+            async fn test_complex_concurrent_mixed() {
+                let (client, endpoint, handle) =
+                    <$transport as $crate::test_transport::TestTransport>::connect_s2c().await;
+                let label = <$transport as $crate::test_transport::TestTransport>::name();
+                $crate::test_suites::complex_concurrent_mixed(client, &*endpoint, handle, label)
+                    .await;
+            }
+        }
+    };
+}

@@ -3,7 +3,7 @@ use crate::rpc::{
     RpcRequest, RpcResponse,
     rpc_internals::{
         RpcHeader, RpcMessageType, RpcRespondableSession, RpcStreamEncoder, RpcStreamEvent,
-        rpc_trait::{RpcEmit, RpcResponseHandler},
+        rpc_trait::{RpcEmit, RpcResponseHandler, RpcResponseWriter},
     },
 };
 use crate::utils::increment_u32_id;
@@ -70,6 +70,21 @@ impl<'a> RpcDispatcher<'a> {
         instance
     }
 
+    /// Sets a stream method router that maps incoming `(method_id, request_id)`
+    /// pairs to per-request response handlers. When a streaming method is
+    /// detected on a `Header` event, the router installs a dedicated handler
+    /// so that subsequent `PayloadChunk` / `End` events bypass the prebuffered
+    /// catch-all accumulator.
+    ///
+    /// This is used by the endpoint layer to support `register_stream_handler()`.
+    pub fn set_stream_method_router<R>(&mut self, router: R)
+    where
+        R: FnMut(u64, u32) -> Option<Box<dyn FnMut(RpcStreamEvent) + Send + 'a>> + Send + 'a,
+    {
+        self.rpc_respondable_session
+            .set_stream_method_router(router);
+    }
+
     /// Internal helper to register a global response event handler.
     ///
     /// This callback listens for all incoming response stream events and updates
@@ -79,7 +94,7 @@ impl<'a> RpcDispatcher<'a> {
     ///
     /// Behavior:
     /// - On `Header`: pushes a new `RpcRequest` into the queue.
-    /// - On `PayloadChunk`: appends bytes to the matching request’s payload.
+    /// - On `PayloadChunk`: appends bytes to the matching request's payload.
     /// - On `End`: marks the request as finalized.
     ///
     /// ## Thread Safety and Poisoning
@@ -336,6 +351,44 @@ impl<'a> RpcDispatcher<'a> {
         Ok(response_encoder)
     }
 
+    /// Creates a writer closure for a streaming response.
+    ///
+    /// The returned writer sends properly framed response chunks directly
+    /// to the transport via `on_emit`, without buffering.  Call it from
+    /// any thread — the encoder is fully owned by the closure.
+    ///
+    /// `request_id` must match the incoming request's header ID so the
+    /// client can demux the response frames onto the correct stream.
+    pub fn create_response_writer<E>(
+        &mut self,
+        request_id: u32,
+        max_chunk_size: usize,
+        on_emit: E,
+    ) -> Result<RpcResponseWriter, FrameEncodeError>
+    where
+        E: RpcEmit + Send + Sync + Clone + 'static,
+    {
+        let header = RpcHeader {
+            rpc_request_id: request_id,
+            rpc_msg_type: RpcMessageType::Response,
+            rpc_method_id: 0,
+            rpc_metadata_bytes: vec![0], // Success status
+        };
+        let mut encoder =
+            self.rpc_respondable_session
+                .start_reply_stream(header, max_chunk_size, on_emit)?;
+        let writer: RpcResponseWriter = Box::new(move |chunk, is_finalized| {
+            // Ignore write/flush/end errors — a failed response stream
+            // is acceptable; the caller will see the connection drop.
+            let _ = encoder.write_bytes(chunk);
+            let _ = encoder.flush();
+            if is_finalized {
+                let _ = encoder.end_stream();
+            }
+        });
+        Ok(writer)
+    }
+
     /// Feeds incoming byte stream data into the `RpcRespondableSession` for
     /// decoding and stream reassembly. This method should be called whenever
     /// new bytes are received from the transport layer (e.g. socket).
@@ -424,6 +477,11 @@ impl<'a> RpcDispatcher<'a> {
     /// This is a crucial cleanup mechanism to prevent hanging requests when a
     /// transport-level connection is dropped. It ensures that any code awaiting
     /// a response is promptly notified of the failure.
+    ///
+    /// This is one of three layers in the disconnect detection strategy:
+    /// 1. Transport heartbeats (e.g., 5s ping / 15s timeout on WebSocket server)
+    /// 2. `fail_all_pending_requests()` called on every transport disconnect path
+    /// 3. Frame-level Cancel/End processing in the stream decoder
     #[instrument(skip(self))]
     pub fn fail_all_pending_requests(&mut self, error: FrameDecodeError) {
         tracing::error!("Entered. Error: {:?}", error);

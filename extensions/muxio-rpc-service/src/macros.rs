@@ -14,6 +14,11 @@ pub const fn method_id_hash(name: &str) -> u64 {
 /// - **Deterministic** (same on all platforms, including WASM)
 /// - **Statically embeddable** (usable in `const` contexts)
 ///
+/// xxHash3 is collision-resistant for practical use, but if two different strings
+/// produce the same hash, the collision will be caught at runtime by the test
+/// in `muxio_rpc_service::tests::method_ids_are_unique` (or by running
+/// `cargo test --test method_id_collision`).
+///
 /// ## Example
 ///
 /// ```rust,no_run
@@ -32,4 +37,21 @@ macro_rules! rpc_method_id {
         const ID: u64 = $crate::method_id_hash($name);
         ID
     }};
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn rpc_method_ids_are_deterministic() {
+        let a = rpc_method_id!("test.method");
+        let b = rpc_method_id!("test.method");
+        assert_eq!(a, b, "same name must produce same hash");
+    }
+
+    #[test]
+    fn rpc_method_ids_differ_for_distinct_names() {
+        let a = rpc_method_id!("test.method.one");
+        let b = rpc_method_id!("test.method.two");
+        assert_ne!(a, b, "distinct names should not collide");
+    }
 }
