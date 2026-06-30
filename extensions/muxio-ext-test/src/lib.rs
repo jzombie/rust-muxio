@@ -233,6 +233,85 @@ macro_rules! streaming_handler_tests {
     };
 }
 
+/// Generate `#[tokio::test]` functions for mpsc adapter tests.
+///
+/// Tests:
+/// - `test_mpsc_open_channel` — client opens a channel, writes data, reads echoed response
+/// - `test_mpsc_open_channel_method_not_found` — unregistered method doesn't hang
+/// - `test_mpsc_channel_handler_s2c` — server-to-client streaming via channel handler
+#[macro_export]
+macro_rules! mpsc_adapter_tests {
+    ($module:ident, $transport:ty) => {
+        mod $module {
+            use muxio_rpc_service_caller::RpcServiceCallerInterface;
+            use std::sync::Arc;
+
+            #[tokio::test]
+            async fn test_mpsc_open_channel() {
+                let (client, _, _) =
+                    <$transport as $crate::test_transport::TestTransport>::connect_for_streaming()
+                        .await;
+                $crate::test_suites::mpsc_adapter_open_channel(client.as_ref()).await;
+            }
+
+            #[tokio::test]
+            async fn test_mpsc_open_channel_method_not_found() {
+                let (client, _, _) =
+                    <$transport as $crate::test_transport::TestTransport>::connect_for_streaming()
+                        .await;
+                $crate::test_suites::mpsc_adapter_open_channel_method_not_found(client.as_ref())
+                    .await;
+            }
+
+            #[tokio::test]
+            async fn test_mpsc_channel_handler_s2c() {
+                let (client, endpoint, handle) =
+                    <$transport as $crate::test_transport::TestTransport>::connect_s2c().await;
+                $crate::test_suites::mpsc_adapter_channel_handler_s2c(
+                    client.clone(),
+                    &*endpoint,
+                    handle,
+                )
+                .await;
+            }
+        }
+    };
+}
+
+/// Generate `#[tokio::test]` functions for registration conflict tests.
+///
+/// Tests:
+/// - `test_duplicate_prebuffered_rejected` — same method_id twice
+/// - `test_duplicate_streaming_rejected` — same method_id twice
+/// - `test_cross_type_conflict_rejected` — prebuffered then streaming
+#[macro_export]
+macro_rules! registration_conflict_tests {
+    ($module:ident, $transport:ty) => {
+        mod $module {
+            #[tokio::test]
+            async fn test_duplicate_prebuffered_rejected() {
+                let (_, endpoint) =
+                    <$transport as $crate::test_transport::TestTransport>::connect().await;
+                $crate::test_suites::duplicate_prebuffered_rejected(&*endpoint).await;
+            }
+
+            #[tokio::test]
+            async fn test_duplicate_streaming_rejected() {
+                let (_, endpoint) =
+                    <$transport as $crate::test_transport::TestTransport>::connect().await;
+                $crate::test_suites::duplicate_streaming_rejected(&*endpoint).await;
+            }
+
+            #[tokio::test]
+            async fn test_cross_type_conflict_rejected() {
+                let (_, endpoint) =
+                    <$transport as $crate::test_transport::TestTransport>::connect().await;
+                $crate::test_suites::cross_type_conflict_rejected(&*endpoint).await;
+            }
+        }
+    };
+}
+
 /// Generate `#[tokio::test]` functions for complex concurrent tests.
 ///
 /// Tests:

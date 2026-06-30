@@ -36,3 +36,14 @@ Extension crate source files use unprefixed names:
 
 - Free functions: `snake_case` (e.g., `increment_u32_id`, `now`)
 - Methods on RPC types: `snake_case` with `rpc_` prefix where applicable (e.g., `from_rpc_header`)
+
+# Cross-Transport Constraints
+
+All transports (ws, ipc, wasm, etc.) must behave identically. Never special-case or exclude any transport from a test, macro, or feature — if a test or feature doesn't work on a transport, fix the underlying issue rather than gating it out.
+
+Rules:
+- Every test macro invocation in test files must include all three transports: `ws`, `ipc`, `wasm`
+- Never add `#[cfg(not(target_arch = "wasm32"))]` or any transport-excluding conditional compilation
+- Never implement a `TestTransport` method as a no-op or panic for a specific transport
+- If a transport lacks a capability (e.g., WASM `read_bytes` skipping streaming handler routing), fix the transport — do not gate the test
+- If a capability cannot be implemented on a transport (extremely rare, e.g. Unix-specific), the macro must still invoke that transport and the test body must be a compile-time or runtime assertion explaining why

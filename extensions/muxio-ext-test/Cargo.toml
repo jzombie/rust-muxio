@@ -21,6 +21,7 @@ muxio-core = { workspace = true }
 muxio-rpc-service = { workspace = true }
 muxio-rpc-service-caller = { workspace = true }
 muxio-rpc-service-endpoint = { workspace = true, features = ["tokio_support"] }
+muxio-tokio-mpsc-adapter = { workspace = true }
 muxio-tokio-rpc-client = { workspace = true }
 muxio-tokio-rpc-ipc-client = { workspace = true }
 muxio-tokio-rpc-ipc-server = { workspace = true }
