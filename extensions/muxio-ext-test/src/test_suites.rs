@@ -862,6 +862,80 @@ pub async fn mpsc_adapter_channel_handler_s2c<C, H>(
     );
 }
 
+// ------------------------------------------------------------------
+// registration conflict test bodies
+// ------------------------------------------------------------------
+
+pub async fn duplicate_prebuffered_rejected(
+    endpoint: &impl muxio_rpc_service_endpoint::RpcServiceEndpointInterface<()>,
+) {
+    use muxio_rpc_service_endpoint::error::RpcServiceEndpointError;
+
+    const METHOD_ID: u64 = 999_001;
+    let handler = |_request_bytes: Vec<u8>, _ctx| async {
+        Ok::<_, Box<dyn std::error::Error + Send + Sync>>(vec![])
+    };
+
+    let r1 = endpoint.register_prebuffered(METHOD_ID, handler).await;
+    assert!(r1.is_ok(), "first prebuffered registration should succeed");
+
+    let r2 = endpoint.register_prebuffered(METHOD_ID, handler).await;
+    assert!(
+        matches!(r2, Err(RpcServiceEndpointError::Handler(_))),
+        "duplicate prebuffered registration should be rejected: got {:?}",
+        r2
+    );
+}
+
+pub async fn duplicate_streaming_rejected(
+    endpoint: &impl muxio_rpc_service_endpoint::RpcServiceEndpointInterface<()>,
+) {
+    use muxio_rpc_service_endpoint::error::RpcServiceEndpointError;
+
+    const METHOD_ID: u64 = 999_002;
+    let handler = |_event: muxio_core::rpc::rpc_internals::RpcStreamEvent,
+                   _respond: muxio_rpc_service_endpoint::StreamResponder,
+                   _ctx| {};
+
+    let r1 = endpoint.register_stream_handler(METHOD_ID, handler).await;
+    assert!(r1.is_ok(), "first streaming registration should succeed");
+
+    let r2 = endpoint.register_stream_handler(METHOD_ID, handler).await;
+    assert!(
+        matches!(r2, Err(RpcServiceEndpointError::Handler(_))),
+        "duplicate streaming registration should be rejected: got {:?}",
+        r2
+    );
+}
+
+pub async fn cross_type_conflict_rejected(
+    endpoint: &impl muxio_rpc_service_endpoint::RpcServiceEndpointInterface<()>,
+) {
+    use muxio_rpc_service_endpoint::error::RpcServiceEndpointError;
+
+    const METHOD_ID: u64 = 999_003;
+
+    // prebuffered first, then streaming — should fail
+    let r1 = endpoint
+        .register_prebuffered(METHOD_ID, |_request_bytes: Vec<u8>, _ctx| async {
+            Ok::<_, Box<dyn std::error::Error + Send + Sync>>(vec![])
+        })
+        .await;
+    assert!(
+        r1.is_ok(),
+        "first (prebuffered) registration should succeed"
+    );
+
+    let r2 = endpoint
+        .register_stream_handler(METHOD_ID, |_event, _respond, _ctx| {})
+        .await;
+    assert!(
+        matches!(r2, Err(RpcServiceEndpointError::Handler(_))),
+        "streaming registration should be rejected after prebuffered: got {:?}",
+        r2
+    );
+}
+
 #[cfg(test)]
 mod method_id_uniqueness_tests {
     use example_muxio_rpc_service_definition::RpcMethodPrebuffered;
