@@ -877,6 +877,7 @@ dependencies = [
  "futures-util",
  "interprocess",
  "muxio-core",
+ "muxio-mpsc-adapter",
  "muxio-rpc-service",
  "muxio-rpc-service-caller",
  "muxio-rpc-service-endpoint",
@@ -889,6 +890,19 @@ dependencies = [
  "tokio-tungstenite",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "muxio-mpsc-adapter"
+version = "0.12.0-alpha"
+dependencies = [
+ "async-trait",
+ "muxio-core",
+ "muxio-rpc-service",
+ "muxio-rpc-service-caller",
+ "muxio-rpc-service-endpoint",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

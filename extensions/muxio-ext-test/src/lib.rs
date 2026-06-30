@@ -233,6 +233,51 @@ macro_rules! streaming_handler_tests {
     };
 }
 
+/// Generate `#[tokio::test]` functions for mpsc adapter tests.
+///
+/// Tests:
+/// - `test_mpsc_open_channel` — client opens a channel, writes data, reads echoed response
+/// - `test_mpsc_open_channel_method_not_found` — unregistered method doesn't hang
+/// - `test_mpsc_channel_handler_s2c` — server-to-client streaming via channel handler
+#[macro_export]
+macro_rules! mpsc_adapter_tests {
+    ($module:ident, $transport:ty) => {
+        mod $module {
+            use muxio_rpc_service_caller::RpcServiceCallerInterface;
+            use std::sync::Arc;
+
+            #[tokio::test]
+            async fn test_mpsc_open_channel() {
+                let (client, _, _) =
+                    <$transport as $crate::test_transport::TestTransport>::connect_for_streaming()
+                        .await;
+                $crate::test_suites::mpsc_adapter_open_channel(client.as_ref()).await;
+            }
+
+            #[tokio::test]
+            async fn test_mpsc_open_channel_method_not_found() {
+                let (client, _, _) =
+                    <$transport as $crate::test_transport::TestTransport>::connect_for_streaming()
+                        .await;
+                $crate::test_suites::mpsc_adapter_open_channel_method_not_found(client.as_ref())
+                    .await;
+            }
+
+            #[tokio::test]
+            async fn test_mpsc_channel_handler_s2c() {
+                let (client, endpoint, handle) =
+                    <$transport as $crate::test_transport::TestTransport>::connect_s2c().await;
+                $crate::test_suites::mpsc_adapter_channel_handler_s2c(
+                    client.clone(),
+                    &*endpoint,
+                    handle,
+                )
+                .await;
+            }
+        }
+    };
+}
+
 /// Generate `#[tokio::test]` functions for complex concurrent tests.
 ///
 /// Tests:

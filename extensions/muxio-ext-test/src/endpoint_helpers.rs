@@ -10,6 +10,9 @@ use std::sync::{Arc, Mutex};
 /// Generated via `rpc_method_id!` hash, same mechanism as every real service definition.
 pub const STREAMING_CAPTURE_METHOD_ID: u64 = rpc_method_id!("streaming.capture");
 
+/// Stable method ID used for mpsc channel handler tests.
+pub const MPSC_CHANNEL_METHOD_ID: u64 = rpc_method_id!("mpsc.channel.test");
+
 /// Shared method ID for error-handler tests across all transports.
 pub const ERROR_TEST_METHOD_ID: u64 = rpc_method_id!("__test.error");
 
