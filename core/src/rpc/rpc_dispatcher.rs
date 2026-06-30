@@ -379,11 +379,11 @@ impl<'a> RpcDispatcher<'a> {
             on_emit,
         )?;
         let writer: Box<dyn FnMut(&[u8], bool) + Send> = Box::new(move |chunk, is_finalized| {
-            // Ignore write/end errors — a failed response stream
+            // Ignore write/flush/end errors — a failed response stream
             // is acceptable; the caller will see the connection drop.
             let _ = encoder.write_bytes(chunk);
+            let _ = encoder.flush();
             if is_finalized {
-                let _ = encoder.flush();
                 let _ = encoder.end_stream();
             }
         });
