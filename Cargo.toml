@@ -19,9 +19,9 @@ members = [
     "extensions/muxio-rpc-service",
     "extensions/muxio-rpc-service-caller",
     "extensions/muxio-rpc-service-endpoint",
+    "extensions/muxio-tokio-rpc-client",
     "extensions/muxio-tokio-rpc-ipc-client",
     "extensions/muxio-tokio-rpc-ipc-server",
-    "extensions/muxio-tokio-rpc-client",
     "extensions/muxio-tokio-rpc-server",
     "extensions/muxio-wasm-rpc-client",
 ]
@@ -52,9 +52,9 @@ muxio-core = { path = "core", version = "0.11.1-alpha" }
 muxio-rpc-service = { path = "extensions/muxio-rpc-service", version = "0.11.1-alpha" }
 muxio-rpc-service-caller = { path = "extensions/muxio-rpc-service-caller", version = "0.11.1-alpha" }
 muxio-rpc-service-endpoint = { path = "extensions/muxio-rpc-service-endpoint", version = "0.11.1-alpha" }
+muxio-tokio-rpc-client = { path = "extensions/muxio-tokio-rpc-client", version = "0.11.1-alpha" }
 muxio-tokio-rpc-ipc-client = { path = "extensions/muxio-tokio-rpc-ipc-client", version = "0.11.1-alpha" }
 muxio-tokio-rpc-ipc-server = { path = "extensions/muxio-tokio-rpc-ipc-server", version = "0.11.1-alpha" }
-muxio-tokio-rpc-client = { path = "extensions/muxio-tokio-rpc-client", version = "0.11.1-alpha" }
 muxio-tokio-rpc-server = { path = "extensions/muxio-tokio-rpc-server", version = "0.11.1-alpha" }
 muxio-wasm-rpc-client = { path = "extensions/muxio-wasm-rpc-client", version = "0.11.1-alpha" }
 num_enum = "0.7.6"
@@ -94,9 +94,9 @@ muxio-core = { workspace = true }
 muxio-rpc-service = { workspace = true, optional = true }
 muxio-rpc-service-caller = { workspace = true, optional = true }
 muxio-rpc-service-endpoint = { workspace = true, optional = true }
+muxio-tokio-rpc-client = { workspace = true, optional = true }
 muxio-tokio-rpc-ipc-client = { workspace = true, optional = true }
 muxio-tokio-rpc-ipc-server = { workspace = true, optional = true }
-muxio-tokio-rpc-client = { workspace = true, optional = true }
 muxio-tokio-rpc-server = { workspace = true, optional = true }
 muxio-wasm-rpc-client = { workspace = true, optional = true }
 
@@ -104,11 +104,12 @@ muxio-wasm-rpc-client = { workspace = true, optional = true }
 bitcode = { workspace = true }
 example-muxio-rpc-service-definition = { workspace = true }
 futures = { workspace = true }
+muxio-rpc-service = { workspace = true }
 muxio-rpc-service-caller = { workspace = true }
 muxio-rpc-service-endpoint = { workspace = true }
+muxio-tokio-rpc-client = { workspace = true }
 muxio-tokio-rpc-ipc-client = { workspace = true }
 muxio-tokio-rpc-ipc-server = { workspace = true }
-muxio-tokio-rpc-client = { workspace = true }
 muxio-tokio-rpc-server = { workspace = true }
 rand.workspace = true
 tokio = { workspace = true, features = ["full"] }
