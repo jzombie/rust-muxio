@@ -84,8 +84,8 @@ impl TestTransport for RpcIpcClient {
         let socket_name = temp_name("s2c");
         let (event_tx, mut event_rx) = tokio::sync::mpsc::unbounded_channel();
         let server = RpcIpcServer::new(Some(event_tx));
-        // Register Echo on the server endpoint so client-initiated calls work
-        endpoint_helpers::register_echo_handler(&*server.endpoint()).await;
+        // Register standard handlers on the server endpoint so client-initiated calls work
+        endpoint_helpers::register_standard_handlers(&*server.endpoint()).await;
         let name = socket_name.clone();
         tokio::spawn(async move {
             let _ = server.serve(&name).await;

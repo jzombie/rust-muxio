@@ -85,8 +85,8 @@ impl TestTransport for RpcWasmClient {
         let server_url = format!("ws://{addr}/ws");
         let (event_tx, mut event_rx) = tokio::sync::mpsc::unbounded_channel();
         let server = Arc::new(RpcServer::new(Some(event_tx)));
-        // Register Echo on the server endpoint so client-initiated calls work
-        endpoint_helpers::register_echo_handler(&*server.endpoint()).await;
+        // Register standard handlers on the server endpoint so client-initiated calls work
+        endpoint_helpers::register_standard_handlers(&*server.endpoint()).await;
         let server_clone = server.clone();
         tokio::spawn(async move {
             let _ = server_clone.serve_with_listener(listener).await;

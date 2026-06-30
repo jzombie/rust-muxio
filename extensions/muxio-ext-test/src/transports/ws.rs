@@ -87,8 +87,8 @@ impl TestTransport for RpcClient {
         Self::S2cHandle,
     ) {
         let (server, mut event_rx, host, port) = ws_helpers::setup_ws_server_with_events().await;
-        // Register Echo on the server endpoint so client-initiated calls work
-        endpoint_helpers::register_echo_handler(&*server.endpoint()).await;
+        // Register standard handlers on the server endpoint so client-initiated calls work
+        endpoint_helpers::register_standard_handlers(&*server.endpoint()).await;
         let client = ws_helpers::connect_ws_client(&host, port).await;
         let endpoint = client.get_endpoint();
 
