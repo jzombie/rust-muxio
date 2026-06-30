@@ -34,5 +34,4 @@ pub trait TestTransport: Sized {
         Arc<RpcServiceEndpoint<()>>,
         Arc<Mutex<Vec<RpcStreamEvent>>>,
     );
-
 }

@@ -882,5 +882,8 @@ pub async fn mpsc_adapter_channel_handler_s2c<C, H>(
         received.extend_from_slice(&chunk);
     }
 
-    assert_eq!(received, payload, "Channel handler received mismatched payload");
+    assert_eq!(
+        received, payload,
+        "Channel handler received mismatched payload"
+    );
 }

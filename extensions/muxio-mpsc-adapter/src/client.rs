@@ -7,10 +7,7 @@ use muxio_core::rpc::{
         rpc_trait::{RpcEmit, RpcResponseHandler},
     },
 };
-use muxio_rpc_service::{
-    error::RpcServiceError,
-    constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE,
-};
+use muxio_rpc_service::{constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE, error::RpcServiceError};
 use muxio_rpc_service_caller::RpcServiceCallerInterface;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
@@ -105,14 +102,12 @@ pub trait ChannelCallerExt: RpcServiceCallerInterface {
                 Some(recv_fn),
                 false,
             )
-            .map_err(|e| {
-                RpcServiceError::Transport(std::io::Error::other(format!("{e:?}")))
-            })?;
+            .map_err(|e| RpcServiceError::Transport(std::io::Error::other(format!("{e:?}"))))?;
 
         // Flush the header immediately so the remote sees the call start
-        encoder.flush().map_err(|e| {
-            RpcServiceError::Transport(std::io::Error::other(format!("{e:?}")))
-        })?;
+        encoder
+            .flush()
+            .map_err(|e| RpcServiceError::Transport(std::io::Error::other(format!("{e:?}"))))?;
 
         drop(dispatcher);
 

@@ -2,8 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use muxio_core::rpc::rpc_internals::RpcStreamEvent;
 use muxio_rpc_service_endpoint::{
-    RpcServiceEndpointInterface, StreamResponder,
-    error::RpcServiceEndpointError,
+    RpcServiceEndpointInterface, StreamResponder, error::RpcServiceEndpointError,
 };
 use tokio::sync::mpsc;
 
@@ -57,23 +56,26 @@ where
         S: MpscSender,
     {
         let tx = Arc::new(Mutex::new(Some(tx)));
-        self.register_stream_handler(method_id, move |event, _responder: StreamResponder, _ctx: C| {
-            let mut guard = match tx.lock() {
-                Ok(g) => g,
-                Err(_) => return,
-            };
-            match event {
-                RpcStreamEvent::PayloadChunk { bytes, .. } => {
-                    if let Some(ref inner) = *guard {
-                        inner.try_send_bytes(bytes);
+        self.register_stream_handler(
+            method_id,
+            move |event, _responder: StreamResponder, _ctx: C| {
+                let mut guard = match tx.lock() {
+                    Ok(g) => g,
+                    Err(_) => return,
+                };
+                match event {
+                    RpcStreamEvent::PayloadChunk { bytes, .. } => {
+                        if let Some(ref inner) = *guard {
+                            inner.try_send_bytes(bytes);
+                        }
                     }
+                    RpcStreamEvent::End { .. } | RpcStreamEvent::Error { .. } => {
+                        *guard = None;
+                    }
+                    _ => {}
                 }
-                RpcStreamEvent::End { .. } | RpcStreamEvent::Error { .. } => {
-                    *guard = None;
-                }
-                _ => {}
-            }
-        })
+            },
+        )
         .await
     }
 }
