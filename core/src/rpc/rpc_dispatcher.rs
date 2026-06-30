@@ -3,15 +3,13 @@ use crate::rpc::{
     RpcRequest, RpcResponse,
     rpc_internals::{
         RpcHeader, RpcMessageType, RpcRespondableSession, RpcStreamEncoder, RpcStreamEvent,
-        rpc_trait::{RpcEmit, RpcResponseHandler},
+        rpc_trait::{RpcEmit, RpcResponseHandler, RpcResponseWriter},
     },
 };
 use crate::utils::increment_u32_id;
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use tracing::{self, instrument};
-
-type ResponseWriter = Box<dyn FnMut(&[u8], bool) + Send>;
 
 impl<'a> Default for RpcDispatcher<'a> {
     fn default() -> Self {
@@ -366,7 +364,7 @@ impl<'a> RpcDispatcher<'a> {
         request_id: u32,
         max_chunk_size: usize,
         on_emit: E,
-    ) -> Result<ResponseWriter, FrameEncodeError>
+    ) -> Result<RpcResponseWriter, FrameEncodeError>
     where
         E: RpcEmit + Send + Sync + Clone + 'static,
     {
@@ -379,7 +377,7 @@ impl<'a> RpcDispatcher<'a> {
         let mut encoder =
             self.rpc_respondable_session
                 .start_reply_stream(header, max_chunk_size, on_emit)?;
-        let writer: ResponseWriter = Box::new(move |chunk, is_finalized| {
+        let writer: RpcResponseWriter = Box::new(move |chunk, is_finalized| {
             // Ignore write/flush/end errors — a failed response stream
             // is acceptable; the caller will see the connection drop.
             let _ = encoder.write_bytes(chunk);

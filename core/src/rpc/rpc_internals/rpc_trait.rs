@@ -1,5 +1,26 @@
 use super::RpcStreamEvent;
 use crate::frame::FrameDecodeError;
+use std::sync::Arc;
+
+/// Type alias for a response writer closure that sends framed chunks.
+///
+/// The closure receives `(chunk_bytes, is_finalized)`. When `is_finalized` is
+/// `true`, the stream is ended after writing the chunk.
+pub type RpcResponseWriter = Box<dyn FnMut(&[u8], bool) + Send>;
+
+/// Thread-safe buffer for queuing response chunks before a writer is available.
+///
+/// Each entry is `(chunk_bytes, is_finalized)`. Used by `StreamResponder` to
+/// buffer writes that occur before `read_bytes` installs the real encoder-backed writer.
+pub type RpcResponseBuffer = Arc<std::sync::Mutex<Vec<(Vec<u8>, bool)>>>;
+
+/// Type alias for a streaming method router closure.
+///
+/// Maps `(method_id, request_id)` to an optional per-request response handler.
+/// When a handler is returned, it is registered for that stream and subsequent
+/// events bypass the catch-all accumulator.
+pub type RpcStreamMethodRouter<'a> =
+    Box<dyn FnMut(u64, u32) -> Option<Box<dyn FnMut(RpcStreamEvent) + Send + 'a>> + Send + 'a>;
 
 /// Trait alias for any mutable function or closure that emits a byte slice.
 ///

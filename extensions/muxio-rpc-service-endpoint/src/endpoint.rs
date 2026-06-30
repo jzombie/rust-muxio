@@ -1,11 +1,9 @@
 use super::RpcServiceEndpointInterface;
+use muxio_core::rpc::rpc_internals::rpc_trait::{RpcResponseBuffer, RpcResponseWriter};
 use muxio_core::rpc::rpc_internals::RpcStreamEvent;
 use std::collections::HashMap;
 use std::sync::Mutex as StdMutex;
 use std::{future::Future, marker::PhantomData, pin::Pin, sync::Arc};
-
-type ResponseWriter = Box<dyn FnMut(&[u8], bool) + Send>;
-type ResponseBuffer = Arc<StdMutex<Vec<(Vec<u8>, bool)>>>;
 
 // --- Conditionally Alias the Mutex Implementation ---
 #[cfg(not(feature = "tokio_support"))]
@@ -34,8 +32,8 @@ pub type RpcPrebufferedHandler<C> = Arc<
 #[derive(Clone)]
 pub struct StreamResponder {
     pub(crate) request_id: u32,
-    writer: Arc<StdMutex<Option<ResponseWriter>>>,
-    buffer: ResponseBuffer,
+    writer: Arc<StdMutex<Option<RpcResponseWriter>>>,
+    buffer: RpcResponseBuffer,
 }
 
 impl StreamResponder {
@@ -66,7 +64,7 @@ impl StreamResponder {
         }
     }
 
-    pub(crate) fn set_writer(&self, writer: ResponseWriter) {
+    pub(crate) fn set_writer(&self, writer: RpcResponseWriter) {
         let mut guard = self
             .writer
             .lock()

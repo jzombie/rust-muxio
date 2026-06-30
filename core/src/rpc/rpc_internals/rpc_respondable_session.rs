@@ -1,12 +1,9 @@
 use crate::frame::{FrameDecodeError, FrameEncodeError};
 use crate::rpc::rpc_internals::{
     RpcHeader, RpcSession, RpcStreamEncoder, RpcStreamEvent,
-    rpc_trait::{RpcEmit, RpcResponseHandler},
+    rpc_trait::{RpcEmit, RpcResponseHandler, RpcStreamMethodRouter},
 };
 use std::collections::HashMap;
-
-type StreamMethodRouter<'a> =
-    Box<dyn FnMut(u64, u32) -> Option<Box<dyn FnMut(RpcStreamEvent) + Send + 'a>> + Send + 'a>;
 
 impl<'a> Default for RpcRespondableSession<'a> {
     fn default() -> Self {
@@ -32,7 +29,7 @@ pub struct RpcRespondableSession<'a> {
     /// When set, it is consulted on each `Header` event. If it returns a handler,
     /// the handler is registered for that stream, bypassing the catch-all accumulator.
     /// This enables streaming handler dispatch on the endpoint side.
-    stream_method_router: Option<StreamMethodRouter<'a>>,
+    stream_method_router: Option<RpcStreamMethodRouter<'a>>,
 }
 
 impl<'a> RpcRespondableSession<'a> {
