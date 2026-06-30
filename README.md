@@ -349,11 +349,7 @@ async fn streaming_example(rpc_client: &RpcClient) -> Result<(), Box<dyn std::er
 
 ### Handling streaming requests on the server
 
-Streaming handlers are registered via `register_stream_handler()` and receive
-individual `RpcStreamEvent`s as they arrive from the transport. Unlike
-prebuffered handlers (which accumulate the entire request into a `Vec<u8>`
-before invoking the handler), streaming handlers are called synchronously
-for each event:
+Streaming handlers are registered via `register_stream_handler()` and receive individual `RpcStreamEvent`s as they arrive from the transport. Unlike prebuffered handlers (which accumulate the entire request into a `Vec<u8>` before invoking the handler), streaming handlers are called synchronously for each event:
 
 ```rust
 use muxio_core::rpc::rpc_internals::RpcStreamEvent;
@@ -396,38 +392,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 The streaming API is intentionally asymmetric between the two roles:
 
-- **Client side** (`call_rpc_streaming`): The client initiates a stream, writes chunks via an
-  `RpcStreamEncoder`, and reads the response via a `DynamicReceiver` (which implements `Stream`).
-  This is the producer/consumer pattern — the caller produces request data and consumes the response.
+- **Client side** (`call_rpc_streaming`): The client initiates a stream, writes chunks via an `RpcStreamEncoder`, and reads the response via a `DynamicReceiver` (which implements `Stream`). This is the producer/consumer pattern — the caller produces request data and consumes the response.
 
 - **Server side** (`register_stream_handler`): The server registers a handler that is invoked
-  synchronously for each `RpcStreamEvent` as it arrives. The handler receives a `StreamResponder`
-  for sending response chunks back. This is the event-driven pattern — the server reacts to
-  stream events rather than driving the stream.
+  synchronously for each `RpcStreamEvent` as it arrives. The handler receives a `StreamResponder` for sending response chunks back. This is the event-driven pattern — the server reacts to stream events rather than driving the stream.
 
-The asymmetry is inherent to the request-reply model: one side initiates (client), the other
-handles (server). The same `RpcServiceCallerInterface` trait powers client-style calls from
-*any* context, including server-side code that wants to push data to connected clients (see
-"server-initiated calls" below).
+The asymmetry is inherent to the request-reply model: one side initiates (client), the other handles (server). The same `RpcServiceCallerInterface` trait powers client-style calls from *any* context, including server-side code that wants to push data to connected clients (see "server-initiated calls" below).
 
 ### Disconnect Detection
 
 Streaming RPC calls detect remote disconnection through three layers:
 
-1. **Transport heartbeats**: The transport sends periodic pings (default 5s interval on the
-   WebSocket server) and closes the connection if no response arrives within the timeout (15s).
+1. **Transport heartbeats**: The transport sends periodic pings (default 5s interval on the WebSocket server) and closes the connection if no response arrives within the timeout (15s).
 
-2. **`fail_all_pending_requests()`**: When any transport detects a disconnect, it calls this
-   method on the dispatcher, which fails all pending response handlers. Any
-   `receiver.next().await` in application code will return `None` or `Err(...)`.
+2. **`fail_all_pending_requests()`**: When any transport detects a disconnect, it calls this method on the dispatcher, which fails all pending response handlers. Any    `receiver.next().await` in application code will return `None` or `Err(...)`.
 
-3. **Frame-level signaling**: Individual `Cancel` and `End` frames are processed by the
-   stream decoder. Corrupt or invalid frames produce `RpcStreamEvent::Error`, which propagates
-   as a transport error to the caller.
+3. **Frame-level signaling**: Individual `Cancel` and `End` frames are processed by the  stream decoder. Corrupt or invalid frames produce `RpcStreamEvent::Error`, which propagates as a transport error to the caller.
 
-Applications should handle stream termination by checking the `Result` from
-`receiver.next().await` and treating `None` (stream ended) or `Err(...)` as signals
-that the remote peer is gone.
+Applications should handle stream termination by checking the `Result` from receiver.next().await` and treating `None` (stream ended) or `Err(...)` as signals that the remote peer is gone. 
 
 ### Streaming from the server to the client (server-initiated calls)
 
