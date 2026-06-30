@@ -1,6 +1,7 @@
 use super::RpcServiceEndpointInterface;
-use muxio_core::rpc::rpc_internals::{RpcStreamEvent, rpc_trait::RpcEmit};
+use muxio_core::rpc::rpc_internals::RpcStreamEvent;
 use std::collections::HashMap;
+use std::sync::Mutex as StdMutex;
 use std::{future::Future, marker::PhantomData, pin::Pin, sync::Arc};
 
 // --- Conditionally Alias the Mutex Implementation ---
@@ -23,16 +24,43 @@ pub type RpcPrebufferedHandler<C> = Arc<
         + Sync,
 >;
 
+/// Handle for sending properly framed response chunks back to the caller
+/// from within a streaming handler.  Calls to [`respond`] are buffered and
+/// flushed through the dispatcher after each `read_bytes` cycle.
+#[derive(Clone)]
+pub struct StreamResponder {
+    request_id: u32,
+    buffer: Arc<StdMutex<Vec<PendingResponse>>>,
+}
+
+#[derive(Clone)]
+pub(crate) struct PendingResponse {
+    pub request_id: u32,
+    pub chunk: Vec<u8>,
+    pub is_finalized: bool,
+}
+
+impl StreamResponder {
+    pub(crate) fn new(request_id: u32, buffer: Arc<StdMutex<Vec<PendingResponse>>>) -> Self {
+        Self { request_id, buffer }
+    }
+
+    /// Queue a response chunk.  Call with `is_finalized: true` on the
+    /// last chunk to signal the end of the response stream.
+    pub fn respond(&self, chunk: Vec<u8>, is_finalized: bool) {
+        self.buffer.lock().unwrap().push(PendingResponse {
+            request_id: self.request_id,
+            chunk,
+            is_finalized,
+        });
+    }
+}
+
 /// A streaming RPC handler receives individual [`RpcStreamEvent`]s as they
-/// arrive from the transport, along with an emit function for sending response
-/// chunks back to the caller and the connection context.
-///
-/// Unlike a prebuffered handler (which accumulates the entire request before
-/// invoking the handler), a streaming handler is called synchronously for each
-/// event — `Header`, `PayloadChunk`, `End`, and `Error`. The emit function
-/// should be used to stream response chunks back.
+/// arrive from the transport, along with a [`StreamResponder`] for sending
+/// properly framed response chunks back to the caller.
 pub type RpcStreamHandler<C> = Arc<
-    dyn Fn(RpcStreamEvent, Box<dyn RpcEmit + Send + Sync>, C) + Send + Sync,
+    dyn Fn(RpcStreamEvent, StreamResponder, C) + Send + Sync,
 >;
 
 /// A concrete RPC service endpoint, generic over a context type `C`.

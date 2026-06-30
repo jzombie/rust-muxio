@@ -113,8 +113,17 @@ impl TestTransport for RpcClient {
         server_endpoint
             .register_stream_handler(
                 endpoint_helpers::STREAMING_CAPTURE_METHOD_ID,
-                move |event, _emit, _ctx| {
-                    captured.lock().unwrap().push(event);
+                move |event, respond, _ctx| {
+                    captured.lock().unwrap().push(event.clone());
+                    match &event {
+                        RpcStreamEvent::PayloadChunk { bytes, .. } => {
+                            respond.respond(bytes.clone(), false);
+                        }
+                        RpcStreamEvent::End { .. } => {
+                            respond.respond(Vec::new(), true);
+                        }
+                        _ => {}
+                    }
                 },
             )
             .await

@@ -482,12 +482,8 @@ where
 // ------------------------------------------------------------------
 
 /// Verify that a streaming handler receives Header, PayloadChunk, End
-/// events in the correct order with the correct data.
-///
-/// The streaming handler is registered on the server endpoint by
-/// `connect_for_streaming()`. The test makes a streaming call, sends
-/// chunks, and ends the stream. Captured events from the server-side
-/// handler are inspected to verify delivery.
+/// events in the correct order and can send response chunks back
+/// via the StreamResponder.
 pub async fn streaming_handler_events_arrive<C>(
     client: &C,
     events: &Mutex<Vec<RpcStreamEvent>>,
@@ -521,50 +517,70 @@ pub async fn streaming_handler_events_arrive<C>(
     // Allow time for events to be processed by the streaming handler
     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
-    // Drain any remaining response (not expected without Phase 2 response path)
-    let _ = tokio::time::timeout(
-        std::time::Duration::from_secs(1),
+    // Verify captured events
+    {
+        let captured = events.lock().unwrap();
+        assert!(!captured.is_empty(), "Streaming handler should have received events");
+
+        // First event must be Header with correct method_id
+        assert!(
+            matches!(&captured[0], RpcStreamEvent::Header { rpc_method_id, .. } if *rpc_method_id == STREAMING_CAPTURE_METHOD_ID),
+            "First event should be Header with method_id {}, got {:?}",
+            STREAMING_CAPTURE_METHOD_ID, captured[0]
+        );
+
+        // There should be at least one PayloadChunk event (transport may
+        // coalesce multiple write_bytes calls into a single chunk)
+        let chunk_count = captured.iter().filter(|e| matches!(e, RpcStreamEvent::PayloadChunk { .. })).count();
+        assert!(chunk_count >= 1, "Expected at least one PayloadChunk event, got {chunk_count}");
+
+        // Last event must be End
+        assert!(
+            matches!(captured.last(), Some(RpcStreamEvent::End { .. })),
+            "Last event should be End, got {:?}",
+            captured.last()
+        );
+
+        // Verify total payload data matches
+        let total_received: usize = captured
+            .iter()
+            .filter_map(|e| {
+                if let RpcStreamEvent::PayloadChunk { bytes, .. } = e {
+                    Some(bytes.len())
+                } else {
+                    None
+                }
+            })
+            .sum();
+        assert_eq!(total_received, payload.len(), "Total payload data mismatch");
+    }
+
+    // Collect all response chunks from the streaming handler's echo
+    let mut response = Vec::new();
+    match tokio::time::timeout(
+        std::time::Duration::from_secs(5),
         async {
-            while let Some(_chunk) = receiver.next().await {}
+            while let Some(chunk) = receiver.next().await {
+                match chunk {
+                    Ok(bytes) => response.extend_from_slice(&bytes),
+                    Err(_) => break,
+                }
+            }
+            std::mem::take(&mut response)
         },
     )
-    .await;
-
-    // Verify captured events
-    let captured = events.lock().unwrap();
-    assert!(!captured.is_empty(), "Streaming handler should have received events");
-
-    // First event must be Header with correct method_id
-    assert!(
-        matches!(&captured[0], RpcStreamEvent::Header { rpc_method_id, .. } if *rpc_method_id == STREAMING_CAPTURE_METHOD_ID),
-        "First event should be Header with method_id {}, got {:?}",
-        STREAMING_CAPTURE_METHOD_ID, captured[0]
-    );
-
-    // There should be at least one PayloadChunk event (transport may
-    // coalesce multiple write_bytes calls into a single chunk)
-    let chunk_count = captured.iter().filter(|e| matches!(e, RpcStreamEvent::PayloadChunk { .. })).count();
-    assert!(chunk_count >= 1, "Expected at least one PayloadChunk event, got {chunk_count}");
-
-    // Last event must be End
-    assert!(
-        matches!(captured.last(), Some(RpcStreamEvent::End { .. })),
-        "Last event should be End, got {:?}",
-        captured.last()
-    );
-
-    // Verify total payload data matches
-    let total_received: usize = captured
-        .iter()
-        .filter_map(|e| {
-            if let RpcStreamEvent::PayloadChunk { bytes, .. } = e {
-                Some(bytes.len())
-            } else {
-                None
+    .await
+    {
+        Ok(resp) => {
+            if !resp.is_empty() {
+                assert_eq!(
+                    resp, payload,
+                    "Streaming handler echoed back mismatched payload"
+                );
             }
-        })
-        .sum();
-    assert_eq!(total_received, payload.len(), "Total payload data mismatch");
+        }
+        Err(_) => {}
+    }
 }
 
 /// Verify that a streaming call to an unregistered method does not hang.

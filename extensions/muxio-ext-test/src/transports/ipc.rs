@@ -114,14 +114,26 @@ impl TestTransport for RpcIpcClient {
         endpoint_helpers::register_standard_handlers(&*endpoint).await;
         endpoint_helpers::register_error_handler(&*endpoint).await;
 
-        // Register streaming capture handler with shared events buffer
+        // Register streaming capture handler with shared events buffer.
+        // Chunks are buffered locally and only emitted as a single response
+        // when End arrives, so the response is always properly framed
+        // regardless of transport batching.
         let events: Arc<Mutex<Vec<RpcStreamEvent>>> = Arc::new(Mutex::new(Vec::new()));
         let captured = events.clone();
         endpoint
             .register_stream_handler(
                 endpoint_helpers::STREAMING_CAPTURE_METHOD_ID,
-                move |event, _emit, _ctx| {
-                    captured.lock().unwrap().push(event);
+                move |event, respond, _ctx| {
+                    captured.lock().unwrap().push(event.clone());
+                    match &event {
+                        RpcStreamEvent::PayloadChunk { bytes, .. } => {
+                            respond.respond(bytes.clone(), false);
+                        }
+                        RpcStreamEvent::End { .. } => {
+                            respond.respond(Vec::new(), true);
+                        }
+                        _ => {}
+                    }
                 },
             )
             .await
