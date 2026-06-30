@@ -25,34 +25,51 @@ pub type RpcPrebufferedHandler<C> = Arc<
 >;
 
 /// Handle for sending properly framed response chunks back to the caller
-/// from within a streaming handler.  Calls to [`respond`] are buffered and
-/// flushed through the dispatcher after each `read_bytes` cycle.
+/// from within a streaming handler.  Writes go directly to the transport
+/// via a pre-created `RpcStreamEncoder` (set after `read_bytes` returns),
+/// so the responder can be stored and used from background tasks.
 #[derive(Clone)]
 pub struct StreamResponder {
-    request_id: u32,
-    buffer: Arc<StdMutex<Vec<PendingResponse>>>,
-}
-
-#[derive(Clone)]
-pub(crate) struct PendingResponse {
-    pub request_id: u32,
-    pub chunk: Vec<u8>,
-    pub is_finalized: bool,
+    pub(crate) request_id: u32,
+    writer: Arc<StdMutex<Option<Box<dyn FnMut(&[u8], bool) + Send>>>>,
+    buffer: Arc<StdMutex<Vec<(Vec<u8>, bool)>>>,
 }
 
 impl StreamResponder {
-    pub(crate) fn new(request_id: u32, buffer: Arc<StdMutex<Vec<PendingResponse>>>) -> Self {
-        Self { request_id, buffer }
+    pub(crate) fn new(request_id: u32) -> Self {
+        Self {
+            request_id,
+            writer: Arc::new(StdMutex::new(None)),
+            buffer: Arc::new(StdMutex::new(Vec::new())),
+        }
     }
 
     /// Queue a response chunk.  Call with `is_finalized: true` on the
     /// last chunk to signal the end of the response stream.
+    /// Writes directly to the transport if a writer is available,
+    /// otherwise buffers until the writer is set (after `read_bytes`).
     pub fn respond(&self, chunk: Vec<u8>, is_finalized: bool) {
-        self.buffer.lock().unwrap().push(PendingResponse {
-            request_id: self.request_id,
-            chunk,
-            is_finalized,
-        });
+        let mut writer_guard = self.writer.lock().unwrap();
+        if let Some(writer) = writer_guard.as_mut() {
+            // Writer is available — send directly to transport
+            writer(&chunk, is_finalized);
+        } else {
+            // Writer not yet set — buffer for later flush
+            self.buffer.lock().unwrap().push((chunk, is_finalized));
+        }
+    }
+
+    /// Install the encoder-backed writer and flush any buffered chunks.
+    pub(crate) fn set_writer(&self, writer: Box<dyn FnMut(&[u8], bool) + Send>) {
+        let mut guard = self.writer.lock().unwrap();
+        *guard = Some(writer);
+        // Flush any chunks that were buffered before the writer was set
+        let buffered = std::mem::take(&mut *self.buffer.lock().unwrap());
+        if let Some(w) = guard.as_mut() {
+            for (chunk, is_finalized) in buffered {
+                w(&chunk, is_finalized);
+            }
+        }
     }
 }
 

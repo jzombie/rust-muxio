@@ -350,6 +350,46 @@ impl<'a> RpcDispatcher<'a> {
         Ok(response_encoder)
     }
 
+    /// Creates a writer closure for a streaming response.
+    ///
+    /// The returned writer sends properly framed response chunks directly
+    /// to the transport via `on_emit`, without buffering.  Call it from
+    /// any thread — the encoder is fully owned by the closure.
+    ///
+    /// `request_id` must match the incoming request's header ID so the
+    /// client can demux the response frames onto the correct stream.
+    pub fn create_response_writer<E>(
+        &mut self,
+        request_id: u32,
+        max_chunk_size: usize,
+        on_emit: E,
+    ) -> Result<Box<dyn FnMut(&[u8], bool) + Send>, FrameEncodeError>
+    where
+        E: RpcEmit + Send + Sync + Clone + 'static,
+    {
+        let header = RpcHeader {
+            rpc_request_id: request_id,
+            rpc_msg_type: RpcMessageType::Response,
+            rpc_method_id: 0,
+            rpc_metadata_bytes: vec![0], // Success status
+        };
+        let mut encoder = self.rpc_respondable_session.start_reply_stream(
+            header,
+            max_chunk_size,
+            on_emit,
+        )?;
+        let writer: Box<dyn FnMut(&[u8], bool) + Send> = Box::new(move |chunk, is_finalized| {
+            // Ignore write/end errors — a failed response stream
+            // is acceptable; the caller will see the connection drop.
+            let _ = encoder.write_bytes(chunk);
+            if is_finalized {
+                let _ = encoder.flush();
+                let _ = encoder.end_stream();
+            }
+        });
+        Ok(writer)
+    }
+
     /// Feeds incoming byte stream data into the `RpcRespondableSession` for
     /// decoding and stream reassembly. This method should be called whenever
     /// new bytes are received from the transport layer (e.g. socket).

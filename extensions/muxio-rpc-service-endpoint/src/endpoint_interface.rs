@@ -1,12 +1,12 @@
 use super::endpoint_utils::process_single_prebuffered_request;
 use super::{
-    endpoint::{PendingResponse, StreamResponder},
+    endpoint::StreamResponder,
     error::RpcServiceEndpointError,
     with_handlers_trait::{WithHandlers, WithStreamHandlers},
 };
 use futures::future::join_all;
 use muxio_core::rpc::{
-    RpcDispatcher, RpcResponse,
+    RpcDispatcher,
     rpc_internals::{RpcStreamEvent, rpc_trait::RpcEmit},
 };
 use muxio_rpc_service::constants::DEFAULT_SERVICE_MAX_CHUNK_SIZE;
@@ -156,17 +156,17 @@ where
     where
         E: RpcEmit + Send + Sync + Clone + 'static,
     {
-        // Shared buffer for streaming response chunks.  The per-request
-        // handler closures (installed by the router) push into this;
-        // we drain it after read_bytes returns.
-        let pending_responses: Arc<StdMutex<Vec<PendingResponse>>> =
-            Arc::new(StdMutex::new(Vec::new()));
-
         // --- Streaming Method Routing ---
         // Take a snapshot of registered streaming handlers. If any exist,
         // install a router on the dispatcher so that incoming Header events
         // for streaming methods get per-request handlers installed (bypassing
         // the prebuffered catch-all accumulator).
+        //
+        // Pending responders are collected during routing so that after
+        // read_bytes we can install encoder-backed writers on them.
+        let pending_responders: Arc<StdMutex<Vec<StreamResponder>>> =
+            Arc::new(StdMutex::new(Vec::new()));
+
         let stream_handlers = self.get_stream_handlers();
         let has_stream_handlers = stream_handlers
             .with_stream_handlers(|handlers| !handlers.is_empty())
@@ -177,14 +177,14 @@ where
                 .with_stream_handlers(|handlers| handlers.clone())
                 .await;
             let ctx_clone = context.clone();
+            let responders = pending_responders.clone();
 
-            let buffer = pending_responses.clone();
             dispatcher.set_stream_method_router(move |method_id, request_id| {
                 handlers_snapshot.get(&method_id).map(|handler| {
                     let h = Arc::clone(handler);
                     let ctx = ctx_clone.clone();
-                    let respond =
-                        StreamResponder::new(request_id, buffer.clone());
+                    let respond = StreamResponder::new(request_id);
+                    responders.lock().unwrap().push(respond.clone());
                     let boxed: Box<dyn FnMut(RpcStreamEvent) + Send + 'a> =
                         Box::new(move |event: RpcStreamEvent| {
                             h(event, respond.clone(), ctx.clone());
@@ -200,36 +200,23 @@ where
         // It then collects all requests that are now fully received and ready for handling.
         let request_ids = dispatcher.read_bytes(bytes)?;
 
-        // Flush streaming responses accumulated during read_bytes.
-        // This runs even when there are no finalized prebuffered requests,
-        // so streaming-only batches don't get silently dropped.
+        // After decoding, install encoder-backed writers on all pending
+        // responders so that future respond() calls go directly to the
+        // transport.  Any writes that happened during read_bytes (before
+        // the writer was set) were buffered inside StreamResponder and
+        // are flushed now.
         {
-            let mut buf = pending_responses.lock().unwrap();
-            // Coalesce all chunks for the same request_id into a single
-            // response — multiple respond() calls create separate streams.
-            let mut by_id: std::collections::HashMap<u32, (Vec<u8>, bool)> =
-                std::collections::HashMap::new();
-            for pr in buf.drain(..) {
-                let (data, finalized) = by_id.entry(pr.request_id).or_insert((Vec::new(), false));
-                data.extend_from_slice(&pr.chunk);
-                if pr.is_finalized {
-                    *finalized = true;
-                }
-            }
-            for (request_id, (data, is_finalized)) in by_id {
-                let response = RpcResponse {
-                    rpc_request_id: request_id,
-                    rpc_method_id: 0,
-                    rpc_result_status: Some(0),
-                    rpc_prebuffered_payload_bytes: Some(data),
-                    is_finalized,
-                };
-                let _ = dispatcher.respond(
-                    response,
+            let mut responders = pending_responders.lock().unwrap();
+            for respond in responders.iter() {
+                if let Ok(writer) = dispatcher.create_response_writer(
+                    respond.request_id,
                     DEFAULT_SERVICE_MAX_CHUNK_SIZE,
                     on_emit.clone(),
-                );
+                ) {
+                    respond.set_writer(writer);
+                }
             }
+            responders.clear();
         }
 
         // Collect finalized requests for prebuffered handler dispatch.
