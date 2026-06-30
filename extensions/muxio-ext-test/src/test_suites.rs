@@ -6,13 +6,13 @@ use example_muxio_rpc_service_definition::prebuffered::{Add, Echo, Mult};
 use futures_util::StreamExt;
 use muxio_core::rpc::RpcRequest;
 use muxio_core::rpc::rpc_internals::RpcStreamEvent;
-use muxio_tokio_mpsc_adapter::ChannelCallerExt;
 use muxio_rpc_service::error::{RpcServiceError, RpcServiceErrorCode};
 use muxio_rpc_service::prebuffered::RpcMethodPrebuffered;
 use muxio_rpc_service_caller::dynamic_channel::DynamicChannelType;
 use muxio_rpc_service_caller::prebuffered::RpcCallPrebuffered;
 use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
 use muxio_rpc_service_endpoint::RpcServiceEndpointInterface;
+use muxio_tokio_mpsc_adapter::ChannelCallerExt;
 use std::error::Error;
 use std::sync::{Arc, Mutex};
 use tokio::join;
@@ -872,7 +872,9 @@ pub async fn duplicate_prebuffered_rejected(
     use muxio_rpc_service_endpoint::error::RpcServiceEndpointError;
 
     const METHOD_ID: u64 = 999_001;
-    let handler = |_request_bytes: Vec<u8>, _ctx| async { Ok::<_, Box<dyn std::error::Error + Send + Sync>>(vec![]) };
+    let handler = |_request_bytes: Vec<u8>, _ctx| async {
+        Ok::<_, Box<dyn std::error::Error + Send + Sync>>(vec![])
+    };
 
     let r1 = endpoint.register_prebuffered(METHOD_ID, handler).await;
     assert!(r1.is_ok(), "first prebuffered registration should succeed");
@@ -892,17 +894,13 @@ pub async fn duplicate_streaming_rejected(
 
     const METHOD_ID: u64 = 999_002;
     let handler = |_event: muxio_core::rpc::rpc_internals::RpcStreamEvent,
-     _respond: muxio_rpc_service_endpoint::StreamResponder,
-     _ctx| {};
+                   _respond: muxio_rpc_service_endpoint::StreamResponder,
+                   _ctx| {};
 
-    let r1 = endpoint
-        .register_stream_handler(METHOD_ID, handler)
-        .await;
+    let r1 = endpoint.register_stream_handler(METHOD_ID, handler).await;
     assert!(r1.is_ok(), "first streaming registration should succeed");
 
-    let r2 = endpoint
-        .register_stream_handler(METHOD_ID, handler)
-        .await;
+    let r2 = endpoint.register_stream_handler(METHOD_ID, handler).await;
     assert!(
         matches!(r2, Err(RpcServiceEndpointError::Handler(_))),
         "duplicate streaming registration should be rejected: got {:?}",
@@ -923,7 +921,10 @@ pub async fn cross_type_conflict_rejected(
             Ok::<_, Box<dyn std::error::Error + Send + Sync>>(vec![])
         })
         .await;
-    assert!(r1.is_ok(), "first (prebuffered) registration should succeed");
+    assert!(
+        r1.is_ok(),
+        "first (prebuffered) registration should succeed"
+    );
 
     let r2 = endpoint
         .register_stream_handler(METHOD_ID, |_event, _respond, _ctx| {})
