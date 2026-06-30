@@ -1,6 +1,6 @@
 [package]
-name = "muxio-tokio-rpc-ipc-client"
-description = "A Tokio-based Muxio IPC (local socket) RPC client implementation."
+name = "muxio-tokio-mpsc-adapter"
+description = "A Tokio mpsc channel adapter wrapping Muxio's streaming RPC API with simple Sender/Receiver pairs."
 authors.workspace = true
 edition.workspace = true
 version.workspace = true
@@ -10,15 +10,9 @@ publish.workspace = true
 
 [dependencies]
 async-trait = { workspace = true }
-bytes = { workspace = true }
-futures-util = { workspace = true }
-interprocess = { workspace = true }
 muxio-core = { workspace = true }
 muxio-rpc-service = { workspace = true }
 muxio-rpc-service-caller = { workspace = true }
 muxio-rpc-service-endpoint = { workspace = true, features = ["tokio_support"] }
-tokio = { workspace = true, features = ["full"] }
+tokio = { workspace = true, features = ["rt", "sync"] }
 tracing = { workspace = true }
-
-[dev-dependencies]
-muxio-rpc-service = { workspace = true }

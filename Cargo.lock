@@ -404,12 +404,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "doc-comment"
-version = "0.3.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "780955b8b195a21ab8e4ac6b60dd1dbdcec1dc6c51c0617964b08c81785e12c9"
-
-[[package]]
 name = "doctest-file"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -439,7 +433,7 @@ dependencies = [
 
 [[package]]
 name = "example-muxio-rpc-service-definition"
-version = "0.11.0-alpha"
+version = "0.12.0-alpha"
 dependencies = [
  "bitcode",
  "muxio-rpc-service",
@@ -447,18 +441,15 @@ dependencies = [
 
 [[package]]
 name = "example-muxio-ws-rpc-app"
-version = "0.11.0-alpha"
+version = "0.12.0-alpha"
 dependencies = [
  "async-trait",
  "criterion",
- "doc-comment",
  "example-muxio-rpc-service-definition",
  "futures",
  "muxio-core",
  "muxio-rpc-service-caller",
  "muxio-tokio-rpc-client",
- "muxio-tokio-rpc-ipc-client",
- "muxio-tokio-rpc-ipc-server",
  "muxio-tokio-rpc-server",
  "tokio",
  "tracing",
@@ -847,7 +838,7 @@ dependencies = [
 
 [[package]]
 name = "muxio"
-version = "0.11.0-alpha"
+version = "0.12.0-alpha"
 dependencies = [
  "bitcode",
  "example-muxio-rpc-service-definition",
@@ -869,19 +860,16 @@ dependencies = [
 
 [[package]]
 name = "muxio-core"
-version = "0.11.0-alpha"
+version = "0.12.0-alpha"
 dependencies = [
- "bitcode",
  "chrono",
  "once_cell",
- "rand 0.10.1",
- "tokio",
  "tracing",
 ]
 
 [[package]]
 name = "muxio-ext-test"
-version = "0.11.0-alpha"
+version = "0.12.0-alpha"
 dependencies = [
  "async-trait",
  "bytemuck",
@@ -892,6 +880,7 @@ dependencies = [
  "muxio-rpc-service",
  "muxio-rpc-service-caller",
  "muxio-rpc-service-endpoint",
+ "muxio-tokio-mpsc-adapter",
  "muxio-tokio-rpc-client",
  "muxio-tokio-rpc-ipc-client",
  "muxio-tokio-rpc-ipc-server",
@@ -905,22 +894,18 @@ dependencies = [
 
 [[package]]
 name = "muxio-rpc-service"
-version = "0.11.0-alpha"
+version = "0.12.0-alpha"
 dependencies = [
- "async-trait",
  "bitcode",
- "futures",
- "muxio-core",
  "num_enum",
  "xxhash-rust",
 ]
 
 [[package]]
 name = "muxio-rpc-service-caller"
-version = "0.11.0-alpha"
+version = "0.12.0-alpha"
 dependencies = [
  "async-trait",
- "example-muxio-rpc-service-definition",
  "futures",
  "muxio-core",
  "muxio-rpc-service",
@@ -930,28 +915,38 @@ dependencies = [
 
 [[package]]
 name = "muxio-rpc-service-endpoint"
-version = "0.11.0-alpha"
+version = "0.12.0-alpha"
 dependencies = [
  "async-trait",
  "bitcode",
  "bytes",
- "example-muxio-rpc-service-definition",
  "futures",
  "muxio-core",
  "muxio-rpc-service",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "muxio-tokio-mpsc-adapter"
+version = "0.12.0-alpha"
+dependencies = [
+ "async-trait",
+ "muxio-core",
+ "muxio-rpc-service",
  "muxio-rpc-service-caller",
+ "muxio-rpc-service-endpoint",
  "tokio",
  "tracing",
 ]
 
 [[package]]
 name = "muxio-tokio-rpc-client"
-version = "0.11.0-alpha"
+version = "0.12.0-alpha"
 dependencies = [
  "async-trait",
  "axum",
  "bytes",
- "example-muxio-rpc-service-definition",
  "futures",
  "futures-util",
  "muxio-core",
@@ -966,26 +961,23 @@ dependencies = [
 
 [[package]]
 name = "muxio-tokio-rpc-ipc-client"
-version = "0.11.0-alpha"
+version = "0.12.0-alpha"
 dependencies = [
  "async-trait",
  "bytes",
- "example-muxio-rpc-service-definition",
  "futures-util",
  "interprocess",
  "muxio-core",
  "muxio-rpc-service",
  "muxio-rpc-service-caller",
  "muxio-rpc-service-endpoint",
- "muxio-tokio-rpc-ipc-server",
  "tokio",
  "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
 name = "muxio-tokio-rpc-ipc-server"
-version = "0.11.0-alpha"
+version = "0.12.0-alpha"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1001,7 +993,7 @@ dependencies = [
 
 [[package]]
 name = "muxio-tokio-rpc-server"
-version = "0.11.0-alpha"
+version = "0.12.0-alpha"
 dependencies = [
  "async-trait",
  "axum",
@@ -1018,10 +1010,9 @@ dependencies = [
 
 [[package]]
 name = "muxio-wasm-rpc-client"
-version = "0.11.0-alpha"
+version = "0.12.0-alpha"
 dependencies = [
  "async-trait",
- "example-muxio-rpc-service-definition",
  "futures",
  "futures-util",
  "js-sys",
@@ -1029,9 +1020,7 @@ dependencies = [
  "muxio-rpc-service",
  "muxio-rpc-service-caller",
  "muxio-rpc-service-endpoint",
- "muxio-tokio-rpc-server",
  "tokio",
- "tokio-tungstenite",
  "tracing",
  "wasm-bindgen",
  "wasm-bindgen-futures",

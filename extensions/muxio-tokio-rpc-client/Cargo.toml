@@ -23,7 +23,6 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 axum = { workspace = true }
-example-muxio-rpc-service-definition = { workspace = true }
 futures-util = { workspace = true }
 muxio-tokio-rpc-server = { workspace = true }
 tokio = { workspace = true, features = ["full"] }

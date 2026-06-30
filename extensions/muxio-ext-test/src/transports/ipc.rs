@@ -2,12 +2,13 @@ use crate::endpoint_helpers;
 use crate::test_transport::TestTransport;
 use async_trait::async_trait;
 use interprocess::local_socket::{GenericNamespaced, ListenerOptions, ToNsName, tokio::prelude::*};
-use muxio_rpc_service_endpoint::RpcServiceEndpoint;
+use muxio_core::rpc::rpc_internals::RpcStreamEvent;
+
+use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface};
 use muxio_tokio_rpc_ipc_client::RpcIpcClient;
-use muxio_tokio_rpc_ipc_server::{
-    RpcIpcConnectionContextHandle, RpcIpcServer, RpcIpcServerEvent, RpcServiceEndpointInterface,
-};
-use std::sync::Arc;
+use muxio_tokio_rpc_ipc_server::{RpcIpcConnectionContextHandle, RpcIpcServer, RpcIpcServerEvent};
+use std::sync::{Arc, Mutex};
+
 use tokio::sync::oneshot;
 use tokio::time::{Duration, sleep};
 
@@ -34,13 +35,7 @@ impl TestTransport for RpcIpcClient {
         let server = RpcIpcServer::new(None);
         let endpoint = server.endpoint();
         endpoint_helpers::register_standard_handlers(&*endpoint).await;
-        // Pre-register a test error handler for the roundtrip_error test
-        let _ = endpoint
-            .register_prebuffered(0xBAD, |_request_bytes, _ctx| async move {
-                Err(Box::new(std::io::Error::other("test error"))
-                    as Box<dyn std::error::Error + Send + Sync>)
-            })
-            .await;
+        endpoint_helpers::register_error_handler(&*endpoint).await;
         drop(endpoint);
         let name = socket_name.clone();
         tokio::spawn(async move {
@@ -89,8 +84,8 @@ impl TestTransport for RpcIpcClient {
         let socket_name = temp_name("s2c");
         let (event_tx, mut event_rx) = tokio::sync::mpsc::unbounded_channel();
         let server = RpcIpcServer::new(Some(event_tx));
-        // Register Echo on the server endpoint so client-initiated calls work
-        endpoint_helpers::register_echo_handler(&*server.endpoint()).await;
+        // Register standard handlers on the server endpoint so client-initiated calls work
+        endpoint_helpers::register_standard_handlers(&*server.endpoint()).await;
         let name = socket_name.clone();
         tokio::spawn(async move {
             let _ = server.serve(&name).await;
@@ -108,5 +103,54 @@ impl TestTransport for RpcIpcClient {
         };
 
         (client, endpoint, ctx_handle)
+    }
+
+    async fn connect_for_streaming() -> (
+        Arc<Self::Client>,
+        Arc<RpcServiceEndpoint<()>>,
+        Arc<Mutex<Vec<RpcStreamEvent>>>,
+    ) {
+        let socket_name = temp_name("streaming");
+        let server = RpcIpcServer::new(None);
+        let endpoint = server.endpoint();
+
+        // Register standard prebuffered handlers (Add, Mult, Echo, error test)
+        endpoint_helpers::register_standard_handlers(&*endpoint).await;
+        endpoint_helpers::register_error_handler(&*endpoint).await;
+
+        // Register streaming capture handler with shared events buffer.
+        // Chunks are buffered locally and only emitted as a single response
+        // when End arrives, so the response is always properly framed
+        // regardless of transport batching.
+        let events: Arc<Mutex<Vec<RpcStreamEvent>>> = Arc::new(Mutex::new(Vec::new()));
+        let captured = events.clone();
+        endpoint
+            .register_stream_handler(
+                endpoint_helpers::STREAMING_CAPTURE_METHOD_ID,
+                move |event, respond, _ctx| {
+                    captured.lock().unwrap().push(event.clone());
+                    match &event {
+                        RpcStreamEvent::PayloadChunk { bytes, .. } => {
+                            respond.respond(bytes.clone(), false);
+                        }
+                        RpcStreamEvent::End { .. } => {
+                            respond.respond(Vec::new(), true);
+                        }
+                        _ => {}
+                    }
+                },
+            )
+            .await
+            .expect("Failed to register streaming capture handler");
+
+        drop(endpoint);
+        let name = socket_name.clone();
+        tokio::spawn(async move {
+            let _ = server.serve(&name).await;
+        });
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        let client = RpcIpcClient::new(&socket_name).await.unwrap();
+        let client_endpoint = client.get_endpoint();
+        (client, client_endpoint, events)
     }
 }

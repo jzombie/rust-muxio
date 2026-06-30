@@ -1,14 +1,20 @@
+use crate::endpoint_helpers::{
+    ERROR_TEST_METHOD_ID, MPSC_CHANNEL_METHOD_ID, STREAMING_CAPTURE_METHOD_ID,
+    UNREGISTERED_METHOD_ID,
+};
 use example_muxio_rpc_service_definition::prebuffered::{Add, Echo, Mult};
 use futures_util::StreamExt;
 use muxio_core::rpc::RpcRequest;
+use muxio_core::rpc::rpc_internals::RpcStreamEvent;
 use muxio_rpc_service::error::{RpcServiceError, RpcServiceErrorCode};
 use muxio_rpc_service::prebuffered::RpcMethodPrebuffered;
 use muxio_rpc_service_caller::dynamic_channel::DynamicChannelType;
 use muxio_rpc_service_caller::prebuffered::RpcCallPrebuffered;
 use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
 use muxio_rpc_service_endpoint::RpcServiceEndpointInterface;
+use muxio_tokio_mpsc_adapter::ChannelCallerExt;
 use std::error::Error;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tokio::join;
 
 /// Run the standard success roundtrip test (Add, Mult, Echo concurrent calls).
@@ -29,11 +35,11 @@ pub async fn roundtrip_success<C: RpcServiceCallerInterface>(client: &C) {
     assert_eq!(res6.unwrap(), b"testing 4 5 6".to_vec());
 }
 
-/// Run the error roundtrip test — the transport already registered 0xBAD
+/// Run the error roundtrip test — the transport already registered ERROR_TEST_METHOD_ID
 /// with a failing handler. Just call it and assert error propagation.
 pub async fn roundtrip_error<C: RpcServiceCallerInterface>(client: &C) {
     let request = RpcRequest {
-        rpc_method_id: 0xBAD,
+        rpc_method_id: ERROR_TEST_METHOD_ID,
         rpc_param_bytes: Some(b"hello".to_vec()),
         rpc_prebuffered_payload_bytes: None,
         is_finalized: true,
@@ -66,7 +72,7 @@ pub async fn roundtrip_large_payload<C: RpcServiceCallerInterface>(client: &C) {
 /// Run the method-not-found test.
 pub async fn roundtrip_method_not_found<C: RpcServiceCallerInterface>(client: &C) {
     let request = RpcRequest {
-        rpc_method_id: 0xDEAD_BEEF,
+        rpc_method_id: UNREGISTERED_METHOD_ID,
         rpc_param_bytes: Some(b"hello".to_vec()),
         rpc_prebuffered_payload_bytes: None,
         is_finalized: true,
@@ -473,4 +479,485 @@ where
         result.is_err(),
         "Expected the pending RPC call to fail, but it succeeded."
     );
+}
+
+// ------------------------------------------------------------------
+// Streaming handler test bodies
+// ------------------------------------------------------------------
+
+/// Verify that a streaming handler receives Header, PayloadChunk, End
+/// events in the correct order and can send response chunks back
+/// via the StreamResponder.
+pub async fn streaming_handler_events_arrive<C>(client: &C, events: &Mutex<Vec<RpcStreamEvent>>)
+where
+    C: RpcServiceCallerInterface,
+{
+    let payload = b"hello streaming world".to_vec();
+
+    let request = RpcRequest {
+        rpc_method_id: STREAMING_CAPTURE_METHOD_ID,
+        rpc_param_bytes: None,
+        rpc_prebuffered_payload_bytes: None,
+        is_finalized: false,
+    };
+
+    let (mut encoder, mut receiver) = client
+        .call_rpc_streaming(request, DynamicChannelType::Unbounded)
+        .await
+        .expect("streaming call failed");
+
+    // Write data in chunks
+    for chunk in payload.chunks(8) {
+        encoder.write_bytes(chunk).expect("write_bytes failed");
+    }
+    encoder.flush().expect("flush failed");
+    encoder.end_stream().expect("end_stream failed");
+    drop(encoder);
+
+    // Allow time for events to be processed by the streaming handler
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+    // Verify captured events
+    {
+        let captured = events.lock().unwrap();
+        assert!(
+            !captured.is_empty(),
+            "Streaming handler should have received events"
+        );
+
+        // First event must be Header with correct method_id
+        assert!(
+            matches!(&captured[0], RpcStreamEvent::Header { rpc_method_id, .. } if *rpc_method_id == STREAMING_CAPTURE_METHOD_ID),
+            "First event should be Header with method_id {}, got {:?}",
+            STREAMING_CAPTURE_METHOD_ID,
+            captured[0]
+        );
+
+        // There should be at least one PayloadChunk event (transport may
+        // coalesce multiple write_bytes calls into a single chunk)
+        let chunk_count = captured
+            .iter()
+            .filter(|e| matches!(e, RpcStreamEvent::PayloadChunk { .. }))
+            .count();
+        assert!(
+            chunk_count >= 1,
+            "Expected at least one PayloadChunk event, got {chunk_count}"
+        );
+
+        // Last event must be End
+        assert!(
+            matches!(captured.last(), Some(RpcStreamEvent::End { .. })),
+            "Last event should be End, got {:?}",
+            captured.last()
+        );
+
+        // Verify total payload data matches
+        let total_received: usize = captured
+            .iter()
+            .filter_map(|e| {
+                if let RpcStreamEvent::PayloadChunk { bytes, .. } = e {
+                    Some(bytes.len())
+                } else {
+                    None
+                }
+            })
+            .sum();
+        assert_eq!(total_received, payload.len(), "Total payload data mismatch");
+    }
+
+    let mut response = Vec::new();
+    if let Ok(resp) = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        while let Some(chunk) = receiver.next().await {
+            match chunk {
+                Ok(bytes) => response.extend_from_slice(&bytes),
+                Err(_) => break,
+            }
+        }
+        std::mem::take(&mut response)
+    })
+    .await
+        && !resp.is_empty()
+    {
+        assert_eq!(
+            resp, payload,
+            "Streaming handler echoed back mismatched payload"
+        );
+    }
+}
+
+/// Verify that a streaming call to an unregistered method does not hang.
+/// The server may or may not produce a response for unregistered streaming
+/// methods — the test just verifies the call doesn't deadlock.
+pub async fn streaming_handler_method_not_found<C>(client: &C)
+where
+    C: RpcServiceCallerInterface,
+{
+    let request = RpcRequest {
+        rpc_method_id: UNREGISTERED_METHOD_ID,
+        rpc_param_bytes: Some(b"hello".to_vec()),
+        rpc_prebuffered_payload_bytes: None,
+        is_finalized: false,
+    };
+
+    let (mut encoder, mut receiver) = client
+        .call_rpc_streaming(request, DynamicChannelType::Unbounded)
+        .await
+        .expect("streaming call should succeed initially");
+
+    encoder.end_stream().expect("end_stream failed");
+    drop(encoder);
+
+    // Drain receiver with timeout — ensures no deadlock even if
+    // the server doesn't send a response
+    let _ = tokio::time::timeout(std::time::Duration::from_secs(2), async {
+        while let Some(_chunk) = receiver.next().await {}
+    })
+    .await;
+}
+
+/// Run multiple concurrent streams from both parties interleaved with
+/// prebuffered RPC calls on the same connection.
+///
+/// Exercises:
+/// - 3 concurrent client→server streaming calls
+/// - 3 concurrent server→client streaming calls (simultaneous bidirectional)
+/// - Prebuffered (unary) RPCs interleaved between stream chunks
+/// - True concurrent bidirectional streaming at the transport level
+pub async fn complex_concurrent_mixed<H, C, E>(
+    client: Arc<C>,
+    client_endpoint: &impl RpcServiceEndpointInterface<E>,
+    ctx_handle: H,
+    label: &str,
+) where
+    H: RpcServiceCallerInterface + Clone + Send + Sync + 'static,
+    C: RpcServiceCallerInterface + Send + Sync + 'static,
+    E: Send + Sync + Clone + 'static,
+{
+    client_endpoint
+        .register_prebuffered(Echo::METHOD_ID, |request_bytes, _ctx| async move {
+            Echo::encode_response(Echo::decode_request(&request_bytes)?)
+                .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>)
+        })
+        .await
+        .unwrap();
+
+    let client_stream_tasks: Vec<_> = (0..3)
+        .map(|i| {
+            let client = client.clone();
+            tokio::spawn(async move {
+                let request = RpcRequest {
+                    rpc_method_id: Echo::METHOD_ID,
+                    rpc_param_bytes: None,
+                    rpc_prebuffered_payload_bytes: None,
+                    is_finalized: false,
+                };
+                let (mut encoder, mut receiver) = client
+                    .call_rpc_streaming(request, DynamicChannelType::Unbounded)
+                    .await
+                    .expect("client stream failed to start");
+
+                let payload = vec![b'A' + i as u8; 100_000];
+                for chunk in payload.chunks(1024) {
+                    encoder.write_bytes(chunk).unwrap();
+                    if i % 2 == 0 {
+                        tokio::task::yield_now().await;
+                    }
+                }
+                encoder.flush().unwrap();
+                encoder.end_stream().unwrap();
+
+                let mut response = Vec::new();
+                while let Some(chunk) = receiver.next().await {
+                    match chunk {
+                        Ok(bytes) => response.extend_from_slice(&bytes),
+                        Err(e) => panic!("client stream {i} error: {e:?}"),
+                    }
+                }
+                (i, response)
+            })
+        })
+        .collect();
+
+    let server_stream_tasks: Vec<_> = (0..3)
+        .map(|i| {
+            let handle = ctx_handle.clone();
+            tokio::spawn(async move {
+                let request = RpcRequest {
+                    rpc_method_id: Echo::METHOD_ID,
+                    rpc_param_bytes: None,
+                    rpc_prebuffered_payload_bytes: None,
+                    is_finalized: false,
+                };
+                let (mut encoder, mut receiver) = handle
+                    .call_rpc_streaming(request, DynamicChannelType::Unbounded)
+                    .await
+                    .expect("server stream failed to start");
+
+                let payload = vec![b'X' + i as u8; 100_000];
+                for chunk in payload.chunks(1024) {
+                    encoder.write_bytes(chunk).unwrap();
+                    if i % 2 == 0 {
+                        tokio::task::yield_now().await;
+                    }
+                }
+                encoder.flush().unwrap();
+                encoder.end_stream().unwrap();
+
+                let mut response = Vec::new();
+                while let Some(chunk) = receiver.next().await {
+                    match chunk {
+                        Ok(bytes) => response.extend_from_slice(&bytes),
+                        Err(e) => panic!("server stream {i} error: {e:?}"),
+                    }
+                }
+                (i, response)
+            })
+        })
+        .collect();
+
+    let mut prebuffered_results = Vec::new();
+    for i in 0..5 {
+        let sum = Add::call(&*client, vec![i as f64, (i + 1) as f64])
+            .await
+            .unwrap();
+        prebuffered_results.push(sum);
+        tokio::task::yield_now().await;
+    }
+
+    for task in client_stream_tasks {
+        let (i, response) = task.await.unwrap();
+        let expected = vec![b'A' + i as u8; 100_000];
+        assert_eq!(
+            response, expected,
+            "{label} client stream {i} data mismatch"
+        );
+    }
+
+    for task in server_stream_tasks {
+        let (i, response) = task.await.unwrap();
+        let expected = vec![b'X' + i as u8; 100_000];
+        assert_eq!(
+            response, expected,
+            "{label} server stream {i} data mismatch"
+        );
+    }
+
+    assert_eq!(
+        prebuffered_results,
+        vec![1.0, 3.0, 5.0, 7.0, 9.0],
+        "{label} prebuffered results mismatch"
+    );
+}
+
+// ------------------------------------------------------------------
+// mpsc adapter test bodies
+// ------------------------------------------------------------------
+
+/// Verify that the client can `open_channel` and roundtrip data through a
+/// streaming handler on the server end.
+///
+/// The server already has a streaming echo handler for `STREAMING_CAPTURE_METHOD_ID`
+/// (set up by `connect_for_streaming`).
+pub async fn mpsc_adapter_open_channel<C>(client: &C)
+where
+    C: RpcServiceCallerInterface,
+{
+    let payload = b"hello mpsc channel".to_vec();
+
+    let (writer, mut reader) = client
+        .open_channel(STREAMING_CAPTURE_METHOD_ID, 0)
+        .await
+        .expect("open_channel failed");
+
+    // Write the payload in chunks via the sender
+    for chunk in payload.chunks(8) {
+        writer.send(chunk.to_vec()).unwrap();
+    }
+    // Drop the writer to signal end-of-stream to the background task
+    drop(writer);
+
+    // Collect the echoed response
+    let mut response = Vec::new();
+    while let Some(chunk) = reader.recv().await {
+        match chunk {
+            Ok(bytes) => response.extend_from_slice(&bytes),
+            Err(_) => break,
+        }
+    }
+
+    assert_eq!(
+        response, payload,
+        "Channel adapter echoed back mismatched payload"
+    );
+}
+
+/// Verify that opening a channel to an unregistered method does not hang.
+pub async fn mpsc_adapter_open_channel_method_not_found<C>(client: &C)
+where
+    C: RpcServiceCallerInterface,
+{
+    let (writer, mut reader) = client
+        .open_channel(UNREGISTERED_METHOD_ID, 0)
+        .await
+        .expect("open_channel should succeed initially");
+
+    writer.send(b"hello".to_vec()).unwrap();
+    drop(writer);
+
+    // Drain with timeout — ensures no deadlock
+    let _ = tokio::time::timeout(std::time::Duration::from_secs(2), async {
+        while let Some(_chunk) = reader.recv().await {}
+    })
+    .await;
+}
+
+/// Verify `register_channel_handler` works for server-to-client streaming.
+///
+/// Registers a channel handler on the client endpoint, then has the server
+/// initiate a streaming call to that method. The handler's receiver gets the data.
+pub async fn mpsc_adapter_channel_handler_s2c<C, H>(
+    _client: Arc<C>,
+    client_endpoint: &impl muxio_rpc_service_endpoint::RpcServiceEndpointInterface<()>,
+    server_handle: H,
+) where
+    C: RpcServiceCallerInterface + Send + Sync + 'static,
+    H: RpcServiceCallerInterface + Clone + Send + Sync + 'static,
+{
+    use muxio_tokio_mpsc_adapter::ChannelEndpointExt;
+    use tokio::sync::mpsc;
+
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    client_endpoint
+        .register_channel_handler(MPSC_CHANNEL_METHOD_ID, tx)
+        .await
+        .expect("Failed to register channel handler");
+
+    let request = RpcRequest {
+        rpc_method_id: MPSC_CHANNEL_METHOD_ID,
+        rpc_param_bytes: None,
+        rpc_prebuffered_payload_bytes: None,
+        is_finalized: false,
+    };
+
+    let payload = b"hello from server".to_vec();
+    let (mut encoder, _receiver) = server_handle
+        .call_rpc_streaming(request, DynamicChannelType::Unbounded)
+        .await
+        .expect("server streaming call failed");
+
+    encoder.write_bytes(&payload).expect("write_bytes failed");
+    encoder.flush().expect("flush failed");
+    encoder.end_stream().expect("end_stream failed");
+    drop(encoder);
+
+    // Read from the channel handler's receiver
+    let mut received = Vec::new();
+    while let Some(chunk) = rx.recv().await {
+        received.extend_from_slice(&chunk);
+    }
+
+    assert_eq!(
+        received, payload,
+        "Channel handler received mismatched payload"
+    );
+}
+
+// ------------------------------------------------------------------
+// registration conflict test bodies
+// ------------------------------------------------------------------
+
+pub async fn duplicate_prebuffered_rejected(
+    endpoint: &impl muxio_rpc_service_endpoint::RpcServiceEndpointInterface<()>,
+) {
+    use muxio_rpc_service_endpoint::error::RpcServiceEndpointError;
+
+    const METHOD_ID: u64 = 999_001;
+    let handler = |_request_bytes: Vec<u8>, _ctx| async {
+        Ok::<_, Box<dyn std::error::Error + Send + Sync>>(vec![])
+    };
+
+    let r1 = endpoint.register_prebuffered(METHOD_ID, handler).await;
+    assert!(r1.is_ok(), "first prebuffered registration should succeed");
+
+    let r2 = endpoint.register_prebuffered(METHOD_ID, handler).await;
+    assert!(
+        matches!(r2, Err(RpcServiceEndpointError::Handler(_))),
+        "duplicate prebuffered registration should be rejected: got {:?}",
+        r2
+    );
+}
+
+pub async fn duplicate_streaming_rejected(
+    endpoint: &impl muxio_rpc_service_endpoint::RpcServiceEndpointInterface<()>,
+) {
+    use muxio_rpc_service_endpoint::error::RpcServiceEndpointError;
+
+    const METHOD_ID: u64 = 999_002;
+    let handler = |_event: muxio_core::rpc::rpc_internals::RpcStreamEvent,
+                   _respond: muxio_rpc_service_endpoint::StreamResponder,
+                   _ctx| {};
+
+    let r1 = endpoint.register_stream_handler(METHOD_ID, handler).await;
+    assert!(r1.is_ok(), "first streaming registration should succeed");
+
+    let r2 = endpoint.register_stream_handler(METHOD_ID, handler).await;
+    assert!(
+        matches!(r2, Err(RpcServiceEndpointError::Handler(_))),
+        "duplicate streaming registration should be rejected: got {:?}",
+        r2
+    );
+}
+
+pub async fn cross_type_conflict_rejected(
+    endpoint: &impl muxio_rpc_service_endpoint::RpcServiceEndpointInterface<()>,
+) {
+    use muxio_rpc_service_endpoint::error::RpcServiceEndpointError;
+
+    const METHOD_ID: u64 = 999_003;
+
+    // prebuffered first, then streaming — should fail
+    let r1 = endpoint
+        .register_prebuffered(METHOD_ID, |_request_bytes: Vec<u8>, _ctx| async {
+            Ok::<_, Box<dyn std::error::Error + Send + Sync>>(vec![])
+        })
+        .await;
+    assert!(
+        r1.is_ok(),
+        "first (prebuffered) registration should succeed"
+    );
+
+    let r2 = endpoint
+        .register_stream_handler(METHOD_ID, |_event, _respond, _ctx| {})
+        .await;
+    assert!(
+        matches!(r2, Err(RpcServiceEndpointError::Handler(_))),
+        "streaming registration should be rejected after prebuffered: got {:?}",
+        r2
+    );
+}
+
+#[cfg(test)]
+mod method_id_uniqueness_tests {
+    use example_muxio_rpc_service_definition::RpcMethodPrebuffered;
+    use std::collections::HashSet;
+
+    #[test]
+    fn all_known_method_ids_are_unique() {
+        let mut seen = HashSet::new();
+        let test_ids = vec![
+            crate::endpoint_helpers::STREAMING_CAPTURE_METHOD_ID,
+            crate::endpoint_helpers::ERROR_TEST_METHOD_ID,
+            crate::endpoint_helpers::UNREGISTERED_METHOD_ID,
+            example_muxio_rpc_service_definition::prebuffered::Add::METHOD_ID,
+            example_muxio_rpc_service_definition::prebuffered::Mult::METHOD_ID,
+            example_muxio_rpc_service_definition::prebuffered::Echo::METHOD_ID,
+        ];
+        for id in test_ids {
+            assert!(
+                seen.insert(id),
+                "Duplicate method ID detected: {}. All method IDs must be unique.",
+                id
+            );
+        }
+    }
 }

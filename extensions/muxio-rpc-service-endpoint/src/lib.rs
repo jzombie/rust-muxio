@@ -10,7 +10,7 @@ pub use endpoint_interface::*;
 pub mod error;
 
 mod with_handlers_trait;
-pub use with_handlers_trait::*;
+pub use with_handlers_trait::{WithHandlers, WithStreamHandlers};
 
 mod endpoint_utils;
 pub use endpoint_utils::*;

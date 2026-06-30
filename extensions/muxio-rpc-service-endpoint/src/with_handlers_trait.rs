@@ -1,4 +1,4 @@
-use crate::endpoint::RpcPrebufferedHandler;
+use crate::endpoint::{RpcPrebufferedHandler, RpcStreamHandler};
 use std::collections::HashMap;
 
 /// A trait that provides a generic, asynchronous interface for accessing a shared
@@ -43,6 +43,52 @@ where
     async fn with_handlers<F, R>(&self, f: F) -> R
     where
         F: FnOnce(&mut HashMap<u64, RpcPrebufferedHandler<C>>) -> R + Send,
+        R: Send,
+    {
+        let mut guard = self.lock().expect("Mutex was poisoned");
+        f(&mut guard)
+    }
+}
+
+/// A trait that provides a generic, asynchronous interface for accessing a shared
+/// `HashMap` of streaming RPC handlers protected by a mutex.
+#[async_trait::async_trait]
+pub trait WithStreamHandlers<C>: Send + Sync
+where
+    C: Send + Sync + Clone + 'static,
+{
+    /// Executes a closure with exclusive access to the streaming handlers map.
+    async fn with_stream_handlers<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&mut HashMap<u64, RpcStreamHandler<C>>) -> R + Send,
+        R: Send;
+}
+
+// Only compile this block if the "tokio_support" feature is active.
+#[cfg(feature = "tokio_support")]
+#[async_trait::async_trait]
+impl<C> WithStreamHandlers<C> for tokio::sync::Mutex<HashMap<u64, RpcStreamHandler<C>>>
+where
+    C: Send + Sync + Clone + 'static,
+{
+    async fn with_stream_handlers<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&mut HashMap<u64, RpcStreamHandler<C>>) -> R + Send,
+        R: Send,
+    {
+        let mut guard = self.lock().await;
+        f(&mut guard)
+    }
+}
+
+#[async_trait::async_trait]
+impl<C> WithStreamHandlers<C> for std::sync::Mutex<HashMap<u64, RpcStreamHandler<C>>>
+where
+    C: Send + Sync + Clone + 'static,
+{
+    async fn with_stream_handlers<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&mut HashMap<u64, RpcStreamHandler<C>>) -> R + Send,
         R: Send,
     {
         let mut guard = self.lock().expect("Mutex was poisoned");

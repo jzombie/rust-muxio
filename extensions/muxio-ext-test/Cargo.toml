@@ -7,6 +7,10 @@ repository.workspace = true
 license.workspace = true
 publish = false
 
+# `cargo-udeps` cannot detect usage of crates that are only used in doc-tests.
+[package.metadata.cargo-udeps.ignore]
+development = ["tracing-subscriber"]
+
 [dependencies]
 async-trait = { workspace = true }
 bytemuck.workspace = true
@@ -17,12 +21,15 @@ muxio-core = { workspace = true }
 muxio-rpc-service = { workspace = true }
 muxio-rpc-service-caller = { workspace = true }
 muxio-rpc-service-endpoint = { workspace = true, features = ["tokio_support"] }
+muxio-tokio-mpsc-adapter = { workspace = true }
+muxio-tokio-rpc-client = { workspace = true }
 muxio-tokio-rpc-ipc-client = { workspace = true }
 muxio-tokio-rpc-ipc-server = { workspace = true }
-muxio-tokio-rpc-client = { workspace = true }
 muxio-tokio-rpc-server = { workspace = true }
 muxio-wasm-rpc-client = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tokio-tungstenite = { workspace = true }
 tracing = { workspace = true }
+
+[dev-dependencies]
 tracing-subscriber = { workspace = true, features = ["fmt"] }

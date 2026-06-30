@@ -28,6 +28,26 @@ pub enum RpcServiceEndpointError {
     Handler(Box<dyn std::error::Error + Send + Sync>),
 }
 
+impl fmt::Display for RpcServiceEndpointError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RpcServiceEndpointError::Decode(e) => write!(f, "decode error: {e}"),
+            RpcServiceEndpointError::Encode(e) => write!(f, "encode error: {e}"),
+            RpcServiceEndpointError::Handler(e) => write!(f, "handler error: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for RpcServiceEndpointError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            RpcServiceEndpointError::Decode(e) => Some(e),
+            RpcServiceEndpointError::Encode(e) => Some(e),
+            RpcServiceEndpointError::Handler(e) => e.source(),
+        }
+    }
+}
+
 impl From<FrameDecodeError> for RpcServiceEndpointError {
     fn from(err: FrameDecodeError) -> Self {
         RpcServiceEndpointError::Decode(err)
