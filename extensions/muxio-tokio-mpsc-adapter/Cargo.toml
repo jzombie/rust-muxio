@@ -1,6 +1,6 @@
 [package]
-name = "muxio-mpsc-adapter"
-description = "mpsc channel adapter wrapping muxio's streaming RPC API with simple Sender/Receiver pairs."
+name = "muxio-tokio-mpsc-adapter"
+description = "A Tokio mpsc channel adapter wrapping Muxio's streaming RPC API with simple Sender/Receiver pairs."
 authors.workspace = true
 edition.workspace = true
 version.workspace = true

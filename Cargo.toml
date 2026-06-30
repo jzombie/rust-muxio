@@ -20,7 +20,7 @@ members = [
     "examples/example-muxio-rpc-service-definition",
     "examples/example-muxio-ws-rpc-app",
     "extensions/muxio-ext-test",
-    "extensions/muxio-mpsc-adapter",
+    "extensions/muxio-tokio-mpsc-adapter",
     "extensions/muxio-rpc-service",
     "extensions/muxio-rpc-service-caller",
     "extensions/muxio-rpc-service-endpoint",
@@ -54,7 +54,7 @@ futures-util = "0.3.32"
 interprocess = { version = "2.4.2", features = ["tokio"] }
 muxio = { path = ".", version = "0.12.0-alpha" }
 muxio-core = { path = "core", version = "0.12.0-alpha" }
-muxio-mpsc-adapter = { path = "extensions/muxio-mpsc-adapter", version = "0.12.0-alpha" }
+muxio-tokio-mpsc-adapter = { path = "extensions/muxio-tokio-mpsc-adapter", version = "0.12.0-alpha" }
 muxio-rpc-service = { path = "extensions/muxio-rpc-service", version = "0.12.0-alpha" }
 muxio-rpc-service-caller = { path = "extensions/muxio-rpc-service-caller", version = "0.12.0-alpha" }
 muxio-rpc-service-endpoint = { path = "extensions/muxio-rpc-service-endpoint", version = "0.12.0-alpha" }
@@ -65,7 +65,7 @@ muxio-tokio-rpc-server = { path = "extensions/muxio-tokio-rpc-server", version =
 muxio-wasm-rpc-client = { path = "extensions/muxio-wasm-rpc-client", version = "0.12.0-alpha" }
 num_enum = "0.7.6"
 
-# muxio-mpsc-adapter (not re-exported by default, used directly)
+# muxio-tokio-mpsc-adapter (not re-exported by default, used directly)
 
 once_cell = "1.21.4"
 rand = "0.10.1"

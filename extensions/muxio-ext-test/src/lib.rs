@@ -298,3 +298,37 @@ macro_rules! complex_concurrent_tests {
         }
     };
 }
+
+/// Generate `#[tokio::test]` functions for registration conflict tests.
+///
+/// Tests:
+/// - `test_duplicate_prebuffered_rejected` — same method_id twice
+/// - `test_duplicate_streaming_rejected` — same method_id twice
+/// - `test_cross_type_conflict_rejected` — prebuffered then streaming
+#[macro_export]
+macro_rules! registration_conflict_tests {
+    ($module:ident, $transport:ty) => {
+        mod $module {
+            #[tokio::test]
+            async fn test_duplicate_prebuffered_rejected() {
+                let (_, endpoint) =
+                    <$transport as $crate::test_transport::TestTransport>::connect().await;
+                $crate::test_suites::duplicate_prebuffered_rejected(&*endpoint).await;
+            }
+
+            #[tokio::test]
+            async fn test_duplicate_streaming_rejected() {
+                let (_, endpoint) =
+                    <$transport as $crate::test_transport::TestTransport>::connect().await;
+                $crate::test_suites::duplicate_streaming_rejected(&*endpoint).await;
+            }
+
+            #[tokio::test]
+            async fn test_cross_type_conflict_rejected() {
+                let (_, endpoint) =
+                    <$transport as $crate::test_transport::TestTransport>::connect().await;
+                $crate::test_suites::cross_type_conflict_rejected(&*endpoint).await;
+            }
+        }
+    };
+}
