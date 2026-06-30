@@ -37,6 +37,17 @@ where
     ///
     /// The sender is dropped on `End` / `Error` events, which closes the
     /// corresponding receiver.
+    ///
+    /// # When to use this vs. raw `register_stream_handler`
+    ///
+    /// | `register_channel_handler` | raw `register_stream_handler` |
+    /// |---|---|
+    /// | Each stream gets the same sender. On `End` the sender is dropped and the channel closes. | You control the sender lifecycle; `End` is a no-op unless you choose otherwise. |
+    /// | Best for **per-stream work queues**: one request → one stream → one channel → receiver exits cleanly. | Best for **shared sinks** that outlive individual connections: PTY input, broadcast fan-out, persistent subscriptions. |
+    ///
+    /// If a reconnect must keep working (the channel survives first client's
+    /// disconnect), use raw `register_stream_handler` and keep the sender
+    /// alive by ignoring `End`/`Error`.
     async fn register_channel_handler<S>(
         &self,
         method_id: u64,

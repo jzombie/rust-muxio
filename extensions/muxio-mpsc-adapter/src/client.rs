@@ -25,6 +25,16 @@ pub trait ChannelCallerExt: RpcServiceCallerInterface {
     /// `buffer_size` controls the response channel capacity. Pass `0` for
     /// unbounded (recommended for bursty streams like PTY output).
     /// The request writer is always unbounded so user writes never block.
+    ///
+    /// # Channel lifecycle
+    ///
+    /// - Dropping `writer` ends the outgoing stream (the server receives
+    ///   an `End` event).
+    /// - The server closing the response stream drops the reader and
+    ///   `reader.recv()` returns `None`.
+    /// - The background task spawned by `open_channel` lives for the
+    ///   duration of the request stream. When the writer is dropped, the
+    ///   task flushes buffered data and calls `end_stream`, then exits.
     async fn open_channel(
         &self,
         method_id: u64,
