@@ -143,7 +143,7 @@ where
     /// Reads raw bytes from the transport, decodes them into RPC requests,
     /// invokes the appropriate handler, and sends back a response.
     ///
-    /// For streaming methods (registered via [`register_stream_handler`]),
+    /// For streaming methods (registered via [`Self::register_stream_handler`]),
     /// events are forwarded to the streaming handler as they arrive rather
     /// than being accumulated. For prebuffered methods, the entire request
     /// is accumulated and then passed to the handler.
