@@ -1,4 +1,7 @@
 #![doc = include_str!("../README.md")]
+#![doc(
+    html_logo_url = "https://raw.githubusercontent.com/jzombie/rust-muxio/main/assets/Muxio-logo.svg"
+)]
 
 // TODO: Validate docs
 // #![warn(missing_docs)]

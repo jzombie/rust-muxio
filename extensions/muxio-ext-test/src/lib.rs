@@ -44,11 +44,6 @@ macro_rules! prebuffered_roundtrip_tests {
 }
 
 /// Generate `#[tokio::test]` functions for server-to-client tests.
-///
-/// Current tests:
-/// - `test_server_to_client_echo` — prebuffered request/response
-/// - `test_server_to_client_streaming_echo` — chunked streaming
-/// - `test_concurrent_bidirectional_streaming` — simultaneous streams both ways
 #[macro_export]
 macro_rules! server_to_client_tests {
     ($module:ident, $transport:ty) => {

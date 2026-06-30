@@ -1,5 +1,5 @@
 <div align="center">
-    <img src="./assets/Muxio-logo.svg" width=250 height=250 />
+    <img src="https://raw.githubusercontent.com/jzombie/rust-muxio/main/assets/Muxio-logo.svg" width=250 height=250 />
 </div>
 
 <div align="center">
@@ -7,7 +7,7 @@
   <a href="https://crates.io/crates/muxio"><img src="https://img.shields.io/crates/v/muxio.svg" alt="crates.io"></a>
   <a href="https://docs.rs/muxio"><img src="https://docs.rs/muxio/badge.svg" alt="Documentation"></a>
   <a href="https://deepwiki.com/jzombie/rust-muxio"><img src="https://deepwiki.com/badge.svg" alt="DeepWiki"></a>
-  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="Apache 2.0 License"></a>
+  <a href="https://github.com/jzombie/rust-muxio/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="Apache 2.0 License"></a>
   <a href="https://coveralls.io/github/jzombie/rust-muxio?branch=main"><img src="https://coveralls.io/repos/github/jzombie/rust-muxio/badge.svg?branch=main" alt="Coverage Status"></a>
 </div>
 
@@ -49,15 +49,15 @@ On top of this multiplexing layer, Muxio offers a minimal, unopinionated RPC fra
 
 - **Extensible by Design:** Muxio comes with pre-built extensions:
 
-  - **Tokio-based WebSocket [Server](./extensions/muxio-tokio-rpc-server/)/[Client](./extensions/muxio-tokio-rpc-client/)**: For native, multi-threaded environments.
-  - **[WASM-based Web Client](./extensions/muxio-wasm-rpc-client/)**: For seamless integration into web applications via a JavaScript byte-passing bridge.
-  - **Tokio-based IPC [Server](./extensions/muxio-tokio-rpc-ipc-server/)/[Client](./extensions/muxio-tokio-rpc-ipc-client/)**: For local inter-process communication over Unix domain sockets or Windows named pipes.
+  - **Tokio-based WebSocket [Server](https://github.com/jzombie/rust-muxio/tree/main/extensions/muxio-tokio-rpc-server/)/[Client](https://github.com/jzombie/rust-muxio/tree/main/extensions/muxio-tokio-rpc-client/)**: For native, multi-threaded environments.
+  - **[WASM-based Web Client](https://github.com/jzombie/rust-muxio/tree/main/extensions/muxio-wasm-rpc-client/)**: For seamless integration into web applications via a JavaScript byte-passing bridge.
+  - **Tokio-based IPC [Server](https://github.com/jzombie/rust-muxio/tree/main/extensions/muxio-tokio-rpc-ipc-server/)/[Client](https://github.com/jzombie/rust-muxio/tree/main/extensions/muxio-tokio-rpc-ipc-client/)**: For local inter-process communication over Unix domain sockets or Windows named pipes.
 
 ## How Muxio Compares
 
 **Minimal framing overhead:** 17 bytes per frame (stream ID, sequence ID, frame kind, timestamp) vs HTTP/2's 9 bytes or gRPC's ~50+ bytes per protobuf message. For high-frequency small messages — keystrokes, mouse events, terminal output chunks — this overhead difference is significant.
 
-**Transport-agnostic core:** The [`RpcServiceCallerInterface`](./extensions/muxio-rpc-service-caller/src/caller_interface.rs) trait abstracts away the transport so the same application code works over WebSocket, Unix domain sockets, or WASM bridges without modification. Not many (if any) other Rust RPC frameworks offer WASM as a first-class transport.
+**Transport-agnostic core:** The [`RpcServiceCallerInterface`](https://github.com/jzombie/rust-muxio/blob/main/extensions/muxio-rpc-service-caller/src/caller_interface.rs) trait abstracts away the transport so the same application code works over WebSocket, Unix domain sockets, or WASM bridges without modification. Not many (if any) other Rust RPC frameworks offer WASM as a first-class transport.
 
 **FFI-friendly byte model:** The core dispatcher receives and emits raw byte slices, making it straightforward to bridge to C, C++, Python, or JavaScript. The included WASM client demonstrates this pattern with `#[wasm_bindgen]`.
 
@@ -80,7 +80,7 @@ Muxio is designed to be compiled into Rust first. Interop with other languages h
 
 **Minimal framing overhead:** 17 bytes per frame (stream ID, sequence ID, frame kind, timestamp) vs HTTP/2's 9 bytes or gRPC's ~50+ bytes per protobuf message. For high-frequency small messages — keystrokes, mouse events, terminal output chunks — this overhead difference is significant.
 
-**Transport-agnostic core:** The [`RpcServiceCallerInterface`](./extensions/muxio-rpc-service-caller/src/caller_interface.rs) trait abstracts away the transport so the same application code works over WebSocket, Unix domain sockets, or WASM bridges without modification. Not many (if any) other Rust RPC frameworks offer WASM as a first-class transport.
+**Transport-agnostic core:** The [`RpcServiceCallerInterface`](https://github.com/jzombie/rust-muxio/blob/main/extensions/muxio-rpc-service-caller/src/caller_interface.rs) trait abstracts away the transport so the same application code works over WebSocket, Unix domain sockets, or WASM bridges without modification. Not many (if any) other Rust RPC frameworks offer WASM as a first-class transport.
 
 **FFI-friendly byte model:** The core dispatcher receives and emits raw byte slices, making it straightforward to bridge to C, C++, Python, or JavaScript. The included WASM client demonstrates this pattern with `#[wasm_bindgen]`.
 
@@ -92,11 +92,11 @@ Muxio is engineered to solve specific challenges in building modern, distributed
 
 - **Low-Latency, High-Performance Communication**: Muxio is built for speed. It uses a compact, **low-overhead binary protocol** (instead of text-based formats like JSON). This significantly reduces the size of data sent over the network and minimizes the CPU cycles needed for serialization and deserialization. By avoiding complex parsing, Muxio lowers end-to-end latency, making it well-suited for real-time applications such as financial data streaming, multiplayer games, and interactive remote tooling.
 
-- **Cross-Platform Code with Agnostic Frontends**: Write your core application logic once and deploy it across multiple platforms. Muxio achieves this through its generic [`RpcServiceCallerInterface` trait](./extensions/muxio-rpc-service-caller/src/caller_interface.rs), which abstracts away the underlying transport. The same application code that calls an RPC method using the native [`RpcClient`](./extensions/muxio-tokio-rpc-client/) can also be utilized in a browser with the [`RpcWasmClient`](./extensions/muxio-wasm-rpc-client/) with minimal changes, while additional client types can also be added, provided they implement the same aformentioned `RpcServiceCallerInterface`. This design ensures that improvements to the core service logic benefit all clients simultaneously, even custom-built clients.
+- **Cross-Platform Code with Agnostic Frontends**: Write your core application logic once and deploy it across multiple platforms. Muxio achieves this through its generic [`RpcServiceCallerInterface` trait](https://github.com/jzombie/rust-muxio/blob/main/extensions/muxio-rpc-service-caller/src/caller_interface.rs), which abstracts away the underlying transport. The same application code that calls an RPC method using the native [`RpcClient`](https://github.com/jzombie/rust-muxio/tree/main/extensions/muxio-tokio-rpc-client/) can also be utilized in a browser with the [`RpcWasmClient`](https://github.com/jzombie/rust-muxio/tree/main/extensions/muxio-wasm-rpc-client/) with minimal changes, while additional client types can also be added, provided they implement the same aformentioned `RpcServiceCallerInterface`. This design ensures that improvements to the core service logic benefit all clients simultaneously, even custom-built clients.
 
-- **Shared Service Definitions for Type-Safe APIs**: Enforce integrity between your server and client by defining RPC methods, inputs, and outputs in a shared crate. By implementing the [`RpcMethodPrebuffered` trait](./extensions/muxio-rpc-service-caller/src/prebuffered/) , both client and server depend on a single source of truth for the API contract. This completely eliminates a common class of runtime errors, as any mismatch in data structures between the client and server will result in a compile-time error.
+- **Shared Service Definitions for Type-Safe APIs**: Enforce integrity between your server and client by defining RPC methods, inputs, and outputs in a shared crate. By implementing the [`RpcMethodPrebuffered` trait](https://github.com/jzombie/rust-muxio/tree/main/extensions/muxio-rpc-service-caller/src/prebuffered/) , both client and server depend on a single source of truth for the API contract. This completely eliminates a common class of runtime errors, as any mismatch in data structures between the client and server will result in a compile-time error.
 
-- **A Strong Foundation for Foreign Function Interfaces (FFI)**: The framework's byte-oriented design makes it an ideal foundation for bridging Rust with other languages. Because the core dispatcher only needs to receive and emit byte slices, you can easily create an FFI layer that connects Muxio to C, C++, Swift, or any language that can handle byte array (including Python). The included [`muxio-wasm-rpc-client`](./extensions/muxio-wasm-rpc-client/) serves as a perfect example, using `wasm_bindgen` to create a simple bridge between the Rust client and the JavaScript host environment.
+- **A Strong Foundation for Foreign Function Interfaces (FFI)**: The framework's byte-oriented design makes it an ideal foundation for bridging Rust with other languages. Because the core dispatcher only needs to receive and emit byte slices, you can easily create an FFI layer that connects Muxio to C, C++, Swift, or any language that can handle byte array (including Python). The included [`muxio-wasm-rpc-client`](https://github.com/jzombie/rust-muxio/tree/main/extensions/muxio-wasm-rpc-client/) serves as a perfect example, using `wasm_bindgen` to create a simple bridge between the Rust client and the JavaScript host environment.
 
 ## Installation
 
@@ -106,13 +106,13 @@ For Muxio's core:
 cargo add muxio
 ```
 
-This provides the low-level functionality, but [Muxio extensions](./extensions/) are likely more desirable for most use cases.
+This provides the low-level functionality, but [Muxio extensions](https://github.com/jzombie/rust-muxio/tree/main/extensions/) are likely more desirable for most use cases.
 
 ## WebSocket Usage Example
 
 Let's build a simple sample app which spins up a Tokio-based WebSocket server, adds some routes, then spins up a client, performs some requests, then shuts everything down.
 
-This example code was taken from the [`example-muxio-ws-rpc-app`](./examples/example-muxio-ws-rpc-app/) crate.
+This example code was taken from the [`example-muxio-ws-rpc-app`](https://github.com/jzombie/rust-muxio/tree/main/examples/example-muxio-ws-rpc-app/) crate.
 
 ```rust
 use example_muxio_rpc_service_definition::{
@@ -208,13 +208,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ### WASM WebSocket RPC
 
-The [WASM client](./extensions/muxio-wasm-rpc-client/) follows a callback-driven pattern — the browser owns the WebSocket, and Rust is called on events. The [`static_lib`](./extensions/muxio-wasm-rpc-client/src/static_lib/) module provides `#[wasm_bindgen]` exports that JS calls on `onopen`, `onmessage`, and `onclose`. The core [`RpcWasmClient`](./extensions/muxio-wasm-rpc-client/src/rpc_wasm_client.rs) implements the same `RpcServiceCallerInterface` used above, so calling methods like `Add::call(...)` works identically in the browser.
+The [WASM client](https://github.com/jzombie/rust-muxio/tree/main/extensions/muxio-wasm-rpc-client/) follows a callback-driven pattern — the browser owns the WebSocket, and Rust is called on events. The [`static_lib`](https://github.com/jzombie/rust-muxio/tree/main/extensions/muxio-wasm-rpc-client/src/static_lib/) module provides `#[wasm_bindgen]` exports that JS calls on `onopen`, `onmessage`, and `onclose`. The core [`RpcWasmClient`](https://github.com/jzombie/rust-muxio/blob/main/extensions/muxio-wasm-rpc-client/src/rpc_wasm_client.rs) implements the same `RpcServiceCallerInterface` used above, so calling methods like `Add::call(...)` works identically in the browser.
 
 ## IPC Usage Example
 
 The same application code works over Unix domain sockets or Windows named pipes via the IPC transport. Only the client and server types change — the service definitions (`Add`, `Mult`, `Echo`) are identical to the WebSocket example above.
 
-This example code was taken from the [`example-muxio-ws-rpc-app`](./examples/example-muxio-ws-rpc-app/) crate.
+This example code was taken from the [`example-muxio-ws-rpc-app`](https://github.com/jzombie/rust-muxio/tree/main/examples/example-muxio-ws-rpc-app/) crate.
 
 ```rust
 use example_muxio_rpc_service_definition::{
@@ -479,8 +479,8 @@ Client                          Server
   │ ── response B (echo) ───────► │
 ```
 
-This is exactly what the [`concurrent_bidirectional_streaming`](./extensions/muxio-ext-test/src/test_suites.rs) integration test exercises. It spawns two `tokio::spawn` tasks that write chunks in opposite directions and **yield between each chunk** so the writes are truly interleaved at the application level, not buffered and sent in one burst per direction.
+This is exactly what the [`concurrent_bidirectional_streaming`](https://github.com/search?q=repo%3Ajzombie%2Frust-muxio+concurrent_bidirectional_streaming&type=code) integration test exercises. It spawns two `tokio::spawn` tasks that write chunks in opposite directions and **yield between each chunk** so the writes are truly interleaved at the application level, not buffered and sent in one burst per direction.
 
 ## License
 
-Licensed under the [Apache-2.0 License](./LICENSE).
+Licensed under the [Apache-2.0 License](https://github.com/jzombie/rust-muxio/blob/main/LICENSE).
