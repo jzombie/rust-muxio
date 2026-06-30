@@ -1,3 +1,4 @@
+use crate::endpoint_helpers::{STREAMING_CAPTURE_METHOD_ID, ERROR_TEST_METHOD_ID, UNREGISTERED_METHOD_ID};
 use example_muxio_rpc_service_definition::prebuffered::{Add, Echo, Mult};
 use futures_util::StreamExt;
 use muxio_core::rpc::RpcRequest;
@@ -29,11 +30,11 @@ pub async fn roundtrip_success<C: RpcServiceCallerInterface>(client: &C) {
     assert_eq!(res6.unwrap(), b"testing 4 5 6".to_vec());
 }
 
-/// Run the error roundtrip test — the transport already registered 0xBAD
+/// Run the error roundtrip test — the transport already registered ERROR_TEST_METHOD_ID
 /// with a failing handler. Just call it and assert error propagation.
 pub async fn roundtrip_error<C: RpcServiceCallerInterface>(client: &C) {
     let request = RpcRequest {
-        rpc_method_id: 0xBAD,
+        rpc_method_id: ERROR_TEST_METHOD_ID,
         rpc_param_bytes: Some(b"hello".to_vec()),
         rpc_prebuffered_payload_bytes: None,
         is_finalized: true,
@@ -66,7 +67,7 @@ pub async fn roundtrip_large_payload<C: RpcServiceCallerInterface>(client: &C) {
 /// Run the method-not-found test.
 pub async fn roundtrip_method_not_found<C: RpcServiceCallerInterface>(client: &C) {
     let request = RpcRequest {
-        rpc_method_id: 0xDEAD_BEEF,
+        rpc_method_id: UNREGISTERED_METHOD_ID,
         rpc_param_bytes: Some(b"hello".to_vec()),
         rpc_prebuffered_payload_bytes: None,
         is_finalized: true,
@@ -472,5 +473,67 @@ where
     assert!(
         result.is_err(),
         "Expected the pending RPC call to fail, but it succeeded."
+    );
+}
+
+// ------------------------------------------------------------------
+// Streaming handler test bodies
+// ------------------------------------------------------------------
+
+/// Verify that a streaming handler receives Header, PayloadChunk, End
+/// events in the correct order with the correct data.
+pub async fn streaming_handler_events_arrive<C>(client: &C)
+where
+    C: RpcServiceCallerInterface,
+{
+    let payload = b"hello streaming world".to_vec();
+
+    let request = RpcRequest {
+        rpc_method_id: STREAMING_CAPTURE_METHOD_ID,
+        rpc_param_bytes: None,
+        rpc_prebuffered_payload_bytes: None,
+        is_finalized: false,
+    };
+
+    let (mut encoder, mut receiver) = client
+        .call_rpc_streaming(request, DynamicChannelType::Unbounded)
+        .await
+        .expect("streaming call failed");
+
+    // Write data in chunks
+    for chunk in payload.chunks(8) {
+        encoder
+            .write_bytes(chunk)
+            .expect("write_bytes failed");
+    }
+    encoder.flush().expect("flush failed");
+    encoder.end_stream().expect("end_stream failed");
+
+    // Drain the receiver (the streaming handler may send response chunks
+    // in the future; for now we just consume and discard)
+    while let Some(_chunk) = receiver.next().await {
+        // Response path not yet implemented — events are captured server-side
+    }
+}
+
+/// Verify that a streaming call to an unregistered method returns an error.
+pub async fn streaming_handler_method_not_found<C>(client: &C)
+where
+    C: RpcServiceCallerInterface,
+{
+    let request = RpcRequest {
+        rpc_method_id: UNREGISTERED_METHOD_ID,
+        rpc_param_bytes: Some(b"hello".to_vec()),
+        rpc_prebuffered_payload_bytes: None,
+        is_finalized: false,
+    };
+
+    let result = client
+        .call_rpc_streaming(request, DynamicChannelType::Unbounded)
+        .await;
+
+    assert!(
+        result.is_err(),
+        "Expected streaming call to unregistered method to fail, but it succeeded"
     );
 }

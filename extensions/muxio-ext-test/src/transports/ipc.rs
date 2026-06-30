@@ -5,7 +5,7 @@ use interprocess::local_socket::{GenericNamespaced, ListenerOptions, ToNsName, t
 use muxio_rpc_service_endpoint::RpcServiceEndpoint;
 use muxio_tokio_rpc_ipc_client::RpcIpcClient;
 use muxio_tokio_rpc_ipc_server::{
-    RpcIpcConnectionContextHandle, RpcIpcServer, RpcIpcServerEvent, RpcServiceEndpointInterface,
+    RpcIpcConnectionContextHandle, RpcIpcServer, RpcIpcServerEvent,
 };
 use std::sync::Arc;
 use tokio::sync::oneshot;
@@ -34,13 +34,7 @@ impl TestTransport for RpcIpcClient {
         let server = RpcIpcServer::new(None);
         let endpoint = server.endpoint();
         endpoint_helpers::register_standard_handlers(&*endpoint).await;
-        // Pre-register a test error handler for the roundtrip_error test
-        let _ = endpoint
-            .register_prebuffered(0xBAD, |_request_bytes, _ctx| async move {
-                Err(Box::new(std::io::Error::other("test error"))
-                    as Box<dyn std::error::Error + Send + Sync>)
-            })
-            .await;
+        endpoint_helpers::register_error_handler(&*endpoint).await;
         drop(endpoint);
         let name = socket_name.clone();
         tokio::spawn(async move {
@@ -108,5 +102,28 @@ impl TestTransport for RpcIpcClient {
         };
 
         (client, endpoint, ctx_handle)
+    }
+
+    async fn connect_for_streaming() -> (Arc<Self::Client>, Arc<RpcServiceEndpoint<()>>) {
+        let socket_name = temp_name("streaming");
+        let server = RpcIpcServer::new(None);
+        let endpoint = server.endpoint();
+
+        // Register standard prebuffered handlers (Add, Mult, Echo, error test)
+        endpoint_helpers::register_standard_handlers(&*endpoint).await;
+        endpoint_helpers::register_error_handler(&*endpoint).await;
+
+        // Register the streaming capture handler alongside prebuffered handlers
+        endpoint_helpers::register_stream_capture_handler(&*endpoint).await;
+
+        drop(endpoint);
+        let name = socket_name.clone();
+        tokio::spawn(async move {
+            let _ = server.serve(&name).await;
+        });
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        let client = RpcIpcClient::new(&socket_name).await.unwrap();
+        let client_endpoint = client.get_endpoint();
+        (client, client_endpoint)
     }
 }

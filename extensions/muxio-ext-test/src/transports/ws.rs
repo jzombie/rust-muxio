@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use muxio_rpc_service_endpoint::RpcServiceEndpoint;
 use muxio_tokio_rpc_client::RpcClient;
 use muxio_tokio_rpc_server::{
-    ConnectionContextHandle, RpcServerEvent, RpcServiceEndpointInterface as _,
+    ConnectionContextHandle, RpcServerEvent,
     utils::tcp_listener_to_host_port,
 };
 use std::sync::Arc;
@@ -27,13 +27,7 @@ impl TestTransport for RpcClient {
         // Register handlers on the SERVER endpoint (where requests are processed)
         let server_endpoint = server.endpoint();
         endpoint_helpers::register_standard_handlers(&*server_endpoint).await;
-        // Pre-register a test error handler for the roundtrip_error test
-        let _ = server_endpoint
-            .register_prebuffered(0xBAD, |_request_bytes, _ctx| async move {
-                Err(Box::new(std::io::Error::other("test error"))
-                    as Box<dyn std::error::Error + Send + Sync>)
-            })
-            .await;
+        endpoint_helpers::register_error_handler(&*server_endpoint).await;
         let client = ws_helpers::connect_ws_client(&host, port).await;
         let endpoint = client.get_endpoint();
         (client, endpoint)
@@ -105,5 +99,16 @@ impl TestTransport for RpcClient {
         };
 
         (client, endpoint, ctx_handle)
+    }
+
+    async fn connect_for_streaming() -> (Arc<Self::Client>, Arc<RpcServiceEndpoint<()>>) {
+        let (server, host, port) = ws_helpers::setup_ws_server().await;
+        let server_endpoint = server.endpoint();
+        endpoint_helpers::register_standard_handlers(&*server_endpoint).await;
+        endpoint_helpers::register_error_handler(&*server_endpoint).await;
+        endpoint_helpers::register_stream_capture_handler(&*server_endpoint).await;
+        let client = ws_helpers::connect_ws_client(&host, port).await;
+        let endpoint = client.get_endpoint();
+        (client, endpoint)
     }
 }

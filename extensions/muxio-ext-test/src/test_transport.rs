@@ -23,4 +23,9 @@ pub trait TestTransport: Sized {
         Arc<RpcServiceEndpoint<()>>,
         Self::S2cHandle,
     );
+
+    /// Like connect() but also registers a streaming capture handler
+    /// (at `rpc_method_id!("streaming.capture")`) on the server endpoint.
+    async fn connect_for_streaming()
+        -> (Arc<Self::Client>, Arc<RpcServiceEndpoint<()>>);
 }

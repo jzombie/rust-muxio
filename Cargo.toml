@@ -105,6 +105,7 @@ bitcode = { workspace = true }
 example-muxio-rpc-service-definition = { workspace = true }
 futures = { workspace = true }
 muxio-rpc-service-caller = { workspace = true }
+muxio-rpc-service-endpoint = { workspace = true }
 muxio-tokio-rpc-ipc-client = { workspace = true }
 muxio-tokio-rpc-ipc-server = { workspace = true }
 muxio-tokio-rpc-client = { workspace = true }

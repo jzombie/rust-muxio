@@ -254,3 +254,61 @@ async fn test_large_payload_request_response_cycle() {
         Some(expected_response_payload.as_slice())
     );
 }
+
+// ---------------------------------------------------------------------------
+// Streaming handler tests
+// ---------------------------------------------------------------------------
+
+const STREAM_TEST_METHOD: u64 = 0x6001;
+
+#[tokio::test]
+async fn test_register_stream_handler_success() {
+    let endpoint = RpcServiceEndpoint::<()>::new();
+    let result = endpoint
+        .register_stream_handler(STREAM_TEST_METHOD, |_event, _emit, _ctx| {})
+        .await;
+    assert!(result.is_ok());
+}
+
+#[tokio::test]
+async fn test_register_stream_handler_duplicate() {
+    let endpoint = RpcServiceEndpoint::<()>::new();
+    endpoint
+        .register_stream_handler(STREAM_TEST_METHOD, |_event, _emit, _ctx| {})
+        .await
+        .unwrap();
+    let result = endpoint
+        .register_stream_handler(STREAM_TEST_METHOD, |_event, _emit, _ctx| {})
+        .await;
+    assert!(matches!(result, Err(RpcServiceEndpointError::Handler(_))));
+}
+
+#[tokio::test]
+async fn test_stream_handler_prebuffered_conflict() {
+    let endpoint = RpcServiceEndpoint::<()>::new();
+    // Register prebuffered first, then try streaming — should fail
+    endpoint
+        .register_prebuffered(STREAM_TEST_METHOD, |_request_bytes: Vec<u8>, _ctx| async {
+            Ok(vec![])
+        })
+        .await
+        .unwrap();
+    let result = endpoint
+        .register_stream_handler(STREAM_TEST_METHOD, |_event, _emit, _ctx| {})
+        .await;
+    assert!(matches!(result, Err(RpcServiceEndpointError::Handler(_))));
+
+    // Also test the reverse: streaming first, then prebuffered — should fail
+    let endpoint2 = RpcServiceEndpoint::<()>::new();
+    endpoint2
+        .register_stream_handler(STREAM_TEST_METHOD + 1, |_event, _emit, _ctx| {})
+        .await
+        .unwrap();
+    let result = endpoint2
+        .register_prebuffered(
+            STREAM_TEST_METHOD + 1,
+            |_request_bytes: Vec<u8>, _ctx| async { Ok(vec![]) },
+        )
+        .await;
+    assert!(matches!(result, Err(RpcServiceEndpointError::Handler(_))));
+}

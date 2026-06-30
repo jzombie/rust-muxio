@@ -52,6 +52,18 @@ where
             + Send
             + 'static,
     {
+        // Also check streaming handlers to prevent ID clashes
+        let stream_exists = self
+            .get_stream_handlers()
+            .with_stream_handlers(|handlers| handlers.contains_key(&method_id))
+            .await;
+        if stream_exists {
+            return Err(RpcServiceEndpointError::Handler(
+                format!("A streaming handler for method ID {method_id} is already registered.")
+                    .into(),
+            ));
+        }
+
         self.get_prebuffered_handlers()
             .with_handlers(|handlers| match handlers.entry(method_id) {
                 // `method_id` is now u64, matches HashMap key

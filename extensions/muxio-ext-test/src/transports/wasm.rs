@@ -3,7 +3,6 @@ use crate::test_transport::TestTransport;
 use async_trait::async_trait;
 use futures_util::{SinkExt, StreamExt};
 use muxio_rpc_service_endpoint::RpcServiceEndpoint;
-use muxio_tokio_rpc_server::RpcServiceEndpointInterface as _;
 use muxio_tokio_rpc_server::{ConnectionContextHandle, RpcServer, RpcServerEvent};
 use muxio_wasm_rpc_client::RpcWasmClient;
 use std::sync::Arc;
@@ -28,12 +27,7 @@ impl TestTransport for RpcWasmClient {
         let server = Arc::new(RpcServer::new(None));
         let server_endpoint = server.endpoint();
         endpoint_helpers::register_standard_handlers(&*server_endpoint).await;
-        let _ = server_endpoint
-            .register_prebuffered(0xBAD, |_request_bytes, _ctx| async move {
-                Err(Box::new(std::io::Error::other("test error"))
-                    as Box<dyn std::error::Error + Send + Sync>)
-            })
-            .await;
+        endpoint_helpers::register_error_handler(&*server_endpoint).await;
         let server_clone = server.clone();
         tokio::spawn(async move {
             let _ = server_clone.serve_with_listener(listener).await;
@@ -109,6 +103,26 @@ impl TestTransport for RpcWasmClient {
         };
 
         (client, endpoint, ctx_handle)
+    }
+
+    async fn connect_for_streaming() -> (Arc<Self::Client>, Arc<RpcServiceEndpoint<()>>) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server_url = format!("ws://{addr}/ws");
+        let server = Arc::new(RpcServer::new(None));
+        let server_endpoint = server.endpoint();
+        endpoint_helpers::register_standard_handlers(&*server_endpoint).await;
+        endpoint_helpers::register_error_handler(&*server_endpoint).await;
+        endpoint_helpers::register_stream_capture_handler(&*server_endpoint).await;
+        let server_clone = server.clone();
+        tokio::spawn(async move {
+            let _ = server_clone.serve_with_listener(listener).await;
+        });
+        sleep(Duration::from_millis(200)).await;
+
+        let (client, _send, _recv) = setup_wasm_bridge(&server_url).await;
+        let endpoint = client.get_endpoint();
+        (client, endpoint)
     }
 }
 

@@ -11,7 +11,7 @@
   <a href="https://coveralls.io/github/jzombie/rust-muxio?branch=main"><img src="https://coveralls.io/repos/github/jzombie/rust-muxio/badge.svg?branch=main" alt="Coverage Status"></a>
 </div>
 
-<p align="center"><strong>Examples:</strong> <a href="#websocket-usage-example">WebSocket RPC</a> · <a href="#wasm-websocket-rpc">WASM WebSocket RPC</a> · <a href="#ipc-usage-example">IPC RPC</a> · <a href="#streaming-rpc-example">Streaming RPC</a> · <a href="#concurrent-bidirectional-streaming">Bidrectional Streaming</a></p>
+<p align="center"><strong>Examples:</strong> <a href="#websocket-usage-example">WebSocket RPC</a> · <a href="#wasm-websocket-rpc">WASM WebSocket RPC</a> · <a href="#ipc-usage-example">IPC RPC</a> · <a href="#streaming-rpc-example">Streaming RPC</a> · <a href="#handling-streaming-requests-on-the-server">Streaming Handlers</a> · <a href="#concurrent-bidirectional-streaming">Bidirectional Streaming</a></p>
 
 # Muxio: A High-Performance Multiplexing and RPC Framework for Rust
 
@@ -332,6 +332,47 @@ async fn streaming_example(rpc_client: &RpcClient) -> Result<(), Box<dyn std::er
     Ok(())
 }
 ```
+
+### Handling streaming requests on the server
+
+Streaming handlers are registered via `register_stream_handler()` and receive
+individual `RpcStreamEvent`s as they arrive from the transport. Unlike
+prebuffered handlers (which accumulate the entire request into a `Vec<u8>`
+before invoking the handler), streaming handlers are called synchronously
+for each event:
+
+```rust
+use muxio_core::rpc::rpc_internals::RpcStreamEvent;
+use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface};
+
+fn main() {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        let endpoint = RpcServiceEndpoint::<()>::new();
+
+        endpoint.register_stream_handler(0x01, |event, _emit, _ctx| {
+            match event {
+                RpcStreamEvent::Header { rpc_method_id, .. } => {
+                    println!("Stream started for method {rpc_method_id}");
+                }
+                RpcStreamEvent::PayloadChunk { bytes, .. } => {
+                    println!("Received {} bytes", bytes.len());
+                }
+                RpcStreamEvent::End { .. } => {
+                    println!("Stream complete");
+                }
+                RpcStreamEvent::Error { frame_decode_error, .. } => {
+                    eprintln!("Stream error: {frame_decode_error:?}");
+                }
+            }
+        }).await.unwrap();
+    });
+}
+```
+
+> **Note:** The second argument (`_emit`) accepts a raw transport byte sink
+> (`Box<dyn RpcEmit>`). A future API will expose `RpcDispatcher::respond()`
+> for sending properly framed response chunks back to the caller.
 
 ### Streaming from the server to the client (server-initiated calls)
 

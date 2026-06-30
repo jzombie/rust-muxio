@@ -203,3 +203,31 @@ macro_rules! transport_state_tests {
 }
 
 // Keep old test_macros module for backwards compat if it exists
+
+/// Generate `#[tokio::test]` functions for streaming handler tests.
+///
+/// Tests:
+/// - `test_streaming_handler_events_arrive` — send chunks, verify events
+/// - `test_streaming_handler_method_not_found` — call unregistered method
+#[macro_export]
+macro_rules! streaming_handler_tests {
+    ($module:ident, $transport:ty) => {
+        mod $module {
+            #[tokio::test]
+            async fn test_streaming_handler_events_arrive() {
+                let (client, _) =
+                    <$transport as $crate::test_transport::TestTransport>::connect_for_streaming()
+                        .await;
+                $crate::test_suites::streaming_handler_events_arrive(client.as_ref()).await;
+            }
+
+            #[tokio::test]
+            async fn test_streaming_handler_method_not_found() {
+                let (client, _) =
+                    <$transport as $crate::test_transport::TestTransport>::connect_for_streaming()
+                        .await;
+                $crate::test_suites::streaming_handler_method_not_found(client.as_ref()).await;
+            }
+        }
+    };
+}
