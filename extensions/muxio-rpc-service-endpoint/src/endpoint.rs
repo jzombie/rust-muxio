@@ -4,6 +4,9 @@ use std::collections::HashMap;
 use std::sync::Mutex as StdMutex;
 use std::{future::Future, marker::PhantomData, pin::Pin, sync::Arc};
 
+type ResponseWriter = Box<dyn FnMut(&[u8], bool) + Send>;
+type ResponseBuffer = Arc<StdMutex<Vec<(Vec<u8>, bool)>>>;
+
 // --- Conditionally Alias the Mutex Implementation ---
 #[cfg(not(feature = "tokio_support"))]
 use std::sync::Mutex;
@@ -31,8 +34,8 @@ pub type RpcPrebufferedHandler<C> = Arc<
 #[derive(Clone)]
 pub struct StreamResponder {
     pub(crate) request_id: u32,
-    writer: Arc<StdMutex<Option<Box<dyn FnMut(&[u8], bool) + Send>>>>,
-    buffer: Arc<StdMutex<Vec<(Vec<u8>, bool)>>>,
+    writer: Arc<StdMutex<Option<ResponseWriter>>>,
+    buffer: ResponseBuffer,
 }
 
 impl StreamResponder {
@@ -63,7 +66,7 @@ impl StreamResponder {
         }
     }
 
-    pub(crate) fn set_writer(&self, writer: Box<dyn FnMut(&[u8], bool) + Send>) {
+    pub(crate) fn set_writer(&self, writer: ResponseWriter) {
         let mut guard = self
             .writer
             .lock()

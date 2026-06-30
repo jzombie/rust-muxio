@@ -5,6 +5,9 @@ use crate::rpc::rpc_internals::{
 };
 use std::collections::HashMap;
 
+type StreamMethodRouter<'a> =
+    Box<dyn FnMut(u64, u32) -> Option<Box<dyn FnMut(RpcStreamEvent) + Send + 'a>> + Send + 'a>;
+
 impl<'a> Default for RpcRespondableSession<'a> {
     fn default() -> Self {
         Self::new()
@@ -29,9 +32,7 @@ pub struct RpcRespondableSession<'a> {
     /// When set, it is consulted on each `Header` event. If it returns a handler,
     /// the handler is registered for that stream, bypassing the catch-all accumulator.
     /// This enables streaming handler dispatch on the endpoint side.
-    stream_method_router: Option<
-        Box<dyn FnMut(u64, u32) -> Option<Box<dyn FnMut(RpcStreamEvent) + Send + 'a>> + Send + 'a>,
-    >,
+    stream_method_router: Option<StreamMethodRouter<'a>>,
 }
 
 impl<'a> RpcRespondableSession<'a> {
@@ -123,12 +124,10 @@ impl<'a> RpcRespondableSession<'a> {
                 rpc_method_id,
                 ..
             } = &evt
+                && let Some(ref mut router) = self.stream_method_router
+                && let Some(handler) = router(*rpc_method_id, *rpc_request_id)
             {
-                if let Some(ref mut router) = self.stream_method_router {
-                    if let Some(handler) = router(*rpc_method_id, *rpc_request_id) {
-                        self.response_handlers.insert(*rpc_request_id, handler);
-                    }
-                }
+                self.response_handlers.insert(*rpc_request_id, handler);
             }
 
             let id = match &evt {

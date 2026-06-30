@@ -1,29 +1,3 @@
-#[cfg(test)]
-mod method_id_uniqueness_tests {
-    use example_muxio_rpc_service_definition::RpcMethodPrebuffered;
-    use std::collections::HashSet;
-
-    #[test]
-    fn all_known_method_ids_are_unique() {
-        let mut seen = HashSet::new();
-        let test_ids = vec![
-            crate::endpoint_helpers::STREAMING_CAPTURE_METHOD_ID,
-            crate::endpoint_helpers::ERROR_TEST_METHOD_ID,
-            crate::endpoint_helpers::UNREGISTERED_METHOD_ID,
-            example_muxio_rpc_service_definition::prebuffered::Add::METHOD_ID,
-            example_muxio_rpc_service_definition::prebuffered::Mult::METHOD_ID,
-            example_muxio_rpc_service_definition::prebuffered::Echo::METHOD_ID,
-        ];
-        for id in test_ids {
-            assert!(
-                seen.insert(id),
-                "Duplicate method ID detected: {}. All method IDs must be unique.",
-                id
-            );
-        }
-    }
-}
-
 use crate::endpoint_helpers::{
     ERROR_TEST_METHOD_ID, STREAMING_CAPTURE_METHOD_ID, UNREGISTERED_METHOD_ID,
 };
@@ -589,9 +563,8 @@ where
         assert_eq!(total_received, payload.len(), "Total payload data mismatch");
     }
 
-    // Collect all response chunks from the streaming handler's echo
     let mut response = Vec::new();
-    match tokio::time::timeout(std::time::Duration::from_secs(5), async {
+    if let Ok(resp) = tokio::time::timeout(std::time::Duration::from_secs(5), async {
         while let Some(chunk) = receiver.next().await {
             match chunk {
                 Ok(bytes) => response.extend_from_slice(&bytes),
@@ -601,16 +574,12 @@ where
         std::mem::take(&mut response)
     })
     .await
+        && !resp.is_empty()
     {
-        Ok(resp) => {
-            if !resp.is_empty() {
-                assert_eq!(
-                    resp, payload,
-                    "Streaming handler echoed back mismatched payload"
-                );
-            }
-        }
-        Err(_) => {}
+        assert_eq!(
+            resp, payload,
+            "Streaming handler echoed back mismatched payload"
+        );
     }
 }
 
@@ -776,4 +745,30 @@ pub async fn complex_concurrent_mixed<H, C, E>(
         vec![1.0, 3.0, 5.0, 7.0, 9.0],
         "{label} prebuffered results mismatch"
     );
+}
+
+#[cfg(test)]
+mod method_id_uniqueness_tests {
+    use example_muxio_rpc_service_definition::RpcMethodPrebuffered;
+    use std::collections::HashSet;
+
+    #[test]
+    fn all_known_method_ids_are_unique() {
+        let mut seen = HashSet::new();
+        let test_ids = vec![
+            crate::endpoint_helpers::STREAMING_CAPTURE_METHOD_ID,
+            crate::endpoint_helpers::ERROR_TEST_METHOD_ID,
+            crate::endpoint_helpers::UNREGISTERED_METHOD_ID,
+            example_muxio_rpc_service_definition::prebuffered::Add::METHOD_ID,
+            example_muxio_rpc_service_definition::prebuffered::Mult::METHOD_ID,
+            example_muxio_rpc_service_definition::prebuffered::Echo::METHOD_ID,
+        ];
+        for id in test_ids {
+            assert!(
+                seen.insert(id),
+                "Duplicate method ID detected: {}. All method IDs must be unique.",
+                id
+            );
+        }
+    }
 }
