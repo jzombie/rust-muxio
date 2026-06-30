@@ -9,7 +9,7 @@ repository.workspace = true # Inherit from workspace
 license.workspace = true # Inherit from workspace
 publish.workspace = true # Inherit from workspace
 
-# README doc tests are not automatically handled by cargo-udeps
+# `cargo-udeps` cannot detect usage of crates that are only used in doc-tests.
 [package.metadata.cargo-udeps.ignore]
 development = ["example-muxio-rpc-service-definition", "tracing-subscriber"]
 

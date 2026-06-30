@@ -7,6 +7,10 @@ repository.workspace = true
 license.workspace = true
 publish = false
 
+# `cargo-udeps` cannot detect usage of crates that are only used in doc-tests.
+[package.metadata.cargo-udeps.ignore]
+development = ["tracing-subscriber"]
+
 [dependencies]
 async-trait = { workspace = true }
 bytemuck.workspace = true
