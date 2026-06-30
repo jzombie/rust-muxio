@@ -184,7 +184,7 @@ where
                     let h = Arc::clone(handler);
                     let ctx = ctx_clone.clone();
                     let respond = StreamResponder::new(request_id);
-                    responders.lock().unwrap().push(respond.clone());
+                    responders.lock().expect("Pending responders lock poisoned").push(respond.clone());
                     let boxed: Box<dyn FnMut(RpcStreamEvent) + Send + 'a> =
                         Box::new(move |event: RpcStreamEvent| {
                             h(event, respond.clone(), ctx.clone());
@@ -206,7 +206,7 @@ where
         // the writer was set) were buffered inside StreamResponder and
         // are flushed now.
         {
-            let mut responders = pending_responders.lock().unwrap();
+            let mut responders = pending_responders.lock().expect("Pending responders lock poisoned");
             for respond in responders.iter() {
                 if let Ok(writer) = dispatcher.create_response_writer(
                     respond.request_id,

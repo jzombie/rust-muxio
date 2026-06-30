@@ -49,22 +49,18 @@ impl StreamResponder {
     /// Writes directly to the transport if a writer is available,
     /// otherwise buffers until the writer is set (after `read_bytes`).
     pub fn respond(&self, chunk: Vec<u8>, is_finalized: bool) {
-        let mut writer_guard = self.writer.lock().unwrap();
+        let mut writer_guard = self.writer.lock().expect("StreamResponder writer lock poisoned");
         if let Some(writer) = writer_guard.as_mut() {
-            // Writer is available — send directly to transport
             writer(&chunk, is_finalized);
         } else {
-            // Writer not yet set — buffer for later flush
-            self.buffer.lock().unwrap().push((chunk, is_finalized));
+            self.buffer.lock().expect("StreamResponder buffer lock poisoned").push((chunk, is_finalized));
         }
     }
 
-    /// Install the encoder-backed writer and flush any buffered chunks.
     pub(crate) fn set_writer(&self, writer: Box<dyn FnMut(&[u8], bool) + Send>) {
-        let mut guard = self.writer.lock().unwrap();
+        let mut guard = self.writer.lock().expect("StreamResponder writer lock poisoned");
         *guard = Some(writer);
-        // Flush any chunks that were buffered before the writer was set
-        let buffered = std::mem::take(&mut *self.buffer.lock().unwrap());
+        let buffered = std::mem::take(&mut *self.buffer.lock().expect("StreamResponder buffer lock poisoned"));
         if let Some(w) = guard.as_mut() {
             for (chunk, is_finalized) in buffered {
                 w(&chunk, is_finalized);

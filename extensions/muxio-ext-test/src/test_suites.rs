@@ -1,3 +1,29 @@
+#[cfg(test)]
+mod method_id_uniqueness_tests {
+    use example_muxio_rpc_service_definition::RpcMethodPrebuffered;
+    use std::collections::HashSet;
+
+    #[test]
+    fn all_known_method_ids_are_unique() {
+        let mut seen = HashSet::new();
+        let test_ids = vec![
+            crate::endpoint_helpers::STREAMING_CAPTURE_METHOD_ID,
+            crate::endpoint_helpers::ERROR_TEST_METHOD_ID,
+            crate::endpoint_helpers::UNREGISTERED_METHOD_ID,
+            example_muxio_rpc_service_definition::prebuffered::Add::METHOD_ID,
+            example_muxio_rpc_service_definition::prebuffered::Mult::METHOD_ID,
+            example_muxio_rpc_service_definition::prebuffered::Echo::METHOD_ID,
+        ];
+        for id in test_ids {
+            assert!(
+                seen.insert(id),
+                "Duplicate method ID detected: {}. All method IDs must be unique.",
+                id
+            );
+        }
+    }
+}
+
 use crate::endpoint_helpers::{ERROR_TEST_METHOD_ID, STREAMING_CAPTURE_METHOD_ID, UNREGISTERED_METHOD_ID};
 use example_muxio_rpc_service_definition::prebuffered::{Add, Echo, Mult};
 use futures_util::StreamExt;
@@ -614,4 +640,138 @@ where
         },
     )
     .await;
+}
+
+/// Run multiple concurrent streams from both parties interleaved with
+/// prebuffered RPC calls on the same connection.
+///
+/// Exercises:
+/// - 3 concurrent client→server streaming calls
+/// - 3 concurrent server→client streaming calls (simultaneous bidirectional)
+/// - Prebuffered (unary) RPCs interleaved between stream chunks
+/// - True concurrent bidirectional streaming at the transport level
+pub async fn complex_concurrent_mixed<H, C, E>(
+    client: Arc<C>,
+    client_endpoint: &impl RpcServiceEndpointInterface<E>,
+    ctx_handle: H,
+    label: &str,
+) where
+    H: RpcServiceCallerInterface + Clone + Send + Sync + 'static,
+    C: RpcServiceCallerInterface + Send + Sync + 'static,
+    E: Send + Sync + Clone + 'static,
+{
+    client_endpoint
+        .register_prebuffered(Echo::METHOD_ID, |request_bytes, _ctx| async move {
+            Echo::encode_response(Echo::decode_request(&request_bytes)?)
+                .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>)
+        })
+        .await
+        .unwrap();
+
+    let client_stream_tasks: Vec<_> = (0..3)
+        .map(|i| {
+            let client = client.clone();
+            tokio::spawn(async move {
+                let request = RpcRequest {
+                    rpc_method_id: Echo::METHOD_ID,
+                    rpc_param_bytes: None,
+                    rpc_prebuffered_payload_bytes: None,
+                    is_finalized: false,
+                };
+                let (mut encoder, mut receiver) = client
+                    .call_rpc_streaming(request, DynamicChannelType::Unbounded)
+                    .await
+                    .expect("client stream failed to start");
+
+                let payload = vec![b'A' + i as u8; 100_000];
+                for chunk in payload.chunks(1024) {
+                    encoder.write_bytes(chunk).unwrap();
+                    if i % 2 == 0 {
+                        tokio::task::yield_now().await;
+                    }
+                }
+                encoder.flush().unwrap();
+                encoder.end_stream().unwrap();
+
+                let mut response = Vec::new();
+                while let Some(chunk) = receiver.next().await {
+                    match chunk {
+                        Ok(bytes) => response.extend_from_slice(&bytes),
+                        Err(e) => panic!("client stream {i} error: {e:?}"),
+                    }
+                }
+                (i, response)
+            })
+        })
+        .collect();
+
+    let server_stream_tasks: Vec<_> = (0..3)
+        .map(|i| {
+            let handle = ctx_handle.clone();
+            tokio::spawn(async move {
+                let request = RpcRequest {
+                    rpc_method_id: Echo::METHOD_ID,
+                    rpc_param_bytes: None,
+                    rpc_prebuffered_payload_bytes: None,
+                    is_finalized: false,
+                };
+                let (mut encoder, mut receiver) = handle
+                    .call_rpc_streaming(request, DynamicChannelType::Unbounded)
+                    .await
+                    .expect("server stream failed to start");
+
+                let payload = vec![b'X' + i as u8; 100_000];
+                for chunk in payload.chunks(1024) {
+                    encoder.write_bytes(chunk).unwrap();
+                    if i % 2 == 0 {
+                        tokio::task::yield_now().await;
+                    }
+                }
+                encoder.flush().unwrap();
+                encoder.end_stream().unwrap();
+
+                let mut response = Vec::new();
+                while let Some(chunk) = receiver.next().await {
+                    match chunk {
+                        Ok(bytes) => response.extend_from_slice(&bytes),
+                        Err(e) => panic!("server stream {i} error: {e:?}"),
+                    }
+                }
+                (i, response)
+            })
+        })
+        .collect();
+
+    let mut prebuffered_results = Vec::new();
+    for i in 0..5 {
+        let sum = Add::call(&*client, vec![i as f64, (i + 1) as f64])
+            .await
+            .unwrap();
+        prebuffered_results.push(sum);
+        tokio::task::yield_now().await;
+    }
+
+    for task in client_stream_tasks {
+        let (i, response) = task.await.unwrap();
+        let expected = vec![b'A' + i as u8; 100_000];
+        assert_eq!(
+            response, expected,
+            "{label} client stream {i} data mismatch"
+        );
+    }
+
+    for task in server_stream_tasks {
+        let (i, response) = task.await.unwrap();
+        let expected = vec![b'X' + i as u8; 100_000];
+        assert_eq!(
+            response, expected,
+            "{label} server stream {i} data mismatch"
+        );
+    }
+
+    assert_eq!(
+        prebuffered_results,
+        vec![1.0, 3.0, 5.0, 7.0, 9.0],
+        "{label} prebuffered results mismatch"
+    );
 }

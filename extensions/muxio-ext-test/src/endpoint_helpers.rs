@@ -11,10 +11,11 @@ use std::sync::{Arc, Mutex};
 pub const STREAMING_CAPTURE_METHOD_ID: u64 = rpc_method_id!("streaming.capture");
 
 /// Shared method ID for error-handler tests across all transports.
-pub const ERROR_TEST_METHOD_ID: u64 = 0xBAD;
+pub const ERROR_TEST_METHOD_ID: u64 = rpc_method_id!("__test.error");
 
 /// Method ID guaranteed to have no registered handler — used for method-not-found tests.
-pub const UNREGISTERED_METHOD_ID: u64 = 0xDEAD_BEEF;
+/// Uses a long, distinctive name that no real service would use.
+pub const UNREGISTERED_METHOD_ID: u64 = rpc_method_id!("__test.unregistered.method");
 
 /// Register a prebuffered error handler at `ERROR_TEST_METHOD_ID` (0xBAD).
 pub async fn register_error_handler<C>(endpoint: &impl RpcServiceEndpointInterface<C>)

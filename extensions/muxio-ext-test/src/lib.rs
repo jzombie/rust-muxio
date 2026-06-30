@@ -231,3 +231,29 @@ macro_rules! streaming_handler_tests {
         }
     };
 }
+
+/// Generate `#[tokio::test]` functions for complex concurrent tests.
+///
+/// Tests:
+/// - `test_complex_concurrent_mixed` — multiple streams both directions with
+///   interleaved prebuffered RPC calls
+#[macro_export]
+macro_rules! complex_concurrent_tests {
+    ($module:ident, $transport:ty) => {
+        mod $module {
+            #[tokio::test]
+            async fn test_complex_concurrent_mixed() {
+                let (client, endpoint, handle) =
+                    <$transport as $crate::test_transport::TestTransport>::connect_s2c().await;
+                let label = <$transport as $crate::test_transport::TestTransport>::name();
+                $crate::test_suites::complex_concurrent_mixed(
+                    client,
+                    &*endpoint,
+                    handle,
+                    label,
+                )
+                .await;
+            }
+        }
+    };
+}

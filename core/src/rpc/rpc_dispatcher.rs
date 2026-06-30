@@ -478,6 +478,11 @@ impl<'a> RpcDispatcher<'a> {
     /// This is a crucial cleanup mechanism to prevent hanging requests when a
     /// transport-level connection is dropped. It ensures that any code awaiting
     /// a response is promptly notified of the failure.
+    ///
+    /// This is one of three layers in the disconnect detection strategy:
+    /// 1. Transport heartbeats (e.g., 5s ping / 15s timeout on WebSocket server)
+    /// 2. `fail_all_pending_requests()` called on every transport disconnect path
+    /// 3. Frame-level Cancel/End processing in the stream decoder
     #[instrument(skip(self))]
     pub fn fail_all_pending_requests(&mut self, error: FrameDecodeError) {
         tracing::error!("Entered. Error: {:?}", error);

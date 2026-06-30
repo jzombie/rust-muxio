@@ -2,7 +2,12 @@ use std::io;
 
 pub trait RpcMethodPrebuffered {
     /// A unique identifier for the RPC method.
-    const METHOD_ID: u64; // TODO: Make helper for this to help avoid numeric collisions
+    ///
+    /// Use the [`rpc_method_id!`](crate::rpc_method_id) macro to generate a
+    /// deterministic hash from a string literal at compile time. In debug builds,
+    /// the macro performs a runtime collision check — if two names produce the same
+    /// hash, the program will panic with a clear message identifying the duplicate.
+    const METHOD_ID: u64;
 
     /// The high-level input type expected by the request encoder (e.g., `Vec<f64>`).
     type Input;

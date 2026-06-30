@@ -29,18 +29,28 @@ On top of this multiplexing layer, Muxio offers a minimal, unopinionated RPC fra
 
 ## Key Features
 
-- **Efficient Multiplexing**: Muxio's foundational framing protocol can reliably manage numerous concurrent data streams over a single connection, correctly reassembling interleaved and out-of-order frames.
+- **Efficient Multiplexing**: Multiple concurrent data streams over a single connection, correctly reassembling interleaved frames.
 
-- **Minimalist RPC Layer**: A lightweight RPC mechanism is provided on top of the framing layer, giving you the freedom to choose your own serialization formats, dispatching logic, and error-handling strategies.
+- **Streaming RPC**: Half-duplex request streams with full payload chunking — send large payloads incrementally without blocking other streams.
 
-- **Low-Overhead Binary Protocol**: Muxio uses a compact binary framing protocol to minimize data transmission overhead, making it highly efficient for performance-sensitive applications. All communication, from frame headers to RPC payloads, is handled as raw bytes. The protocol defines a minimal header structure to keep data transfer lean.
+- **Bidirectional Streaming**: True concurrent streams in both directions using independent unidirectional streams — each direction is separately cancellable and independently backpressured.
 
-- **Transport and Runtime Agnostic**: The core logic uses a flexible, callback-driven design, enabling seamless adaptation across different environments. It supports both Tokio and standard library servers, as well as native and WASM clients, with or without Tokio.
+- **Prebuffered (Unary) RPC**: Standard request/response RPC calls where the entire request is buffered before handler invocation.
 
-- **Extensible by Design:** Muxio comes with pre-built extensions that demonstrate how to integrate the core library into real-world applications:.
+- **Compile-Time Method IDs**: Deterministic `u64` identifiers via `rpc_method_id!("name")` macro using xxHash3 at compile time — no runtime cost, no magic numbers, platform-independent.
+
+- **Minimalist RPC Layer**: Lightweight RPC on top of framing, giving you freedom to choose your own serialization formats, dispatching logic, and error-handling strategies.
+
+- **Low-Overhead Binary Protocol**: Compact binary framing protocol with 17 bytes of header overhead per frame (stream ID, sequence ID, frame kind, timestamp).
+
+- **Transport and Runtime Agnostic**: Core logic uses a flexible, callback-driven design, enabling seamless adaptation across Tokio, WASM, and standard library environments.
+
+- **Disconnect Detection**: Three-layer mechanism — transport heartbeats (5s ping interval, 15s timeout), `fail_all_pending_requests()` on disconnect, and frame-level Cancel/End processing.
+
+- **Extensible by Design:** Muxio comes with pre-built extensions:
 
   - **Tokio-based WebSocket [Server](./extensions/muxio-tokio-rpc-server/)/[Client](./extensions/muxio-tokio-rpc-client/)**: For native, multi-threaded environments.
-  - **[WASM-based Web Client](./extensions/muxio-wasm-rpc-client/)**: For seamless integration into web applications, communicating with a JavaScript host via a simple byte-passing bridge.
+  - **[WASM-based Web Client](./extensions/muxio-wasm-rpc-client/)**: For seamless integration into web applications via a JavaScript byte-passing bridge.
   - **Tokio-based IPC [Server](./extensions/muxio-tokio-rpc-ipc-server/)/[Client](./extensions/muxio-tokio-rpc-ipc-client/)**: For local inter-process communication over Unix domain sockets or Windows named pipes.
 
 ## How Muxio Compares
@@ -118,7 +128,7 @@ use tokio::join;
 use tokio::net::TcpListener;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt().with_env_filter("info").init();
 
     // Bind to a random available port
@@ -126,15 +136,10 @@ async fn main() {
     
     let (server_host, server_port) = tcp_listener_to_host_port(&listener).unwrap();
 
-    // This block sets up and spawns the server
     {
-        // Create the server and immediately wrap it in an Arc for sharing
         let server = Arc::new(RpcServer::new(None));
-
-        //  Get a handle to the endpoint to register handlers
         let endpoint = server.endpoint();
 
-        // Register server methods on the endpoint
         let _ = join!(
             endpoint.register_prebuffered(Add::METHOD_ID, |request_bytes: Vec<u8>, _ctx| async move {
                 let request_params = Add::decode_request(&request_bytes)?;
@@ -171,7 +176,8 @@ async fn main() {
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
         // Connect to the server
-        let rpc_client = RpcClient::new(&server_host.to_string(), server_port).await.unwrap();
+        // Connect to the server
+        let rpc_client = RpcClient::new(&server_host.to_string(), server_port).await?;
 
         rpc_client.set_state_change_handler(move |new_state: RpcTransportState| {
             // This code will run every time the connection state changes
@@ -188,12 +194,14 @@ async fn main() {
             Echo::call(&*rpc_client, b"testing 4 5 6".into()),
         );
 
-        assert_eq!(res1.unwrap(), 6.0);
-        assert_eq!(res2.unwrap(), 18.0);
-        assert_eq!(res3.unwrap(), 168.0);
-        assert_eq!(res4.unwrap(), 31.875);
-        assert_eq!(res5.unwrap(), b"testing 1 2 3");
-        assert_eq!(res6.unwrap(), b"testing 4 5 6");
+        assert_eq!(res1?, 6.0);
+        assert_eq!(res2?, 18.0);
+        assert_eq!(res3?, 168.0);
+        assert_eq!(res4?, 31.875);
+        assert_eq!(res5?, b"testing 1 2 3");
+        assert_eq!(res6?, b"testing 4 5 6");
+
+        Ok(())
     }
 }
 ```
@@ -218,7 +226,7 @@ use muxio_tokio_rpc_ipc_server::{RpcIpcServer, RpcServiceEndpointInterface};
 use tokio::join;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt().with_env_filter("info").init();
 
     // Use process ID to avoid collisions between concurrent test invocations
@@ -261,7 +269,7 @@ async fn main() {
     {
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
-        let rpc_client = RpcIpcClient::new(&socket_name).await.unwrap();
+        let rpc_client = RpcIpcClient::new(&socket_name).await?;
 
         rpc_client
             .set_state_change_handler(move |new_state: RpcTransportState| {
@@ -278,12 +286,14 @@ async fn main() {
             Echo::call(&*rpc_client, b"testing 4 5 6".into()),
         );
 
-        assert_eq!(res1.unwrap(), 6.0);
-        assert_eq!(res2.unwrap(), 18.0);
-        assert_eq!(res3.unwrap(), 168.0);
-        assert_eq!(res4.unwrap(), 31.875);
-        assert_eq!(res5.unwrap(), b"testing 1 2 3");
-        assert_eq!(res6.unwrap(), b"testing 4 5 6");
+        assert_eq!(res1?, 6.0);
+        assert_eq!(res2?, 18.0);
+        assert_eq!(res3?, 168.0);
+        assert_eq!(res4?, 31.875);
+        assert_eq!(res5?, b"testing 1 2 3");
+        assert_eq!(res6?, b"testing 4 5 6");
+
+        Ok(())
     }
 }
 ```
@@ -297,14 +307,19 @@ Muxio supports streaming requests over any transport. Each stream is **half-dupl
 ```rust
 use futures::StreamExt;
 use muxio_core::rpc::RpcRequest;
+use muxio_rpc_service::rpc_method_id;
 use muxio_rpc_service_caller::dynamic_channel::DynamicChannelType;
 use muxio_tokio_rpc_client::{RpcClient, RpcServiceCallerInterface};
+
+// Method IDs are generated at compile time via xxHash3 from string names.
+// Each application defines its own — use distinct names for distinct methods.
+const STREAM_INPUT_METHOD_ID: u64 = rpc_method_id!("example.stream_input");
 
 async fn streaming_example(rpc_client: &RpcClient) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let large_payload = vec![42u8; 100_000];
 
     let request = RpcRequest {
-        rpc_method_id: 0x01,
+        rpc_method_id: STREAM_INPUT_METHOD_ID,
         rpc_param_bytes: None,
         rpc_prebuffered_payload_bytes: None,
         is_finalized: false,
@@ -312,14 +327,13 @@ async fn streaming_example(rpc_client: &RpcClient) -> Result<(), Box<dyn std::er
 
     let (mut encoder, mut receiver) = rpc_client
         .call_rpc_streaming(request, DynamicChannelType::Unbounded)
-        .await
-        .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+        .await?;
 
     for chunk in large_payload.chunks(4096) {
-        encoder.write_bytes(chunk).map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+        encoder.write_bytes(chunk)?;
     }
-    encoder.flush().map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
-    encoder.end_stream().map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+    encoder.flush()?;
+    encoder.end_stream()?;
 
     // Read the single response from the server
     let mut response = Vec::new();
@@ -343,14 +357,17 @@ for each event:
 
 ```rust
 use muxio_core::rpc::rpc_internals::RpcStreamEvent;
+use muxio_rpc_service::rpc_method_id;
 use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface};
 
-fn main() {
-    let rt = tokio::runtime::Runtime::new().unwrap();
+const STREAM_INPUT_METHOD_ID: u64 = rpc_method_id!("example.stream_input");
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let rt = tokio::runtime::Runtime::new()?;
     rt.block_on(async {
         let endpoint = RpcServiceEndpoint::<()>::new();
 
-        endpoint.register_stream_handler(0x01, |event, _emit, _ctx| {
+        endpoint.register_stream_handler(STREAM_INPUT_METHOD_ID, |event, _emit, _ctx| {
             match event {
                 RpcStreamEvent::Header { rpc_method_id, .. } => {
                     println!("Stream started for method {rpc_method_id}");
@@ -365,14 +382,52 @@ fn main() {
                     eprintln!("Stream error: {frame_decode_error:?}");
                 }
             }
-        }).await.unwrap();
-    });
+        }).await?;
+        Ok(())
+    })
 }
 ```
 
 > **Note:** The second argument (`_emit`) accepts a raw transport byte sink
 > (`Box<dyn RpcEmit>`). A future API will expose `RpcDispatcher::respond()`
 > for sending properly framed response chunks back to the caller.
+
+### Client vs Server Streaming: Deliberate Asymmetry
+
+The streaming API is intentionally asymmetric between the two roles:
+
+- **Client side** (`call_rpc_streaming`): The client initiates a stream, writes chunks via an
+  `RpcStreamEncoder`, and reads the response via a `DynamicReceiver` (which implements `Stream`).
+  This is the producer/consumer pattern — the caller produces request data and consumes the response.
+
+- **Server side** (`register_stream_handler`): The server registers a handler that is invoked
+  synchronously for each `RpcStreamEvent` as it arrives. The handler receives a `StreamResponder`
+  for sending response chunks back. This is the event-driven pattern — the server reacts to
+  stream events rather than driving the stream.
+
+The asymmetry is inherent to the request-reply model: one side initiates (client), the other
+handles (server). The same `RpcServiceCallerInterface` trait powers client-style calls from
+*any* context, including server-side code that wants to push data to connected clients (see
+"server-initiated calls" below).
+
+### Disconnect Detection
+
+Streaming RPC calls detect remote disconnection through three layers:
+
+1. **Transport heartbeats**: The transport sends periodic pings (default 5s interval on the
+   WebSocket server) and closes the connection if no response arrives within the timeout (15s).
+
+2. **`fail_all_pending_requests()`**: When any transport detects a disconnect, it calls this
+   method on the dispatcher, which fails all pending response handlers. Any
+   `receiver.next().await` in application code will return `None` or `Err(...)`.
+
+3. **Frame-level signaling**: Individual `Cancel` and `End` frames are processed by the
+   stream decoder. Corrupt or invalid frames produce `RpcStreamEvent::Error`, which propagates
+   as a transport error to the caller.
+
+Applications should handle stream termination by checking the `Result` from
+`receiver.next().await` and treating `None` (stream ended) or `Err(...)` as signals
+that the remote peer is gone.
 
 ### Streaming from the server to the client (server-initiated calls)
 
@@ -381,11 +436,14 @@ Any handle that implements `RpcServiceCallerInterface` — such as the
 can initiate streaming calls:
 
 ```rust
-use std::error::Error;
 use muxio_core::rpc::RpcRequest;
+use muxio_rpc_service::rpc_method_id;
 use muxio_rpc_service_caller::dynamic_channel::DynamicChannelType;
 use muxio_rpc_service_caller::RpcServiceCallerInterface;
 use muxio_tokio_rpc_server::RpcServerEvent;
+
+// Applications define their own method IDs — this is just an example.
+const SERVER_STREAM_METHOD_ID: u64 = rpc_method_id!("example.server_stream");
 
 async fn server_streaming_example(
     mut event_rx: tokio::sync::mpsc::UnboundedReceiver<RpcServerEvent>,
@@ -397,17 +455,16 @@ async fn server_streaming_example(
             let po = pty_output.clone();
             tokio::spawn(async move {
                 let stream_request = RpcRequest {
-                    rpc_method_id: 0x02,
+                    rpc_method_id: SERVER_STREAM_METHOD_ID,
                     rpc_param_bytes: None,
                     rpc_prebuffered_payload_bytes: None,
                     is_finalized: false,
                 };
                 let (mut encoder, _receiver) = handle
                     .call_rpc_streaming(stream_request, DynamicChannelType::Unbounded)
-                    .await
-                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
-                encoder.write_bytes(&po).map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
-                encoder.end_stream().map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+                    .await?;
+                encoder.write_bytes(&po)?;
+                encoder.end_stream()?;
                 Ok::<_, Box<dyn std::error::Error + Send + Sync>>(())
             });
         }
