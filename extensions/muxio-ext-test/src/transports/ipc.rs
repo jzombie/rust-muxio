@@ -2,12 +2,13 @@ use crate::endpoint_helpers;
 use crate::test_transport::TestTransport;
 use async_trait::async_trait;
 use interprocess::local_socket::{GenericNamespaced, ListenerOptions, ToNsName, tokio::prelude::*};
-use muxio_rpc_service_endpoint::RpcServiceEndpoint;
+use muxio_core::rpc::rpc_internals::RpcStreamEvent;
+use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface};
 use muxio_tokio_rpc_ipc_client::RpcIpcClient;
 use muxio_tokio_rpc_ipc_server::{
     RpcIpcConnectionContextHandle, RpcIpcServer, RpcIpcServerEvent,
 };
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tokio::sync::oneshot;
 use tokio::time::{Duration, sleep};
 
@@ -104,7 +105,7 @@ impl TestTransport for RpcIpcClient {
         (client, endpoint, ctx_handle)
     }
 
-    async fn connect_for_streaming() -> (Arc<Self::Client>, Arc<RpcServiceEndpoint<()>>) {
+    async fn connect_for_streaming() -> (Arc<Self::Client>, Arc<RpcServiceEndpoint<()>>, Arc<Mutex<Vec<RpcStreamEvent>>>) {
         let socket_name = temp_name("streaming");
         let server = RpcIpcServer::new(None);
         let endpoint = server.endpoint();
@@ -113,8 +114,18 @@ impl TestTransport for RpcIpcClient {
         endpoint_helpers::register_standard_handlers(&*endpoint).await;
         endpoint_helpers::register_error_handler(&*endpoint).await;
 
-        // Register the streaming capture handler alongside prebuffered handlers
-        endpoint_helpers::register_stream_capture_handler(&*endpoint).await;
+        // Register streaming capture handler with shared events buffer
+        let events: Arc<Mutex<Vec<RpcStreamEvent>>> = Arc::new(Mutex::new(Vec::new()));
+        let captured = events.clone();
+        endpoint
+            .register_stream_handler(
+                endpoint_helpers::STREAMING_CAPTURE_METHOD_ID,
+                move |event, _emit, _ctx| {
+                    captured.lock().unwrap().push(event);
+                },
+            )
+            .await
+            .expect("Failed to register streaming capture handler");
 
         drop(endpoint);
         let name = socket_name.clone();
@@ -124,6 +135,6 @@ impl TestTransport for RpcIpcClient {
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         let client = RpcIpcClient::new(&socket_name).await.unwrap();
         let client_endpoint = client.get_endpoint();
-        (client, client_endpoint)
+        (client, client_endpoint, events)
     }
 }

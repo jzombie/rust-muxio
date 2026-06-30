@@ -215,15 +215,15 @@ macro_rules! streaming_handler_tests {
         mod $module {
             #[tokio::test]
             async fn test_streaming_handler_events_arrive() {
-                let (client, _) =
+                let (client, _, events) =
                     <$transport as $crate::test_transport::TestTransport>::connect_for_streaming()
                         .await;
-                $crate::test_suites::streaming_handler_events_arrive(client.as_ref()).await;
+                $crate::test_suites::streaming_handler_events_arrive(client.as_ref(), &events).await;
             }
 
             #[tokio::test]
             async fn test_streaming_handler_method_not_found() {
-                let (client, _) =
+                let (client, _, _) =
                     <$transport as $crate::test_transport::TestTransport>::connect_for_streaming()
                         .await;
                 $crate::test_suites::streaming_handler_method_not_found(client.as_ref()).await;

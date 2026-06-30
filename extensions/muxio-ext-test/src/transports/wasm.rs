@@ -2,10 +2,11 @@ use crate::endpoint_helpers;
 use crate::test_transport::TestTransport;
 use async_trait::async_trait;
 use futures_util::{SinkExt, StreamExt};
-use muxio_rpc_service_endpoint::RpcServiceEndpoint;
+use muxio_core::rpc::rpc_internals::RpcStreamEvent;
+use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface};
 use muxio_tokio_rpc_server::{ConnectionContextHandle, RpcServer, RpcServerEvent};
 use muxio_wasm_rpc_client::RpcWasmClient;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 use tokio::time::{Duration, sleep};
@@ -105,7 +106,7 @@ impl TestTransport for RpcWasmClient {
         (client, endpoint, ctx_handle)
     }
 
-    async fn connect_for_streaming() -> (Arc<Self::Client>, Arc<RpcServiceEndpoint<()>>) {
+    async fn connect_for_streaming() -> (Arc<Self::Client>, Arc<RpcServiceEndpoint<()>>, Arc<Mutex<Vec<RpcStreamEvent>>>) {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
         let server_url = format!("ws://{addr}/ws");
@@ -113,7 +114,19 @@ impl TestTransport for RpcWasmClient {
         let server_endpoint = server.endpoint();
         endpoint_helpers::register_standard_handlers(&*server_endpoint).await;
         endpoint_helpers::register_error_handler(&*server_endpoint).await;
-        endpoint_helpers::register_stream_capture_handler(&*server_endpoint).await;
+
+        let events: Arc<Mutex<Vec<RpcStreamEvent>>> = Arc::new(Mutex::new(Vec::new()));
+        let captured = events.clone();
+        server_endpoint
+            .register_stream_handler(
+                endpoint_helpers::STREAMING_CAPTURE_METHOD_ID,
+                move |event, _emit, _ctx| {
+                    captured.lock().unwrap().push(event);
+                },
+            )
+            .await
+            .expect("Failed to register streaming capture handler");
+
         let server_clone = server.clone();
         tokio::spawn(async move {
             let _ = server_clone.serve_with_listener(listener).await;
@@ -122,7 +135,7 @@ impl TestTransport for RpcWasmClient {
 
         let (client, _send, _recv) = setup_wasm_bridge(&server_url).await;
         let endpoint = client.get_endpoint();
-        (client, endpoint)
+        (client, endpoint, events)
     }
 }
 

@@ -2,13 +2,14 @@ use crate::endpoint_helpers;
 use crate::test_transport::TestTransport;
 use crate::ws_helpers;
 use async_trait::async_trait;
-use muxio_rpc_service_endpoint::RpcServiceEndpoint;
+use muxio_core::rpc::rpc_internals::RpcStreamEvent;
+use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface};
 use muxio_tokio_rpc_client::RpcClient;
 use muxio_tokio_rpc_server::{
     ConnectionContextHandle, RpcServerEvent,
     utils::tcp_listener_to_host_port,
 };
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 use tokio::time::{Duration, sleep};
@@ -101,14 +102,26 @@ impl TestTransport for RpcClient {
         (client, endpoint, ctx_handle)
     }
 
-    async fn connect_for_streaming() -> (Arc<Self::Client>, Arc<RpcServiceEndpoint<()>>) {
+    async fn connect_for_streaming() -> (Arc<Self::Client>, Arc<RpcServiceEndpoint<()>>, Arc<Mutex<Vec<RpcStreamEvent>>>) {
         let (server, host, port) = ws_helpers::setup_ws_server().await;
         let server_endpoint = server.endpoint();
         endpoint_helpers::register_standard_handlers(&*server_endpoint).await;
         endpoint_helpers::register_error_handler(&*server_endpoint).await;
-        endpoint_helpers::register_stream_capture_handler(&*server_endpoint).await;
+
+        let events: Arc<Mutex<Vec<RpcStreamEvent>>> = Arc::new(Mutex::new(Vec::new()));
+        let captured = events.clone();
+        server_endpoint
+            .register_stream_handler(
+                endpoint_helpers::STREAMING_CAPTURE_METHOD_ID,
+                move |event, _emit, _ctx| {
+                    captured.lock().unwrap().push(event);
+                },
+            )
+            .await
+            .expect("Failed to register streaming capture handler");
+
         let client = ws_helpers::connect_ws_client(&host, port).await;
         let endpoint = client.get_endpoint();
-        (client, endpoint)
+        (client, endpoint, events)
     }
 }
