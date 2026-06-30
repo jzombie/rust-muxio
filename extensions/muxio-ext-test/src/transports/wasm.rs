@@ -106,7 +106,11 @@ impl TestTransport for RpcWasmClient {
         (client, endpoint, ctx_handle)
     }
 
-    async fn connect_for_streaming() -> (Arc<Self::Client>, Arc<RpcServiceEndpoint<()>>, Arc<Mutex<Vec<RpcStreamEvent>>>) {
+    async fn connect_for_streaming() -> (
+        Arc<Self::Client>,
+        Arc<RpcServiceEndpoint<()>>,
+        Arc<Mutex<Vec<RpcStreamEvent>>>,
+    ) {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
         let server_url = format!("ws://{addr}/ws");

@@ -107,10 +107,17 @@ pub trait RpcServiceCallerInterface: Send + Sync {
                     evt
                 );
 
-                let mut tx_lock_guard = tx_clone_for_recv_fn.lock().expect("RPC streaming TX lock poisoned");
-                let mut status_lock_guard = status.lock().expect("RPC streaming status lock poisoned");
-                let mut ready_tx_lock_guard = ready_tx_clone_for_recv_fn.lock().expect("RPC streaming ready TX lock poisoned");
-                let mut error_buffer_lock_guard = error_buffer.lock().expect("RPC streaming error buffer lock poisoned");
+                let mut tx_lock_guard = tx_clone_for_recv_fn
+                    .lock()
+                    .expect("RPC streaming TX lock poisoned");
+                let mut status_lock_guard =
+                    status.lock().expect("RPC streaming status lock poisoned");
+                let mut ready_tx_lock_guard = ready_tx_clone_for_recv_fn
+                    .lock()
+                    .expect("RPC streaming ready TX lock poisoned");
+                let mut error_buffer_lock_guard = error_buffer
+                    .lock()
+                    .expect("RPC streaming error buffer lock poisoned");
 
                 // --- Existing recv_fn logic goes here, operating on the guards ---
                 match evt {
@@ -316,7 +323,9 @@ pub trait RpcServiceCallerInterface: Send + Sync {
         // for non-finalized (streaming) calls the caller can now write
         // chunks and finalize without waiting for the response header.
         {
-            let mut ready_tx_guard = ready_tx_arc.lock().expect("RPC streaming ready TX arc lock poisoned");
+            let mut ready_tx_guard = ready_tx_arc
+                .lock()
+                .expect("RPC streaming ready TX arc lock poisoned");
             if let Some(tx_sender) = ready_tx_guard.take() {
                 let _ = tx_sender.send(Ok(()));
             }

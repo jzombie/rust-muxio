@@ -6,8 +6,7 @@ use muxio_core::rpc::rpc_internals::RpcStreamEvent;
 use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface};
 use muxio_tokio_rpc_client::RpcClient;
 use muxio_tokio_rpc_server::{
-    ConnectionContextHandle, RpcServerEvent,
-    utils::tcp_listener_to_host_port,
+    ConnectionContextHandle, RpcServerEvent, utils::tcp_listener_to_host_port,
 };
 use std::sync::{Arc, Mutex};
 use tokio::net::TcpListener;
@@ -102,7 +101,11 @@ impl TestTransport for RpcClient {
         (client, endpoint, ctx_handle)
     }
 
-    async fn connect_for_streaming() -> (Arc<Self::Client>, Arc<RpcServiceEndpoint<()>>, Arc<Mutex<Vec<RpcStreamEvent>>>) {
+    async fn connect_for_streaming() -> (
+        Arc<Self::Client>,
+        Arc<RpcServiceEndpoint<()>>,
+        Arc<Mutex<Vec<RpcStreamEvent>>>,
+    ) {
         let (server, host, port) = ws_helpers::setup_ws_server().await;
         let server_endpoint = server.endpoint();
         endpoint_helpers::register_standard_handlers(&*server_endpoint).await;

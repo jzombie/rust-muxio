@@ -81,7 +81,8 @@ impl<'a> RpcDispatcher<'a> {
     where
         R: FnMut(u64, u32) -> Option<Box<dyn FnMut(RpcStreamEvent) + Send + 'a>> + Send + 'a,
     {
-        self.rpc_respondable_session.set_stream_method_router(router);
+        self.rpc_respondable_session
+            .set_stream_method_router(router);
     }
 
     /// Internal helper to register a global response event handler.
@@ -373,11 +374,9 @@ impl<'a> RpcDispatcher<'a> {
             rpc_method_id: 0,
             rpc_metadata_bytes: vec![0], // Success status
         };
-        let mut encoder = self.rpc_respondable_session.start_reply_stream(
-            header,
-            max_chunk_size,
-            on_emit,
-        )?;
+        let mut encoder =
+            self.rpc_respondable_session
+                .start_reply_stream(header, max_chunk_size, on_emit)?;
         let writer: Box<dyn FnMut(&[u8], bool) + Send> = Box::new(move |chunk, is_finalized| {
             // Ignore write/flush/end errors — a failed response stream
             // is acceptable; the caller will see the connection drop.

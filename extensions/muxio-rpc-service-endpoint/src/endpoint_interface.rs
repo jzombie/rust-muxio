@@ -127,8 +127,9 @@ where
         self.get_stream_handlers()
             .with_stream_handlers(|handlers| match handlers.entry(method_id) {
                 Entry::Occupied(_) => {
-                    let err_msg =
-                        format!("A streaming handler for method ID {method_id} is already registered.");
+                    let err_msg = format!(
+                        "A streaming handler for method ID {method_id} is already registered."
+                    );
                     Err(RpcServiceEndpointError::Handler(err_msg.into()))
                 }
                 Entry::Vacant(entry) => {
@@ -184,7 +185,10 @@ where
                     let h = Arc::clone(handler);
                     let ctx = ctx_clone.clone();
                     let respond = StreamResponder::new(request_id);
-                    responders.lock().expect("Pending responders lock poisoned").push(respond.clone());
+                    responders
+                        .lock()
+                        .expect("Pending responders lock poisoned")
+                        .push(respond.clone());
                     let boxed: Box<dyn FnMut(RpcStreamEvent) + Send + 'a> =
                         Box::new(move |event: RpcStreamEvent| {
                             h(event, respond.clone(), ctx.clone());
@@ -206,7 +210,9 @@ where
         // the writer was set) were buffered inside StreamResponder and
         // are flushed now.
         {
-            let mut responders = pending_responders.lock().expect("Pending responders lock poisoned");
+            let mut responders = pending_responders
+                .lock()
+                .expect("Pending responders lock poisoned");
             for respond in responders.iter() {
                 if let Ok(writer) = dispatcher.create_response_writer(
                     respond.request_id,

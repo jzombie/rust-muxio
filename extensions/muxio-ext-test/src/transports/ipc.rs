@@ -5,9 +5,7 @@ use interprocess::local_socket::{GenericNamespaced, ListenerOptions, ToNsName, t
 use muxio_core::rpc::rpc_internals::RpcStreamEvent;
 use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface};
 use muxio_tokio_rpc_ipc_client::RpcIpcClient;
-use muxio_tokio_rpc_ipc_server::{
-    RpcIpcConnectionContextHandle, RpcIpcServer, RpcIpcServerEvent,
-};
+use muxio_tokio_rpc_ipc_server::{RpcIpcConnectionContextHandle, RpcIpcServer, RpcIpcServerEvent};
 use std::sync::{Arc, Mutex};
 use tokio::sync::oneshot;
 use tokio::time::{Duration, sleep};
@@ -105,7 +103,11 @@ impl TestTransport for RpcIpcClient {
         (client, endpoint, ctx_handle)
     }
 
-    async fn connect_for_streaming() -> (Arc<Self::Client>, Arc<RpcServiceEndpoint<()>>, Arc<Mutex<Vec<RpcStreamEvent>>>) {
+    async fn connect_for_streaming() -> (
+        Arc<Self::Client>,
+        Arc<RpcServiceEndpoint<()>>,
+        Arc<Mutex<Vec<RpcStreamEvent>>>,
+    ) {
         let socket_name = temp_name("streaming");
         let server = RpcIpcServer::new(None);
         let endpoint = server.endpoint();

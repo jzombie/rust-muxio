@@ -29,8 +29,9 @@ pub struct RpcRespondableSession<'a> {
     /// When set, it is consulted on each `Header` event. If it returns a handler,
     /// the handler is registered for that stream, bypassing the catch-all accumulator.
     /// This enables streaming handler dispatch on the endpoint side.
-    stream_method_router:
-        Option<Box<dyn FnMut(u64, u32) -> Option<Box<dyn FnMut(RpcStreamEvent) + Send + 'a>> + Send + 'a>>,
+    stream_method_router: Option<
+        Box<dyn FnMut(u64, u32) -> Option<Box<dyn FnMut(RpcStreamEvent) + Send + 'a>> + Send + 'a>,
+    >,
 }
 
 impl<'a> RpcRespondableSession<'a> {
@@ -117,7 +118,12 @@ impl<'a> RpcRespondableSession<'a> {
             // If a Header event arrives for a streaming method, register a
             // per-request handler BEFORE the normal routing so subsequent
             // events bypass the catch-all accumulator.
-            if let RpcStreamEvent::Header { rpc_request_id, rpc_method_id, .. } = &evt {
+            if let RpcStreamEvent::Header {
+                rpc_request_id,
+                rpc_method_id,
+                ..
+            } = &evt
+            {
                 if let Some(ref mut router) = self.stream_method_router {
                     if let Some(handler) = router(*rpc_method_id, *rpc_request_id) {
                         self.response_handlers.insert(*rpc_request_id, handler);

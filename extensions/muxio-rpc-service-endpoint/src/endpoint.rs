@@ -49,18 +49,32 @@ impl StreamResponder {
     /// Writes directly to the transport if a writer is available,
     /// otherwise buffers until the writer is set (after `read_bytes`).
     pub fn respond(&self, chunk: Vec<u8>, is_finalized: bool) {
-        let mut writer_guard = self.writer.lock().expect("StreamResponder writer lock poisoned");
+        let mut writer_guard = self
+            .writer
+            .lock()
+            .expect("StreamResponder writer lock poisoned");
         if let Some(writer) = writer_guard.as_mut() {
             writer(&chunk, is_finalized);
         } else {
-            self.buffer.lock().expect("StreamResponder buffer lock poisoned").push((chunk, is_finalized));
+            self.buffer
+                .lock()
+                .expect("StreamResponder buffer lock poisoned")
+                .push((chunk, is_finalized));
         }
     }
 
     pub(crate) fn set_writer(&self, writer: Box<dyn FnMut(&[u8], bool) + Send>) {
-        let mut guard = self.writer.lock().expect("StreamResponder writer lock poisoned");
+        let mut guard = self
+            .writer
+            .lock()
+            .expect("StreamResponder writer lock poisoned");
         *guard = Some(writer);
-        let buffered = std::mem::take(&mut *self.buffer.lock().expect("StreamResponder buffer lock poisoned"));
+        let buffered = std::mem::take(
+            &mut *self
+                .buffer
+                .lock()
+                .expect("StreamResponder buffer lock poisoned"),
+        );
         if let Some(w) = guard.as_mut() {
             for (chunk, is_finalized) in buffered {
                 w(&chunk, is_finalized);
@@ -72,9 +86,7 @@ impl StreamResponder {
 /// A streaming RPC handler receives individual [`RpcStreamEvent`]s as they
 /// arrive from the transport, along with a [`StreamResponder`] for sending
 /// properly framed response chunks back to the caller.
-pub type RpcStreamHandler<C> = Arc<
-    dyn Fn(RpcStreamEvent, StreamResponder, C) + Send + Sync,
->;
+pub type RpcStreamHandler<C> = Arc<dyn Fn(RpcStreamEvent, StreamResponder, C) + Send + Sync>;
 
 /// A concrete RPC service endpoint, generic over a context type `C`.
 ///

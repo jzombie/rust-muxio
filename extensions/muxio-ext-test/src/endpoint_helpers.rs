@@ -76,27 +76,24 @@ where
     let chunks: Arc<Mutex<Vec<Vec<u8>>>> = Arc::new(Mutex::new(Vec::new()));
     let chunks_for_handler = chunks.clone();
     endpoint
-        .register_stream_handler(
-            STREAMING_CAPTURE_METHOD_ID,
-            move |event, respond, _ctx| {
-                captured.lock().unwrap().push(event.clone());
-                match &event {
-                    RpcStreamEvent::PayloadChunk { bytes, .. } => {
-                        chunks_for_handler.lock().unwrap().push(bytes.clone());
-                    }
-                    RpcStreamEvent::End { .. } => {
-                        let all_data: Vec<u8> = chunks_for_handler
-                            .lock()
-                            .unwrap()
-                            .drain(..)
-                            .flatten()
-                            .collect();
-                        respond.respond(all_data, true);
-                    }
-                    _ => {}
+        .register_stream_handler(STREAMING_CAPTURE_METHOD_ID, move |event, respond, _ctx| {
+            captured.lock().unwrap().push(event.clone());
+            match &event {
+                RpcStreamEvent::PayloadChunk { bytes, .. } => {
+                    chunks_for_handler.lock().unwrap().push(bytes.clone());
                 }
-            },
-        )
+                RpcStreamEvent::End { .. } => {
+                    let all_data: Vec<u8> = chunks_for_handler
+                        .lock()
+                        .unwrap()
+                        .drain(..)
+                        .flatten()
+                        .collect();
+                    respond.respond(all_data, true);
+                }
+                _ => {}
+            }
+        })
         .await
         .expect("Failed to register streaming capture handler");
     events

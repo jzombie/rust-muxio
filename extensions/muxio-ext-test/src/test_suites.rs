@@ -24,11 +24,13 @@ mod method_id_uniqueness_tests {
     }
 }
 
-use crate::endpoint_helpers::{ERROR_TEST_METHOD_ID, STREAMING_CAPTURE_METHOD_ID, UNREGISTERED_METHOD_ID};
+use crate::endpoint_helpers::{
+    ERROR_TEST_METHOD_ID, STREAMING_CAPTURE_METHOD_ID, UNREGISTERED_METHOD_ID,
+};
 use example_muxio_rpc_service_definition::prebuffered::{Add, Echo, Mult};
 use futures_util::StreamExt;
-use muxio_core::rpc::rpc_internals::RpcStreamEvent;
 use muxio_core::rpc::RpcRequest;
+use muxio_core::rpc::rpc_internals::RpcStreamEvent;
 use muxio_rpc_service::error::{RpcServiceError, RpcServiceErrorCode};
 use muxio_rpc_service::prebuffered::RpcMethodPrebuffered;
 use muxio_rpc_service_caller::dynamic_channel::DynamicChannelType;
@@ -510,10 +512,8 @@ where
 /// Verify that a streaming handler receives Header, PayloadChunk, End
 /// events in the correct order and can send response chunks back
 /// via the StreamResponder.
-pub async fn streaming_handler_events_arrive<C>(
-    client: &C,
-    events: &Mutex<Vec<RpcStreamEvent>>,
-) where
+pub async fn streaming_handler_events_arrive<C>(client: &C, events: &Mutex<Vec<RpcStreamEvent>>)
+where
     C: RpcServiceCallerInterface,
 {
     let payload = b"hello streaming world".to_vec();
@@ -532,9 +532,7 @@ pub async fn streaming_handler_events_arrive<C>(
 
     // Write data in chunks
     for chunk in payload.chunks(8) {
-        encoder
-            .write_bytes(chunk)
-            .expect("write_bytes failed");
+        encoder.write_bytes(chunk).expect("write_bytes failed");
     }
     encoder.flush().expect("flush failed");
     encoder.end_stream().expect("end_stream failed");
@@ -546,19 +544,29 @@ pub async fn streaming_handler_events_arrive<C>(
     // Verify captured events
     {
         let captured = events.lock().unwrap();
-        assert!(!captured.is_empty(), "Streaming handler should have received events");
+        assert!(
+            !captured.is_empty(),
+            "Streaming handler should have received events"
+        );
 
         // First event must be Header with correct method_id
         assert!(
             matches!(&captured[0], RpcStreamEvent::Header { rpc_method_id, .. } if *rpc_method_id == STREAMING_CAPTURE_METHOD_ID),
             "First event should be Header with method_id {}, got {:?}",
-            STREAMING_CAPTURE_METHOD_ID, captured[0]
+            STREAMING_CAPTURE_METHOD_ID,
+            captured[0]
         );
 
         // There should be at least one PayloadChunk event (transport may
         // coalesce multiple write_bytes calls into a single chunk)
-        let chunk_count = captured.iter().filter(|e| matches!(e, RpcStreamEvent::PayloadChunk { .. })).count();
-        assert!(chunk_count >= 1, "Expected at least one PayloadChunk event, got {chunk_count}");
+        let chunk_count = captured
+            .iter()
+            .filter(|e| matches!(e, RpcStreamEvent::PayloadChunk { .. }))
+            .count();
+        assert!(
+            chunk_count >= 1,
+            "Expected at least one PayloadChunk event, got {chunk_count}"
+        );
 
         // Last event must be End
         assert!(
@@ -583,18 +591,15 @@ pub async fn streaming_handler_events_arrive<C>(
 
     // Collect all response chunks from the streaming handler's echo
     let mut response = Vec::new();
-    match tokio::time::timeout(
-        std::time::Duration::from_secs(5),
-        async {
-            while let Some(chunk) = receiver.next().await {
-                match chunk {
-                    Ok(bytes) => response.extend_from_slice(&bytes),
-                    Err(_) => break,
-                }
+    match tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        while let Some(chunk) = receiver.next().await {
+            match chunk {
+                Ok(bytes) => response.extend_from_slice(&bytes),
+                Err(_) => break,
             }
-            std::mem::take(&mut response)
-        },
-    )
+        }
+        std::mem::take(&mut response)
+    })
     .await
     {
         Ok(resp) => {
@@ -633,12 +638,9 @@ where
 
     // Drain receiver with timeout — ensures no deadlock even if
     // the server doesn't send a response
-    let _ = tokio::time::timeout(
-        std::time::Duration::from_secs(2),
-        async {
-            while let Some(_chunk) = receiver.next().await {}
-        },
-    )
+    let _ = tokio::time::timeout(std::time::Duration::from_secs(2), async {
+        while let Some(_chunk) = receiver.next().await {}
+    })
     .await;
 }
 

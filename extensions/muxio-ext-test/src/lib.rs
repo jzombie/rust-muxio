@@ -218,7 +218,8 @@ macro_rules! streaming_handler_tests {
                 let (client, _, events) =
                     <$transport as $crate::test_transport::TestTransport>::connect_for_streaming()
                         .await;
-                $crate::test_suites::streaming_handler_events_arrive(client.as_ref(), &events).await;
+                $crate::test_suites::streaming_handler_events_arrive(client.as_ref(), &events)
+                    .await;
             }
 
             #[tokio::test]
@@ -246,13 +247,8 @@ macro_rules! complex_concurrent_tests {
                 let (client, endpoint, handle) =
                     <$transport as $crate::test_transport::TestTransport>::connect_s2c().await;
                 let label = <$transport as $crate::test_transport::TestTransport>::name();
-                $crate::test_suites::complex_concurrent_mixed(
-                    client,
-                    &*endpoint,
-                    handle,
-                    label,
-                )
-                .await;
+                $crate::test_suites::complex_concurrent_mixed(client, &*endpoint, handle, label)
+                    .await;
             }
         }
     };
