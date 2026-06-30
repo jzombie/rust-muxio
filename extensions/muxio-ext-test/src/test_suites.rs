@@ -749,32 +749,6 @@ pub async fn complex_concurrent_mixed<H, C, E>(
     );
 }
 
-#[cfg(test)]
-mod method_id_uniqueness_tests {
-    use example_muxio_rpc_service_definition::RpcMethodPrebuffered;
-    use std::collections::HashSet;
-
-    #[test]
-    fn all_known_method_ids_are_unique() {
-        let mut seen = HashSet::new();
-        let test_ids = vec![
-            crate::endpoint_helpers::STREAMING_CAPTURE_METHOD_ID,
-            crate::endpoint_helpers::ERROR_TEST_METHOD_ID,
-            crate::endpoint_helpers::UNREGISTERED_METHOD_ID,
-            example_muxio_rpc_service_definition::prebuffered::Add::METHOD_ID,
-            example_muxio_rpc_service_definition::prebuffered::Mult::METHOD_ID,
-            example_muxio_rpc_service_definition::prebuffered::Echo::METHOD_ID,
-        ];
-        for id in test_ids {
-            assert!(
-                seen.insert(id),
-                "Duplicate method ID detected: {}. All method IDs must be unique.",
-                id
-            );
-        }
-    }
-}
-
 // ------------------------------------------------------------------
 // mpsc adapter test bodies
 // ------------------------------------------------------------------
@@ -886,4 +860,30 @@ pub async fn mpsc_adapter_channel_handler_s2c<C, H>(
         received, payload,
         "Channel handler received mismatched payload"
     );
+}
+
+#[cfg(test)]
+mod method_id_uniqueness_tests {
+    use example_muxio_rpc_service_definition::RpcMethodPrebuffered;
+    use std::collections::HashSet;
+
+    #[test]
+    fn all_known_method_ids_are_unique() {
+        let mut seen = HashSet::new();
+        let test_ids = vec![
+            crate::endpoint_helpers::STREAMING_CAPTURE_METHOD_ID,
+            crate::endpoint_helpers::ERROR_TEST_METHOD_ID,
+            crate::endpoint_helpers::UNREGISTERED_METHOD_ID,
+            example_muxio_rpc_service_definition::prebuffered::Add::METHOD_ID,
+            example_muxio_rpc_service_definition::prebuffered::Mult::METHOD_ID,
+            example_muxio_rpc_service_definition::prebuffered::Echo::METHOD_ID,
+        ];
+        for id in test_ids {
+            assert!(
+                seen.insert(id),
+                "Duplicate method ID detected: {}. All method IDs must be unique.",
+                id
+            );
+        }
+    }
 }
