@@ -22,8 +22,5 @@ wasm-bindgen = "0.2.114"
 wasm-bindgen-futures = "0.4.64"
 
 [dev-dependencies]
-example-muxio-rpc-service-definition = { workspace = true }
 futures-util = { workspace = true }
-muxio-tokio-rpc-server = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
-tokio-tungstenite = { workspace = true }

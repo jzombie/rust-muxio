@@ -102,7 +102,6 @@ muxio-wasm-rpc-client = { workspace = true, optional = true }
 
 [dev-dependencies]
 bitcode = { workspace = true }
-example-muxio-rpc-service-definition = { workspace = true }
 futures = { workspace = true }
 muxio-rpc-service = { workspace = true }
 muxio-rpc-service-caller = { workspace = true }
@@ -114,4 +113,3 @@ muxio-tokio-rpc-server = { workspace = true }
 rand.workspace = true
 tokio = { workspace = true, features = ["full"] }
 tracing.workspace = true
-tracing-subscriber.workspace = true
