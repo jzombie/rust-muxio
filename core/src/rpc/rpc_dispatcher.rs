@@ -70,6 +70,20 @@ impl<'a> RpcDispatcher<'a> {
         instance
     }
 
+    /// Sets a stream method router that maps incoming `(method_id, request_id)`
+    /// pairs to per-request response handlers. When a streaming method is
+    /// detected on a `Header` event, the router installs a dedicated handler
+    /// so that subsequent `PayloadChunk` / `End` events bypass the prebuffered
+    /// catch-all accumulator.
+    ///
+    /// This is used by the endpoint layer to support `register_stream_handler()`.
+    pub fn set_stream_method_router<R>(&mut self, router: R)
+    where
+        R: FnMut(u64, u32) -> Option<Box<dyn FnMut(RpcStreamEvent) + Send + 'a>> + Send + 'a,
+    {
+        self.rpc_respondable_session.set_stream_method_router(router);
+    }
+
     /// Internal helper to register a global response event handler.
     ///
     /// This callback listens for all incoming response stream events and updates
@@ -79,7 +93,7 @@ impl<'a> RpcDispatcher<'a> {
     ///
     /// Behavior:
     /// - On `Header`: pushes a new `RpcRequest` into the queue.
-    /// - On `PayloadChunk`: appends bytes to the matching request’s payload.
+    /// - On `PayloadChunk`: appends bytes to the matching request's payload.
     /// - On `End`: marks the request as finalized.
     ///
     /// ## Thread Safety and Poisoning

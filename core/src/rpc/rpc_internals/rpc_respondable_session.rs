@@ -25,6 +25,12 @@ pub struct RpcRespondableSession<'a> {
     catch_all_response_handler: Option<Box<dyn FnMut(RpcStreamEvent) + Send + 'a>>,
     prebuffered_responses: HashMap<u32, Vec<u8>>, // Track buffered responses by request ID
     prebuffering_flags: HashMap<u32, bool>, // Track whether pre-buffering is enabled for each request
+    /// Optional router that maps (method_id, request_id) to a per-request handler.
+    /// When set, it is consulted on each `Header` event. If it returns a handler,
+    /// the handler is registered for that stream, bypassing the catch-all accumulator.
+    /// This enables streaming handler dispatch on the endpoint side.
+    stream_method_router:
+        Option<Box<dyn FnMut(u64, u32) -> Option<Box<dyn FnMut(RpcStreamEvent) + Send + 'a>> + Send + 'a>>,
 }
 
 impl<'a> RpcRespondableSession<'a> {
@@ -35,6 +41,7 @@ impl<'a> RpcRespondableSession<'a> {
             catch_all_response_handler: None,
             prebuffered_responses: HashMap::new(),
             prebuffering_flags: HashMap::new(),
+            stream_method_router: None,
         }
     }
 
@@ -81,6 +88,20 @@ impl<'a> RpcRespondableSession<'a> {
             .map_err(|_| FrameEncodeError::CorruptFrame)
     }
 
+    /// Sets a router function for streaming method dispatch.
+    ///
+    /// When a `Header` event arrives and no per-request handler exists yet,
+    /// the router is called with `(method_id, request_id)`. If it returns a
+    /// handler, that handler is registered for the stream's lifetime.
+    /// Subsequent events (`PayloadChunk`, `End`) are routed to the per-request
+    /// handler instead of the catch-all accumulator.
+    pub fn set_stream_method_router<R>(&mut self, router: R)
+    where
+        R: FnMut(u64, u32) -> Option<Box<dyn FnMut(RpcStreamEvent) + Send + 'a>> + Send + 'a,
+    {
+        self.stream_method_router = Some(Box::new(router));
+    }
+
     // TODO: Document
     // Invoked on the remote in response to `init_respondable_request` from the local client
     pub fn set_catch_all_response_handler<R>(&mut self, handler: R)
@@ -92,6 +113,18 @@ impl<'a> RpcRespondableSession<'a> {
 
     pub fn read_bytes(&mut self, bytes: &[u8]) -> Result<(), FrameDecodeError> {
         self.rpc_session.read_bytes(bytes, |evt| {
+            // --- Streaming method routing ---
+            // If a Header event arrives for a streaming method, register a
+            // per-request handler BEFORE the normal routing so subsequent
+            // events bypass the catch-all accumulator.
+            if let RpcStreamEvent::Header { rpc_request_id, rpc_method_id, .. } = &evt {
+                if let Some(ref mut router) = self.stream_method_router {
+                    if let Some(handler) = router(*rpc_method_id, *rpc_request_id) {
+                        self.response_handlers.insert(*rpc_request_id, handler);
+                    }
+                }
+            }
+
             let id = match &evt {
                 RpcStreamEvent::Header { rpc_request_id, .. } => Some(*rpc_request_id),
                 RpcStreamEvent::PayloadChunk { rpc_request_id, .. } => Some(*rpc_request_id),
