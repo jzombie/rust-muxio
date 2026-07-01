@@ -1,3 +1,7 @@
+> _Note: Deficit Round Robin (DRR) would be a better solution overall._
+
+---
+
 > _If you want to avoid writing the custom credit mathematics and manual `Waker` cloning entirely, the research highly recommends using **`tokio_util::sync::PollSemaphore`** paired with a `tokio::sync::mpsc::unbounded_channel`._
 
 You are referring to the **"Byte Budget"** or **"Token Bucket"** pattern, which is an advanced flow-control mechanism used in asynchronous networking architectures to enforce backpressure safely.
