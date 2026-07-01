@@ -1,3 +1,5 @@
+> _If you want to avoid writing the custom credit mathematics and manual `Waker` cloning entirely, the research highly recommends using **`tokio_util::sync::PollSemaphore`** paired with a `tokio::sync::mpsc::unbounded_channel`._
+
 You are referring to the **"Byte Budget"** or **"Token Bucket"** pattern, which is an advanced flow-control mechanism used in asynchronous networking architectures to enforce backpressure safely.
 
 In a multiplexed RPC framework, using naive bounded channels to slow down data streams causes a severe issue called Head-of-Line (HOL) blocking—where one aggressive data stream clogs the shared network pipe and starves all other lightweight streams. The "Byte Budget" pattern solves this by moving the traffic control logic upstream to a `StreamBudgetController` at the encoder level.
@@ -29,3 +31,21 @@ When a logical stream attempts to send a data frame (e.g., by invoking a `write_
 4. **Replenishment and Wakeup:** While the stream is sleeping, the local transport read loop will eventually intercept a credit-restoration frame (such as a `WINDOW_UPDATE`) from the remote peer. When this happens:
    * The transport loop updates the `StreamBudgetController`, adding the newly granted tokens back into the stream's budget.
    * It retrieves the saved `Waker` and explicitly calls its `.wake()` method. This acts as a signal flare to the Tokio executor, which places the task back on the active run queue so the stream can wake up, re-evaluate its newly replenished budget, and seamlessly transmit its data.
+
+---
+
+The `StreamBudgetController` is presented in the research as a custom architectural pattern rather than a single, out-of-the-box crate. However, the notes provide several reference implementations and native libraries you can use to achieve this exact behavior:
+
+**1. `async-speed-limit` for Token Bucket Mechanics**
+If you are building the custom controller from scratch, the notes reference the **`async-speed-limit`** crate as a standard implementation for imposing maximum speed limits using token bucket algorithms. It utilizes the lazy refill algorithms required to apply accrued tokens efficiently without relying on heavy background timers.
+
+**2. The Native Tokio Solution: `PollSemaphore`**
+If you want to avoid writing the custom credit mathematics and manual `Waker` cloning entirely, the research highly recommends using **`tokio_util::sync::PollSemaphore`** paired with a `tokio::sync::mpsc::unbounded_channel`. 
+*   In this topology, the total byte capacity of the transport is modeled as the total number of permits in the semaphore. 
+*   Before encoding a frame, the stream calls `poll_acquire_many(frame_size)`. 
+*   If the transport is congested, the semaphore runs out of permits and naturally parks the specific stream's async task by registering its waker, effectively acting as the budget controller.
+
+**3. Enterprise Protocol References: `h2` and `quinn`**
+If you want to study how this exact flow control state machine is engineered in world-class production systems, the notes point to two specific Rust crates:
+*   **The `h2` crate (HTTP/2):** This crate manages complex stream-level flow control using `SendStream` and `FlowControl` structures. It requires callers to use a `poll_capacity` method that yields `Poll::Ready` only when the remote peer has actually granted window capacity via a `WINDOW_UPDATE` frame. 
+*   **The `quinn` crate (QUIC):** This crate enforces strict send windows directly in the transport layer. When writing to a `quinn::SendStream`, the future behaves asynchronously and safely yields the task if the stream's flow control window is exhausted, waking it only when the receiver processes the data.
