@@ -132,26 +132,38 @@ impl RpcIpcServer {
                     }
                     Ok(n) => {
                         let bytes = Bytes::copy_from_slice(&buf[..n]);
-                        let mut dispatcher = context_for_reader.dispatcher.lock().await;
+                        let dispatcher_arc = context_for_reader.dispatcher.clone();
+                        let endpoint = self_for_reader.endpoint.clone();
+                        let ctx = context_for_reader.clone();
                         let tx_clone = tx_mpsc.clone();
                         let on_emit = move |chunk: &[u8]| {
                             let _ = tx_clone.send(chunk.to_vec());
                         };
-                        if let Err(err) = self_for_reader
-                            .endpoint
-                            .read_bytes(
-                                &mut dispatcher,
-                                context_for_reader.clone(),
-                                &bytes,
-                                on_emit,
-                            )
-                            .await
-                        {
-                            tracing::error!(
-                                "RPC-IPC server: error processing bytes from {}: {:?}",
-                                peer_label,
-                                err
-                            );
+
+                        // Decode under the dispatcher lock, run handlers WITHOUT
+                        // the lock (avoiding a deadlock when a handler needs the
+                        // dispatcher), then send responses under the lock again.
+                        let requests = {
+                            let mut dispatcher = dispatcher_arc.lock().await;
+                            match endpoint
+                                .decode_bytes(&mut dispatcher, ctx.clone(), &bytes, on_emit.clone())
+                                .await
+                            {
+                                Ok(reqs) => reqs,
+                                Err(err) => {
+                                    tracing::error!(
+                                        "RPC-IPC server: error processing bytes from {}: {:?}",
+                                        peer_label,
+                                        err
+                                    );
+                                    continue;
+                                }
+                            }
+                        };
+                        let responses = endpoint.run_handlers(ctx, requests).await;
+                        if !responses.is_empty() {
+                            let mut dispatcher = dispatcher_arc.lock().await;
+                            let _ = endpoint.send_responses(&mut dispatcher, responses, on_emit);
                         }
                     }
                     Err(e) => {

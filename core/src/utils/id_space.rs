@@ -34,3 +34,53 @@ impl IdSpace {
         (id & !Self::MASK) | self.marker()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn client_and_server_spaces_never_collide() {
+        // A client-placed and server-placed id must never be equal, for any
+        // underlying id — otherwise a server-initiated request could overwrite
+        // a client stream's route on the same connection.
+        for id in [
+            0u32,
+            1,
+            42,
+            0x7fff_ffff,
+            0x8000_0000,
+            u32::MAX / 2,
+            u32::MAX,
+        ] {
+            assert_ne!(
+                IdSpace::Client.place(id),
+                IdSpace::Server.place(id),
+                "id {id} collides across id spaces"
+            );
+        }
+    }
+
+    #[test]
+    fn place_uses_the_high_bit_as_the_direction_marker() {
+        assert_eq!(IdSpace::Client.place(0), 0);
+        assert_eq!(IdSpace::Server.place(0), 0x8000_0000);
+        // The low 31 bits are preserved; only the marker bit differs.
+        assert_eq!(
+            IdSpace::Client.place(0x1234_5678) & 0x7fff_ffff,
+            0x1234_5678
+        );
+        assert_eq!(
+            IdSpace::Server.place(0x1234_5678) & 0x7fff_ffff,
+            0x1234_5678
+        );
+    }
+
+    #[test]
+    fn placed_ids_remain_unique_within_a_space() {
+        let mut seen = std::collections::HashSet::new();
+        for id in 0..1000u32 {
+            assert!(seen.insert(IdSpace::Client.place(id)));
+        }
+    }
+}
