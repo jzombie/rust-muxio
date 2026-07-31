@@ -72,10 +72,11 @@ pub trait ChannelCallerExt: RpcServiceCallerInterface {
         let resp_tx_for_handler = resp_tx_holder.clone();
         let recv_fn: Box<dyn RpcResponseHandler + Send + 'static> =
             Box::new(move |event: RpcStreamEvent| {
-                let mut guard = match resp_tx_for_handler.lock() {
-                    Ok(g) => g,
-                    Err(_) => return,
-                };
+                // Poisoned lock must not drop the End/Error notification — the
+                // sender has to be released or the reader waits forever.
+                let mut guard = resp_tx_for_handler
+                    .lock()
+                    .unwrap_or_else(|err| err.into_inner());
                 let tx = match guard.as_ref() {
                     Some(tx) => tx.clone(),
                     None => return,

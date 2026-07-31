@@ -2,13 +2,13 @@ use super::rpc_trait::*;
 use crate::{
     frame::{FrameDecodeError, FrameEncodeError, FrameKind, FrameMuxStreamDecoder},
     rpc::rpc_internals::{RpcHeader, RpcStreamDecoder, RpcStreamEncoder, RpcStreamEvent},
-    utils::increment_u32_id,
+    utils::{IdSpace, increment_u32_id},
 };
 use std::collections::HashMap;
 
 impl Default for RpcSession {
     fn default() -> Self {
-        Self::new()
+        Self::new(IdSpace::Client)
     }
 }
 
@@ -19,14 +19,16 @@ impl Default for RpcSession {
 /// or application-le
 pub struct RpcSession {
     next_stream_id: u32,                             // Counter for the next stream ID
+    id_space: IdSpace,                               // Direction of this connection end
     frame_mux_stream_decoder: FrameMuxStreamDecoder, // Decoder that processes frames
     rpc_stream_decoders: HashMap<u32, RpcStreamDecoder>, // Maps stream ID to decoders for individual streams
 }
 
 impl RpcSession {
-    pub fn new() -> Self {
+    pub fn new(id_space: IdSpace) -> Self {
         Self {
             next_stream_id: increment_u32_id(),
+            id_space,
             frame_mux_stream_decoder: FrameMuxStreamDecoder::new(),
             rpc_stream_decoders: HashMap::new(),
         }
@@ -41,7 +43,7 @@ impl RpcSession {
     where
         E: RpcEmit,
     {
-        let stream_id = self.next_stream_id;
+        let stream_id = self.id_space.place(self.next_stream_id);
         self.next_stream_id = increment_u32_id();
 
         let rpc_stream_encoder =

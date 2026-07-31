@@ -6,7 +6,7 @@ use crate::rpc::{
         rpc_trait::{RpcEmit, RpcResponseHandler, RpcResponseWriter},
     },
 };
-use crate::utils::increment_u32_id;
+use crate::utils::{IdSpace, increment_u32_id};
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use tracing::{self, instrument};
@@ -37,6 +37,10 @@ pub struct RpcDispatcher<'a> {
     /// Core session responsible for managing stream lifecycles and handlers.
     rpc_respondable_session: RpcRespondableSession<'a>,
 
+    /// Direction of this connection end; request ids are allocated from the
+    /// matching half of the id space so client and server can never collide.
+    id_space: IdSpace,
+
     // TODO: Document how this must be unique per session
     /// Monotonic ID generator for outbound RPC request headers.
     next_rpc_request_id: u32,
@@ -57,10 +61,19 @@ impl<'a> RpcDispatcher<'a> {
     /// The handler collects incoming response stream events and maintains
     /// them in a shared, thread-safe queue for downstream access.
     pub fn new() -> Self {
-        let rpc_respondable_session = RpcRespondableSession::new();
+        Self::new_with_id_space(IdSpace::Client)
+    }
+
+    /// Constructs a dispatcher for a specific end of a connection. Clients and
+    /// servers allocate request/stream ids from disjoint halves of the id space
+    /// (see [`IdSpace`]), guaranteeing ids can never collide across the two
+    /// processes on a shared connection.
+    pub fn new_with_id_space(id_space: IdSpace) -> Self {
+        let rpc_respondable_session = RpcRespondableSession::new(id_space);
 
         let mut instance = Self {
             rpc_respondable_session,
+            id_space,
             next_rpc_request_id: increment_u32_id(),
             rpc_request_queue: Arc::new(Mutex::new(VecDeque::new())),
         };
@@ -253,7 +266,7 @@ impl<'a> RpcDispatcher<'a> {
     {
         let rpc_method_id = rpc_request.rpc_method_id;
 
-        let rpc_request_id: u32 = self.next_rpc_request_id;
+        let rpc_request_id: u32 = self.id_space.place(self.next_rpc_request_id);
         self.next_rpc_request_id = increment_u32_id();
         tracing::debug!(
             "Initiating RPC call with request_id: {}, method_id: {}",

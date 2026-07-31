@@ -3,11 +3,12 @@ use crate::rpc::rpc_internals::{
     RpcHeader, RpcSession, RpcStreamEncoder, RpcStreamEvent,
     rpc_trait::{RpcEmit, RpcResponseHandler, RpcStreamMethodRouter},
 };
+use crate::utils::IdSpace;
 use std::collections::HashMap;
 
 impl<'a> Default for RpcRespondableSession<'a> {
     fn default() -> Self {
-        Self::new()
+        Self::new(IdSpace::Client)
     }
 }
 
@@ -33,9 +34,9 @@ pub struct RpcRespondableSession<'a> {
 }
 
 impl<'a> RpcRespondableSession<'a> {
-    pub fn new() -> Self {
+    pub fn new(id_space: IdSpace) -> Self {
         Self {
-            rpc_session: RpcSession::new(),
+            rpc_session: RpcSession::new(id_space),
             response_handlers: HashMap::new(),
             catch_all_response_handler: None,
             prebuffered_responses: HashMap::new(),

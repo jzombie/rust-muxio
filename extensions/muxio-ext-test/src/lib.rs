@@ -193,6 +193,39 @@ macro_rules! transport_state_tests {
                     "Expected the pending RPC call to fail, but it succeeded."
                 );
             }
+
+            #[tokio::test]
+            async fn test_open_stream_terminates_on_server_disconnect() {
+                use example_muxio_rpc_service_definition::RpcMethodPrebuffered;
+                use muxio_tokio_mpsc_adapter::ChannelCallerExt;
+                let (client, tx) =
+                    <$transport as $crate::test_transport::TestTransport>::connect_with_disconnect(
+                    )
+                    .await;
+                // Open a streaming channel — the application-level "subscription"
+                // that must not hang when the server dies.
+                let (_writer, mut reader) = client
+                    .open_channel(
+                        example_muxio_rpc_service_definition::prebuffered::Echo::METHOD_ID,
+                        0,
+                    )
+                    .await
+                    .expect("open channel");
+
+                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                drop(tx); // server side of the connection closes
+
+                let result =
+                    tokio::time::timeout(std::time::Duration::from_secs(3), reader.recv()).await;
+                assert!(
+                    result.is_ok() && result.unwrap().is_none(),
+                    "open stream did not terminate on server disconnect"
+                );
+                assert!(
+                    !client.is_connected(),
+                    "client should be marked disconnected after server close"
+                );
+            }
         }
     };
 }

@@ -60,15 +60,17 @@ impl RpcIpcClient {
 
     #[instrument(skip(self))]
     async fn shutdown_async(&self) {
-        if self.is_connected.swap(false, Ordering::SeqCst) {
-            if let Ok(guard) = self.state_change_handler.lock()
-                && let Some(handler) = guard.as_ref()
-            {
-                handler(RpcTransportState::Disconnected);
-            }
-            let mut dispatcher = self.dispatcher.lock().await;
-            dispatcher.fail_all_pending_requests(FrameDecodeError::ReadAfterCancel);
+        // Always mark disconnected and fail every pending stream, even if a
+        // prior path already flipped the flag — otherwise a late disconnect
+        // silently leaves client channels (and the UI waiting on them) hung.
+        self.is_connected.store(false, Ordering::SeqCst);
+        if let Ok(guard) = self.state_change_handler.lock()
+            && let Some(handler) = guard.as_ref()
+        {
+            handler(RpcTransportState::Disconnected);
         }
+        let mut dispatcher = self.dispatcher.lock().await;
+        dispatcher.fail_all_pending_requests(FrameDecodeError::ReadAfterCancel);
     }
 
     #[instrument]
