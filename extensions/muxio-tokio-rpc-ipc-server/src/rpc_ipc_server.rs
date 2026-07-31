@@ -5,6 +5,7 @@ use interprocess::local_socket::{
 };
 use muxio_core::frame::FrameDecodeError;
 use muxio_core::rpc::RpcDispatcher;
+use muxio_core::utils::IdSpace;
 use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
 use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface};
 use std::sync::Arc;
@@ -108,7 +109,9 @@ impl RpcIpcServer {
             write_tx: tx_mpsc.clone(),
             conn_id,
             is_connected: is_connected.clone(),
-            dispatcher: Arc::new(Mutex::new(RpcDispatcher::new())),
+            dispatcher: Arc::new(Mutex::new(RpcDispatcher::new_with_id_space(
+                IdSpace::Server,
+            ))),
         });
 
         if let Some(tx_event) = &self.event_tx {
