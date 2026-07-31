@@ -7,8 +7,12 @@ fn rpc_respondable_session_stream_and_reply_roundtrip() {
     let prebuffering_options = vec![true, false];
 
     for is_prebuffering_response in prebuffering_options {
-        let client = Arc::new(Mutex::new(RpcRespondableSession::new()));
-        let server = Arc::new(Mutex::new(RpcRespondableSession::new()));
+        let client = Arc::new(Mutex::new(RpcRespondableSession::new(
+            muxio::utils::IdSpace::Client,
+        )));
+        let server = Arc::new(Mutex::new(RpcRespondableSession::new(
+            muxio::utils::IdSpace::Server,
+        )));
 
         let mut server_inbox = Vec::new();
         let client_inbox = Arc::new(Mutex::new(Vec::new()));

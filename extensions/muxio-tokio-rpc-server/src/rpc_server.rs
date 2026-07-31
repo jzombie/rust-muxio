@@ -19,6 +19,7 @@ use futures_util::{
 };
 use muxio_core::frame::FrameDecodeError;
 use muxio_core::rpc::RpcDispatcher;
+use muxio_core::utils::IdSpace;
 use muxio_rpc_service_caller::{RpcServiceCallerInterface, RpcTransportState};
 use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface};
 use std::net::SocketAddr;
@@ -170,7 +171,9 @@ impl RpcServer {
             mpsc_tx: tx_mpsc.clone(),
             is_connected: is_connected_atomic.clone(),
             addr,
-            dispatcher: Arc::new(Mutex::new(RpcDispatcher::new())),
+            dispatcher: Arc::new(Mutex::new(RpcDispatcher::new_with_id_space(
+                IdSpace::Server,
+            ))),
         });
 
         if let Some(tx_event) = &self.event_tx {
