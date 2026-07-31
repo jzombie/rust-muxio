@@ -39,14 +39,27 @@ where
                 break;
             };
             let dispatcher_arc = client.dispatcher();
-            let mut dispatcher = dispatcher_arc.lock().await;
-            let on_emit = emit.clone();
             let endpoint = client.endpoint();
-            let _ = endpoint
-                .read_bytes(&mut dispatcher, (), &bytes, move |chunk: &[u8]| {
-                    on_emit(chunk.to_vec())
-                })
-                .await;
+            let on_emit = emit.clone();
+            let adapt = move |chunk: &[u8]| on_emit(chunk.to_vec());
+
+            // Decode under the dispatcher lock, then run the
+            // handlers WITHOUT the lock (a handler that needs
+            // the dispatcher would deadlock the read loop if
+            // the lock were held across execution), then send
+            // responses under the lock again.
+            let requests = {
+                let mut dispatcher = dispatcher_arc.lock().await;
+                endpoint
+                    .decode_bytes(&mut dispatcher, (), &bytes, adapt.clone())
+                    .await
+                    .unwrap_or_default()
+            };
+            let responses = endpoint.run_handlers((), requests).await;
+            if !responses.is_empty() {
+                let mut dispatcher = dispatcher_arc.lock().await;
+                let _ = endpoint.send_responses(&mut dispatcher, responses, adapt);
+            }
         }
 
         if let Some(client) = weak_client.upgrade() {

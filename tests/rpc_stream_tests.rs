@@ -7,8 +7,8 @@ use std::sync::Arc;
 
 #[test]
 fn rpc_parallel_streams_roundtrip() {
-    let mut client = RpcSession::new();
-    let mut server = RpcSession::new();
+    let mut client = RpcSession::new(muxio::utils::IdSpace::Client);
+    let mut server = RpcSession::new(muxio::utils::IdSpace::Server);
 
     // The final validation logic for payload correctness and metadata integrity
     let mut decoded: HashMap<u32, (Option<Arc<RpcHeader>>, Vec<u8>)> = HashMap::new();
@@ -166,8 +166,8 @@ fn rpc_parallel_streams_roundtrip() {
 
 #[test]
 fn rpc_stream_with_multiple_metadata_entries() {
-    let mut client = RpcSession::new();
-    let mut server = RpcSession::new();
+    let mut client = RpcSession::new(muxio::utils::IdSpace::Client);
+    let mut server = RpcSession::new(muxio::utils::IdSpace::Server);
 
     let mut outbound: Vec<u8> = Vec::new();
 
@@ -273,8 +273,8 @@ fn rpc_stream_with_multiple_metadata_entries() {
 
 #[test]
 fn rpc_complex_shuffled_stream() {
-    let mut client = RpcSession::new();
-    let mut server = RpcSession::new();
+    let mut client = RpcSession::new(muxio::utils::IdSpace::Client);
+    let mut server = RpcSession::new(muxio::utils::IdSpace::Server);
 
     // Grouped by chunks so that they can be shuffled
     let outbound_chunks: RefCell<Vec<Vec<u8>>> = RefCell::new(vec![]);
@@ -479,8 +479,8 @@ fn rpc_complex_shuffled_stream() {
 
 #[test]
 fn rpc_session_bidirectional_roundtrip() {
-    let mut client = RpcSession::new();
-    let mut server = RpcSession::new();
+    let mut client = RpcSession::new(muxio::utils::IdSpace::Client);
+    let mut server = RpcSession::new(muxio::utils::IdSpace::Server);
 
     let hdr = RpcHeader {
         rpc_msg_type: RpcMessageType::Call,

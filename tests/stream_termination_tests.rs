@@ -58,8 +58,8 @@ fn cancel_stream_does_not_process_after_cancellation() {
 
 #[test]
 fn rpc_stream_aborts_on_cancel_frame() {
-    let mut client = RpcSession::new();
-    let mut server = RpcSession::new();
+    let mut client = RpcSession::new(muxio::utils::IdSpace::Client);
+    let mut server = RpcSession::new(muxio::utils::IdSpace::Server);
 
     let hdr = RpcHeader {
         rpc_msg_type: RpcMessageType::Call,
@@ -108,8 +108,8 @@ fn rpc_stream_aborts_on_cancel_frame() {
 
 #[test]
 fn rpc_stream_aborts_on_end_frame() {
-    let mut client = RpcSession::new();
-    let mut server = RpcSession::new();
+    let mut client = RpcSession::new(muxio::utils::IdSpace::Client);
+    let mut server = RpcSession::new(muxio::utils::IdSpace::Server);
 
     let hdr = RpcHeader {
         rpc_msg_type: RpcMessageType::Call,
