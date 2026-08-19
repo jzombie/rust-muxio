@@ -1,5 +1,4 @@
 use crate::frame::{Frame, FrameCodec, FrameEncodeError, FrameKind};
-use crate::utils::now;
 
 // TODO: Add optional `UDP mode` which ensures frames have been received on remote
 
@@ -77,7 +76,6 @@ where
                 stream_id: self.stream_id,
                 seq_id: self.next_seq_id,
                 kind: self.next_kind,
-                timestamp_micros: now(),
                 payload: chunk,
             };
 
@@ -106,7 +104,6 @@ where
             stream_id: self.stream_id,
             seq_id: self.next_seq_id,
             kind: self.next_kind,
-            timestamp_micros: now(),
             payload: self.buffer.split_off(0),
         };
 
@@ -130,7 +127,6 @@ where
             stream_id: self.stream_id,
             seq_id: self.next_seq_id,
             kind: FrameKind::End,
-            timestamp_micros: now(),
             payload: self.buffer.split_off(0),
         };
 
@@ -153,7 +149,6 @@ where
             stream_id: self.stream_id,
             seq_id: self.next_seq_id,
             kind: FrameKind::Cancel,
-            timestamp_micros: now(),
             payload: Vec::new(),
         };
 

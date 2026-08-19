@@ -102,3 +102,67 @@ impl RpcResponse {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::rpc::rpc_internals::RpcMessageType;
+
+    #[test]
+    fn rpc_response_from_header_empty_metadata() {
+        let header = RpcHeader {
+            rpc_msg_type: RpcMessageType::Call,
+            rpc_request_id: 42,
+            rpc_method_id: 99,
+            rpc_metadata_bytes: vec![],
+        };
+        let resp = RpcResponse::from_rpc_header(&header);
+        assert_eq!(resp.rpc_request_id, 42);
+        assert_eq!(resp.rpc_method_id, 99);
+        assert_eq!(resp.rpc_result_status, None);
+        assert_eq!(resp.rpc_prebuffered_payload_bytes, None);
+        assert!(!resp.is_finalized);
+    }
+
+    #[test]
+    fn rpc_response_from_header_with_status() {
+        let header = RpcHeader {
+            rpc_msg_type: RpcMessageType::Response,
+            rpc_request_id: 7,
+            rpc_method_id: 123,
+            rpc_metadata_bytes: vec![5, 9, 9],
+        };
+        let resp = RpcResponse::from_rpc_header(&header);
+        assert_eq!(resp.rpc_result_status, Some(5));
+        assert_eq!(resp.rpc_request_id, 7);
+        assert_eq!(resp.rpc_method_id, 123);
+    }
+
+    #[test]
+    fn rpc_request_and_response_debug_and_eq() {
+        let req = RpcRequest {
+            rpc_method_id: 1,
+            rpc_param_bytes: Some(vec![1, 2]),
+            rpc_prebuffered_payload_bytes: Some(vec![3]),
+            is_finalized: true,
+        };
+        let req2 = RpcRequest {
+            rpc_method_id: 1,
+            rpc_param_bytes: Some(vec![1, 2]),
+            rpc_prebuffered_payload_bytes: Some(vec![3]),
+            is_finalized: true,
+        };
+        assert_eq!(req, req2);
+        let _ = format!("{req:?}");
+
+        let resp = RpcResponse {
+            rpc_request_id: 10,
+            rpc_method_id: 20,
+            rpc_result_status: Some(0),
+            rpc_prebuffered_payload_bytes: None,
+            is_finalized: true,
+        };
+        let _ = format!("{resp:?}");
+        assert!(resp.is_finalized);
+    }
+}
