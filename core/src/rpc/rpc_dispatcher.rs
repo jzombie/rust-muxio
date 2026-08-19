@@ -11,6 +11,8 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use tracing::{self, instrument};
 
+const TRANSPORT_TARGET: &str = "muxio_rpc_service::transport";
+
 impl<'a> Default for RpcDispatcher<'a> {
     fn default() -> Self {
         Self::new()
@@ -166,7 +168,7 @@ impl<'a> RpcDispatcher<'a> {
                         };
 
                         queue.push_back((rpc_request_id, rpc_request));
-                        tracing::debug!("Added request {} to queue.", rpc_request_id);
+                        tracing::trace!(target: TRANSPORT_TARGET, id = rpc_request_id, "request enqueued");
                     }
 
                     RpcStreamEvent::PayloadChunk {
@@ -183,15 +185,17 @@ impl<'a> RpcDispatcher<'a> {
                                 .rpc_prebuffered_payload_bytes
                                 .get_or_insert_with(Vec::new);
                             payload.extend_from_slice(&bytes);
-                            tracing::debug!(
-                                "Appended {} bytes to payload for request {}.",
-                                bytes.len(),
-                                rpc_request_id
+                            tracing::trace!(
+                                target: TRANSPORT_TARGET,
+                                id = rpc_request_id,
+                                bytes = bytes.len(),
+                                "payload appended"
                             );
                         } else {
-                            tracing::debug!(
-                                "Payload chunk for unknown request {}. Dropped.",
-                                rpc_request_id
+                            tracing::trace!(
+                                target: TRANSPORT_TARGET,
+                                id = rpc_request_id,
+                                "payload chunk for unknown request dropped"
                             );
                         }
                     }
@@ -203,11 +207,12 @@ impl<'a> RpcDispatcher<'a> {
                         {
                             // Set the `is_finalized` flag to true when the stream ends
                             rpc_request.is_finalized = true;
-                            tracing::debug!("Request {} finalized.", rpc_request_id);
+                            tracing::trace!(target: TRANSPORT_TARGET, id = rpc_request_id, "request finalized");
                         } else {
-                            tracing::debug!(
-                                "End event for unknown request {}. Dropped.",
-                                rpc_request_id
+                            tracing::trace!(
+                                target: TRANSPORT_TARGET,
+                                id = rpc_request_id,
+                                "end event for unknown request dropped"
                             );
                         }
                     }
