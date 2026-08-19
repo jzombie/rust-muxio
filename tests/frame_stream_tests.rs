@@ -234,3 +234,75 @@ fn encode_decode_roundtrip() {
     assert_eq!(original.kind, decoded_frame.inner.kind);
     assert_eq!(original.payload, decoded_frame.inner.payload);
 }
+
+#[test]
+fn decoder_emits_cancel_with_read_after_cancel() {
+    let cancel = Frame {
+        stream_id: 99,
+        seq_id: 0,
+        kind: FrameKind::Cancel,
+        payload: vec![],
+    };
+    let encoded = FrameCodec::encode(&cancel);
+    let mut decoder = FrameMuxStreamDecoder::new();
+    let frames: Vec<_> = decoder.read_bytes(&encoded).collect();
+    assert_eq!(frames.len(), 1);
+    let frame = frames[0].as_ref().expect("cancel frame");
+    assert_eq!(frame.inner.kind, FrameKind::Cancel);
+    assert_eq!(
+        frame.decode_error,
+        Some(muxio::frame::FrameDecodeError::ReadAfterCancel)
+    );
+}
+
+#[test]
+fn decoder_rejects_corrupt_frame_kind() {
+    let mut good = Frame {
+        stream_id: 1,
+        seq_id: 0,
+        kind: FrameKind::Data,
+        payload: b"hi".to_vec(),
+    };
+    let mut encoded = FrameCodec::encode(&good);
+    // Corrupt the kind byte (offset 12)
+    encoded[12] = 0xFF;
+    let mut decoder = FrameMuxStreamDecoder::new();
+    let frames: Vec<_> = decoder.read_bytes(&encoded).collect();
+    assert_eq!(frames.len(), 1);
+    assert!(frames[0].is_err());
+    assert_eq!(
+        frames[0].as_ref().unwrap_err(),
+        &muxio::frame::FrameDecodeError::CorruptFrame
+    );
+
+    good.payload = b"after".to_vec();
+    good.seq_id = 0;
+    let encoded2 = FrameCodec::encode(&good);
+    let frames2: Vec<_> = decoder.read_bytes(&encoded2).collect();
+    // Decoder should recover and still decode next valid frame after corrupt one
+    // (first corrupt frame is not inserted, so next_expected stays 0)
+    assert_eq!(frames2.len(), 1);
+    assert!(frames2[0].is_ok());
+}
+
+#[test]
+fn decoder_incomplete_header_returns_no_frames() {
+    let mut decoder = FrameMuxStreamDecoder::new();
+    // Only length field, no header
+    let partial = vec![0x02, 0x00, 0x00, 0x00];
+    let frames: Vec<_> = decoder.read_bytes(&partial).collect();
+    assert_eq!(frames.len(), 0);
+    // Complete it later
+    let full = {
+        let f = Frame {
+            stream_id: 5,
+            seq_id: 0,
+            kind: FrameKind::Ping,
+            payload: b"ab".to_vec(),
+        };
+        FrameCodec::encode(&f)
+    };
+    // Feed remaining bytes (header + payload minus the 4 we already sent)
+    let frames2: Vec<_> = decoder.read_bytes(&full[4..]).collect();
+    assert_eq!(frames2.len(), 1);
+}
