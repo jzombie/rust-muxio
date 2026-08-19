@@ -52,3 +52,44 @@ impl fmt::Display for FrameDecodeError {
 }
 
 impl std::error::Error for FrameDecodeError {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn display_frame_encode_errors() {
+        assert_eq!(FrameEncodeError::CorruptFrame.to_string(), "Corrupt frame");
+        assert_eq!(
+            FrameEncodeError::WriteAfterEnd.to_string(),
+            "Write after stream ended"
+        );
+        assert_eq!(
+            FrameEncodeError::WriteAfterCancel.to_string(),
+            "Write after stream cancelled"
+        );
+        // Error trait impl is just Display
+        let _: &dyn std::error::Error = &FrameEncodeError::CorruptFrame;
+    }
+
+    #[test]
+    fn display_frame_decode_errors() {
+        assert_eq!(
+            FrameDecodeError::CorruptFrame.to_string(),
+            "Corrupt frame detected"
+        );
+        assert_eq!(
+            FrameDecodeError::ReadAfterEnd.to_string(),
+            "Attempted to read from a stream that has already ended"
+        );
+        assert_eq!(
+            FrameDecodeError::ReadAfterCancel.to_string(),
+            "Attempted to read from a cancelled stream"
+        );
+        assert_eq!(
+            FrameDecodeError::IncompleteHeader.to_string(),
+            "Incomplete frame header received"
+        );
+        let _: &dyn std::error::Error = &FrameDecodeError::CorruptFrame;
+    }
+}

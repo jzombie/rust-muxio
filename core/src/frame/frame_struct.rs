@@ -32,13 +32,6 @@ pub struct Frame {
     /// or control messages like stream termination or cancellation.
     pub kind: FrameKind, // Open, Data, End, etc.
 
-    /// The timestamp when the frame was sent, in microseconds since the UNIX epoch.
-    ///
-    /// The `timestamp_micros` provides the time when the frame was generated or sent.
-    /// It is used for various purposes such as measuring latency or sequencing frames
-    /// that have been generated in different time windows.
-    pub timestamp_micros: u64, // Local send timestamp
-
     /// The raw payload data of the frame.
     ///
     /// The `payload` is the actual data being transmitted in the frame. It is represented

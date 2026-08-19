@@ -1,7 +1,7 @@
 use crate::{
     constants::{
         FRAME_HEADER_SIZE, FRAME_KIND_OFFSET, FRAME_LENGTH_FIELD_SIZE, FRAME_SEQ_ID_OFFSET,
-        FRAME_STREAM_ID_OFFSET, FRAME_TIMESTAMP_OFFSET,
+        FRAME_STREAM_ID_OFFSET,
     },
     frame::{DecodedFrame, Frame, FrameDecodeError, FrameKind},
 };
@@ -30,18 +30,17 @@ impl FrameCodec {
     /// # Returns
     ///
     /// Returns a vector of bytes that represents the encoded frame. The frame consists
-    /// of the frame's length, stream ID, sequence ID, kind, timestamp, and payload.
+    /// of the frame's length, stream ID, sequence ID, kind, and payload.
     pub fn encode(frame: &Frame) -> Vec<u8> {
         let mut buf = Vec::with_capacity(FRAME_HEADER_SIZE + frame.payload.len());
 
         // Add the frame length (payload length in bytes)
         buf.extend(&(frame.payload.len() as u32).to_le_bytes());
 
-        // Add the stream ID, sequence ID, frame kind, timestamp, and payload
+        // Add the stream ID, sequence ID, frame kind, and payload
         buf.extend(&frame.stream_id.to_le_bytes());
         buf.extend(&frame.seq_id.to_le_bytes());
         buf.push(frame.kind as u8);
-        buf.extend(&frame.timestamp_micros.to_le_bytes());
         buf.extend(&frame.payload);
 
         buf
@@ -82,7 +81,7 @@ impl FrameCodec {
             return Err(FrameDecodeError::IncompleteHeader); // Frame size mismatch
         }
 
-        // Parse the stream ID, sequence ID, frame kind, and timestamp
+        // Parse the stream ID, sequence ID, and frame kind
         let stream_id = u32::from_le_bytes(
             buf[FRAME_STREAM_ID_OFFSET..FRAME_SEQ_ID_OFFSET]
                 .try_into()
@@ -96,13 +95,6 @@ impl FrameCodec {
         let kind = FrameKind::try_from(buf[FRAME_KIND_OFFSET])
             .map_err(|_| FrameDecodeError::CorruptFrame)?; // Map error to FrameStreamError
 
-        // Extract the timestamp and payload
-        let timestamp = u64::from_le_bytes(
-            buf[FRAME_TIMESTAMP_OFFSET..FRAME_HEADER_SIZE]
-                .try_into()
-                .map_err(|_| FrameDecodeError::CorruptFrame)?,
-        );
-
         // Discard payload if canceled frame
         let payload = match kind {
             FrameKind::Cancel => vec![],
@@ -113,7 +105,6 @@ impl FrameCodec {
             stream_id,
             seq_id,
             kind,
-            timestamp_micros: timestamp,
             payload,
         };
 

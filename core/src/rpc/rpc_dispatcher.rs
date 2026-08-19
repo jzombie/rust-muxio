@@ -11,6 +11,8 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use tracing::{self, instrument};
 
+const TRANSPORT_TARGET: &str = "muxio_rpc_service::transport";
+
 impl<'a> Default for RpcDispatcher<'a> {
     fn default() -> Self {
         Self::new()
@@ -166,7 +168,7 @@ impl<'a> RpcDispatcher<'a> {
                         };
 
                         queue.push_back((rpc_request_id, rpc_request));
-                        tracing::debug!("Added request {} to queue.", rpc_request_id);
+                        tracing::trace!(target: TRANSPORT_TARGET, id = rpc_request_id, "request enqueued");
                     }
 
                     RpcStreamEvent::PayloadChunk {
@@ -183,15 +185,17 @@ impl<'a> RpcDispatcher<'a> {
                                 .rpc_prebuffered_payload_bytes
                                 .get_or_insert_with(Vec::new);
                             payload.extend_from_slice(&bytes);
-                            tracing::debug!(
-                                "Appended {} bytes to payload for request {}.",
-                                bytes.len(),
-                                rpc_request_id
+                            tracing::trace!(
+                                target: TRANSPORT_TARGET,
+                                id = rpc_request_id,
+                                bytes = bytes.len(),
+                                "payload appended"
                             );
                         } else {
-                            tracing::debug!(
-                                "Payload chunk for unknown request {}. Dropped.",
-                                rpc_request_id
+                            tracing::trace!(
+                                target: TRANSPORT_TARGET,
+                                id = rpc_request_id,
+                                "payload chunk for unknown request dropped"
                             );
                         }
                     }
@@ -203,11 +207,12 @@ impl<'a> RpcDispatcher<'a> {
                         {
                             // Set the `is_finalized` flag to true when the stream ends
                             rpc_request.is_finalized = true;
-                            tracing::debug!("Request {} finalized.", rpc_request_id);
+                            tracing::trace!(target: TRANSPORT_TARGET, id = rpc_request_id, "request finalized");
                         } else {
-                            tracing::debug!(
-                                "End event for unknown request {}. Dropped.",
-                                rpc_request_id
+                            tracing::trace!(
+                                target: TRANSPORT_TARGET,
+                                id = rpc_request_id,
+                                "end event for unknown request dropped"
                             );
                         }
                     }
@@ -524,5 +529,119 @@ impl<'a> RpcDispatcher<'a> {
             tracing::debug!("Handler for request_id {} called with error.", request_id);
         }
         tracing::debug!("Exited.");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::frame::FrameDecodeError;
+    use std::sync::{Arc, Mutex};
+
+    #[test]
+    fn dispatcher_queue_helpers_on_empty() {
+        let mut dispatcher = RpcDispatcher::new();
+        assert!(dispatcher.get_rpc_request(999).is_none());
+        assert!(dispatcher.is_rpc_request_finalized(999).is_none());
+        assert!(dispatcher.delete_rpc_request(999).is_none());
+        assert_eq!(dispatcher.read_bytes(b"").unwrap(), Vec::<u32>::new());
+    }
+
+    #[test]
+    fn dispatcher_fail_all_pending_requests_empty_and_with_handler() {
+        let mut dispatcher = RpcDispatcher::new();
+        // Empty handlers path
+        dispatcher.fail_all_pending_requests(FrameDecodeError::CorruptFrame);
+        assert_eq!(
+            dispatcher.rpc_respondable_session.response_handlers.len(),
+            0
+        );
+
+        // Insert a dummy handler via call() with on_response, then fail it
+        let called = Arc::new(Mutex::new(false));
+        let called_clone = Arc::clone(&called);
+        let req = crate::rpc::RpcRequest {
+            rpc_method_id: 1,
+            rpc_param_bytes: None,
+            rpc_prebuffered_payload_bytes: None,
+            is_finalized: true,
+        };
+        let _encoder = dispatcher
+            .call(
+                req,
+                1024,
+                |_bytes: &[u8]| {},
+                Some(Box::new(move |event| {
+                    if let crate::rpc::rpc_internals::RpcStreamEvent::Error { .. } = event {
+                        *called_clone.lock().unwrap() = true;
+                    }
+                })),
+                false,
+            )
+            .expect("call failed");
+        assert_eq!(
+            dispatcher.rpc_respondable_session.response_handlers.len(),
+            1
+        );
+        dispatcher.fail_all_pending_requests(FrameDecodeError::ReadAfterCancel);
+        assert_eq!(
+            dispatcher.rpc_respondable_session.response_handlers.len(),
+            0
+        );
+        assert!(*called.lock().unwrap());
+    }
+
+    #[test]
+    fn dispatcher_handles_error_event_via_malformed_frame() {
+        let mut dispatcher = RpcDispatcher::new();
+        // Send a frame with an invalid kind (0xFF) wrapped in a valid muxio frame
+        // This should surface as RpcStreamEvent::Error via the catch-all handler
+        // and not panic. We just ensure read_bytes doesn't panic and returns Ok.
+        let good = crate::frame::Frame {
+            stream_id: 1,
+            seq_id: 0,
+            kind: crate::frame::FrameKind::Data,
+            payload: vec![0, 1, 2],
+        };
+        let mut bytes = crate::frame::FrameCodec::encode(&good);
+        bytes[12] = 0xFF; // corrupt kind
+        let result = dispatcher.read_bytes(&bytes);
+        // read_bytes returns Ok with active ids; the Error event is handled internally
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    #[should_panic(expected = "Critical: Request queue mutex poisoned")]
+    fn dispatcher_panics_on_poisoned_queue() {
+        let mut dispatcher = RpcDispatcher::new();
+        let queue = Arc::clone(&dispatcher.rpc_request_queue);
+        // Poison the mutex by panicking while holding it
+        let _ = std::thread::spawn(move || {
+            let _guard = queue.lock().unwrap();
+            panic!("poison");
+        })
+        .join();
+        // Generate a valid RPC-encoded payload that will trigger the catch-all
+        // handler (which locks the poisoned queue).
+        let mut tmp = RpcDispatcher::new();
+        let mut rpc_bytes = Vec::new();
+        let req = crate::rpc::RpcRequest {
+            rpc_method_id: 99,
+            rpc_param_bytes: Some(vec![1, 2, 3]),
+            rpc_prebuffered_payload_bytes: None,
+            is_finalized: false,
+        };
+        let mut enc = tmp
+            .call(
+                req,
+                1024,
+                |b: &[u8]| rpc_bytes.extend_from_slice(b),
+                None::<Box<dyn FnMut(crate::rpc::rpc_internals::RpcStreamEvent) + Send>>,
+                false,
+            )
+            .expect("tmp call");
+        enc.end_stream().expect("end");
+        // This triggers the catch-all handler which tries to lock the poisoned mutex
+        let _ = dispatcher.read_bytes(&rpc_bytes);
     }
 }
