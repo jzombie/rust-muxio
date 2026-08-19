@@ -3,8 +3,7 @@ pub const FRAME_LENGTH_FIELD_SIZE: usize = 4;
 pub const FRAME_STREAM_ID_OFFSET: usize = 4;
 pub const FRAME_SEQ_ID_OFFSET: usize = 8;
 pub const FRAME_KIND_OFFSET: usize = 12;
-pub const FRAME_TIMESTAMP_OFFSET: usize = 13;
-pub const FRAME_HEADER_SIZE: usize = 21;
+pub const FRAME_HEADER_SIZE: usize = 13;
 
 /// Byte offset where the metadata length field begins.
 /// This field is a fixed-size 2-byte unsigned integer (u16)

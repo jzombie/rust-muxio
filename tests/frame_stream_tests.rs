@@ -49,7 +49,6 @@ fn decoder_handles_incomplete_input() {
         stream_id: 2,
         seq_id: 0,
         kind: FrameKind::Ping,
-        timestamp_micros: 0,
         payload: b"xyz".to_vec(),
     };
 
@@ -225,7 +224,6 @@ fn encode_decode_roundtrip() {
         stream_id: 42,
         seq_id: 0,
         kind: FrameKind::Data,
-        timestamp_micros: 12345678,
         payload: b"hello world".to_vec(),
     };
 
@@ -234,9 +232,5 @@ fn encode_decode_roundtrip() {
 
     assert_eq!(original.stream_id, decoded_frame.inner.stream_id);
     assert_eq!(original.kind, decoded_frame.inner.kind);
-    assert_eq!(
-        original.timestamp_micros,
-        decoded_frame.inner.timestamp_micros
-    );
     assert_eq!(original.payload, decoded_frame.inner.payload);
 }

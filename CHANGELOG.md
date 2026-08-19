@@ -4,10 +4,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 (or is loosely based on) Semantic Versioning.
 
-## [0.14.1-alpha] - 2026-08-19
+
+## [0.15.0-alpha] - 2026-08-19
 
 ### Changed
 
+- **BREAKING: Frame header `timestamp_micros` removed (`muxio-core`):** `Frame` no longer
+  carries `u64 timestamp_micros` (`core/src/frame/frame_struct.rs:40`,
+  `core/src/constants.rs:7` `FRAME_HEADER_SIZE 21 → 13`, `core/src/frame/frame_codec.rs`,
+  `core/src/frame/frame_stream_encoder.rs`). Wire is incompatible with `≤0.14.0-alpha` —
+  old peers sending 21-byte headers will be rejected as `CorruptFrame`. Saves 8 bytes per
+  chunk (~38% header) and removes the `chrono`/`utils::now` dependency (`core/Cargo.toml:12`,
+  `core/src/utils/now.rs` deleted, `tests/utils_tests.rs` trimmed). `seq_id` + `stream_id`
+  already provide ordering/reassembly (`FrameMuxStreamDecoder`); timestamp was unused beyond
+  encode/decode and is not required for reliable delivery, including future UDP mode (which
+  will use `seq_id` ACKs). Re-add as optional extension if latency metrics are needed.
 - **RPC transport tracing lowered from `DEBUG` to `TRACE` (`muxio-core`):** the per-request
   `RpcDispatcher::init_catch_all_response_handler` spam (`Added request {} to queue`,
   `Appended {} bytes to payload`, `Payload chunk for unknown request`, `Request {} finalized`,
@@ -24,6 +35,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
   `xxhash-rust 0.8.17 → 0.8.18`, plus new `block-buffer 0.12.1`, `crypto-common 0.2.2`,
   `digest 0.11.3`, `const-oid 0.10.2`, `hybrid-array 0.4.14` pulled via the `tungstenite`
   upgrade (`Cargo.toml` bumps `tokio-tungstenite`).
+- **Removed unused `tokio-tungstenite` dep from `muxio-tokio-rpc-server`** (`extensions/muxio-tokio-rpc-server/Cargo.toml:21`) — server now uses `axum::extract::ws` (which wraps `tungstenite` transitively); `cargo-udeps` no longer flags it. Client retains `tokio-tungstenite` for `connect_async`.
 
 ## [0.14.0-alpha] - 2026-07-31
 
