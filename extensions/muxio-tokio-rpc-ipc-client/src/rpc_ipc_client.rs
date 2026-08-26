@@ -143,8 +143,7 @@ impl RpcIpcClient {
                                 if let Ok(mut guard) = disconnect_error.lock()
                                     && guard.is_none()
                                 {
-                                    *guard =
-                                        Some("unexpected EOF (connection closed)".to_string());
+                                    *guard = Some("unexpected EOF (connection closed)".to_string());
                                 }
                                 tracing::debug!("RPC-IPC client read EOF");
                                 return None;
@@ -226,8 +225,9 @@ impl RpcServiceCallerInterface for RpcIpcClient {
                     return;
                 }
                 let chunk_len = chunk.len();
-                let pending =
-                    CLIENT_PENDING_WRITES.fetch_add(1, Ordering::Relaxed).wrapping_add(1);
+                let pending = CLIENT_PENDING_WRITES
+                    .fetch_add(1, Ordering::Relaxed)
+                    .wrapping_add(1);
                 if pending > WRITE_QUEUE_WARN_THRESHOLD {
                     tracing::warn!(
                         pending_writes = pending,
