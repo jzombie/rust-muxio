@@ -107,7 +107,16 @@ impl RpcIpcClient {
                 let w = write_half.clone();
                 async move {
                     use tokio::io::AsyncWriteExt;
-                    w.lock().await.write_all(&msg).await.map_err(|_| ())
+                    let res = w.lock().await.write_all(&msg).await.map_err(|_| ());
+                    // Decrement pending counter after the frame is flushed or dropped,
+                    // guarding against underflow if the counter was already zero
+                    // (e.g. after a failed send that already undid its increment).
+                    let _ = CLIENT_PENDING_WRITES.fetch_update(
+                        Ordering::Relaxed,
+                        Ordering::Relaxed,
+                        |v| if v == 0 { None } else { Some(v - 1) },
+                    );
+                    res
                 }
             });
 
@@ -217,7 +226,8 @@ impl RpcServiceCallerInterface for RpcIpcClient {
                     return;
                 }
                 let chunk_len = chunk.len();
-                let pending = CLIENT_PENDING_WRITES.fetch_add(1, Ordering::Relaxed) + 1;
+                let pending =
+                    CLIENT_PENDING_WRITES.fetch_add(1, Ordering::Relaxed).wrapping_add(1);
                 if pending > WRITE_QUEUE_WARN_THRESHOLD {
                     tracing::warn!(
                         pending_writes = pending,
@@ -231,8 +241,13 @@ impl RpcServiceCallerInterface for RpcIpcClient {
                         tracing::debug!("Emitted binary chunk ({} bytes) via mpsc.", chunk_len)
                     }
                     Err(e) => {
-                        // Decrement on failure to keep counter roughly accurate
-                        CLIENT_PENDING_WRITES.fetch_sub(1, Ordering::Relaxed);
+                        // Decrement on failure to keep counter roughly accurate,
+                        // guarding against underflow.
+                        let _ = CLIENT_PENDING_WRITES.fetch_update(
+                            Ordering::Relaxed,
+                            Ordering::Relaxed,
+                            |v| if v == 0 { None } else { Some(v - 1) },
+                        );
                         tracing::debug!(
                             "Failed to send binary chunk ({} bytes) via mpsc: {}",
                             chunk_len,
