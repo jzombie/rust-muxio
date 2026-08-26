@@ -703,15 +703,14 @@ mod tests {
             is_finalized: false,
         };
         let _enc = dispatcher
-            .call(
-                req,
-                1024,
-                |_: &[u8]| {},
-                Some(Box::new(|_| {})),
-                true,
-            )
+            .call(req, 1024, |_: &[u8]| {}, Some(Box::new(|_| {})), true)
             .expect("call with prebuffer");
-        assert_eq!(dispatcher.rpc_respondable_session.get_remaining_response_handlers(), 1);
+        assert_eq!(
+            dispatcher
+                .rpc_respondable_session
+                .get_remaining_response_handlers(),
+            1
+        );
         let mut tmp = RpcDispatcher::new();
         let mut rpc_bytes = Vec::new();
         let req2 = crate::rpc::RpcRequest {
@@ -733,7 +732,12 @@ mod tests {
         let _ = dispatcher.read_bytes(&rpc_bytes).expect("read_bytes");
         assert!(!dispatcher.rpc_request_queue.lock().unwrap().is_empty());
         dispatcher.fail_all_pending_requests(FrameDecodeError::Transport("test".to_string()));
-        assert_eq!(dispatcher.rpc_respondable_session.get_remaining_response_handlers(), 0);
+        assert_eq!(
+            dispatcher
+                .rpc_respondable_session
+                .get_remaining_response_handlers(),
+            0
+        );
         assert!(dispatcher.rpc_request_queue.lock().unwrap().is_empty());
     }
 }

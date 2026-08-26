@@ -251,17 +251,20 @@ mod tests {
         let pending = Arc::new(Mutex::new(Vec::new()));
         {
             let pending_clone = Arc::clone(&pending);
-            server.lock().unwrap().set_catch_all_response_handler(move |evt| {
-                if let RpcStreamEvent::End { rpc_request_id, .. } = evt {
-                    let reply_header = RpcHeader {
-                        rpc_msg_type: RpcMessageType::Response,
-                        rpc_request_id,
-                        rpc_method_id: 42,
-                        rpc_metadata_bytes: vec![],
-                    };
-                    pending_clone.lock().unwrap().push(reply_header);
-                }
-            });
+            server
+                .lock()
+                .unwrap()
+                .set_catch_all_response_handler(move |evt| {
+                    if let RpcStreamEvent::End { rpc_request_id, .. } = evt {
+                        let reply_header = RpcHeader {
+                            rpc_msg_type: RpcMessageType::Response,
+                            rpc_request_id,
+                            rpc_method_id: 42,
+                            rpc_metadata_bytes: vec![],
+                        };
+                        pending_clone.lock().unwrap().push(reply_header);
+                    }
+                });
         }
 
         let mut client_enc = client
@@ -330,19 +333,10 @@ mod tests {
             is_finalized: false,
         };
         let _enc = dispatcher
-            .call(
-                req,
-                1024,
-                |_: &[u8]| {},
-                Some(Box::new(|_| {})),
-                true,
-            )
+            .call(req, 1024, |_: &[u8]| {}, Some(Box::new(|_| {})), true)
             .expect("init");
         assert_eq!(
-            dispatcher
-                .rpc_respondable_session
-                .prebuffering_flags
-                .len(),
+            dispatcher.rpc_respondable_session.prebuffering_flags.len(),
             1
         );
         dispatcher.fail_all_pending_requests(crate::frame::FrameDecodeError::Transport(
