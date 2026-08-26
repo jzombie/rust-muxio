@@ -99,4 +99,28 @@ mod tests {
         );
         let _: &dyn std::error::Error = &FrameDecodeError::CorruptFrame;
     }
+
+    #[test]
+    fn display_frame_decode_transport_error() {
+        let err = FrameDecodeError::Transport("ConnectionReset".to_string());
+        assert_eq!(err.to_string(), "Transport error: ConnectionReset");
+        let _: &dyn std::error::Error = &err;
+
+        let empty = FrameDecodeError::Transport(String::new());
+        assert_eq!(empty.to_string(), "Transport error: ");
+        let _: &dyn std::error::Error = &empty;
+
+        let eof = FrameDecodeError::Transport("unexpected EOF (connection closed)".to_string());
+        assert!(eof.to_string().contains("unexpected EOF"));
+        let _: &dyn std::error::Error = &eof;
+
+        assert_eq!(
+            FrameDecodeError::Transport("a".to_string()),
+            FrameDecodeError::Transport("a".to_string())
+        );
+        assert_ne!(
+            FrameDecodeError::Transport("a".to_string()),
+            FrameDecodeError::CorruptFrame
+        );
+    }
 }

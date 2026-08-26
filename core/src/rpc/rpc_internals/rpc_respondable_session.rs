@@ -24,8 +24,8 @@ pub struct RpcRespondableSession<'a> {
     // TODO: Make these names less vague
     pub(crate) response_handlers: HashMap<u32, Box<dyn FnMut(RpcStreamEvent) + Send + 'a>>,
     catch_all_response_handler: Option<Box<dyn FnMut(RpcStreamEvent) + Send + 'a>>,
-    prebuffered_responses: HashMap<u32, Vec<u8>>, // Track buffered responses by request ID
-    prebuffering_flags: HashMap<u32, bool>, // Track whether pre-buffering is enabled for each request
+    pub(crate) prebuffered_responses: HashMap<u32, Vec<u8>>, // Track buffered responses by request ID
+    pub(crate) prebuffering_flags: HashMap<u32, bool>, // Track whether pre-buffering is enabled for each request
     /// Optional router that maps (method_id, request_id) to a per-request handler.
     /// When set, it is consulted on each `Header` event. If it returns a handler,
     /// the handler is registered for that stream, bypassing the catch-all accumulator.
@@ -218,5 +218,149 @@ impl<'a> RpcRespondableSession<'a> {
     pub(crate) fn clear_all_prebuffering(&mut self) {
         self.prebuffering_flags.clear();
         self.prebuffered_responses.clear();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::rpc::rpc_internals::{RpcHeader, RpcMessageType, RpcStreamEvent};
+    use std::sync::{Arc, Mutex};
+
+    #[test]
+    fn prebuffering_flags_cleared_on_end() {
+        // Drive the actual state machine: client -> server -> client roundtrip with prebuffering=true
+        let client = Arc::new(Mutex::new(RpcRespondableSession::new(
+            crate::utils::IdSpace::Client,
+        )));
+        let server = Arc::new(Mutex::new(RpcRespondableSession::new(
+            crate::utils::IdSpace::Server,
+        )));
+
+        let mut server_inbox = Vec::new();
+        let client_inbox = Arc::new(Mutex::new(Vec::new()));
+
+        let call_header = RpcHeader {
+            rpc_msg_type: RpcMessageType::Call,
+            rpc_request_id: 1,
+            rpc_method_id: 42,
+            rpc_metadata_bytes: vec![],
+        };
+
+        // Server will reply with a single chunk and End
+        let pending = Arc::new(Mutex::new(Vec::new()));
+        {
+            let pending_clone = Arc::clone(&pending);
+            server.lock().unwrap().set_catch_all_response_handler(move |evt| {
+                if let RpcStreamEvent::End { rpc_request_id, .. } = evt {
+                    let reply_header = RpcHeader {
+                        rpc_msg_type: RpcMessageType::Response,
+                        rpc_request_id,
+                        rpc_method_id: 42,
+                        rpc_metadata_bytes: vec![],
+                    };
+                    pending_clone.lock().unwrap().push(reply_header);
+                }
+            });
+        }
+
+        let mut client_enc = client
+            .lock()
+            .unwrap()
+            .init_respondable_request(
+                call_header,
+                1024,
+                |bytes| server_inbox.push(bytes.to_vec()),
+                Some(Box::new(|_| {})),
+                true,
+            )
+            .expect("init");
+        client_enc.write_bytes(b"ping").unwrap();
+        client_enc.flush().unwrap();
+        client_enc.end_stream().unwrap();
+
+        for chunk in &server_inbox {
+            server.lock().unwrap().read_bytes(chunk).unwrap();
+        }
+        // Server has processed the Call and queued a reply header
+        assert_eq!(client.lock().unwrap().prebuffering_flags.len(), 1);
+        // Now create the actual reply bytes from the pending header and feed them to the client
+        for reply_header in pending.lock().unwrap().drain(..) {
+            let mut enc = server
+                .lock()
+                .unwrap()
+                .start_reply_stream(reply_header, 1024, |bytes| {
+                    client_inbox.lock().unwrap().push(bytes.to_vec())
+                })
+                .expect("server reply");
+            enc.write_bytes(b"hello").unwrap();
+            enc.flush().unwrap();
+            enc.end_stream().unwrap();
+        }
+        for chunk in client_inbox.lock().unwrap().iter() {
+            client.lock().unwrap().read_bytes(chunk).unwrap();
+        }
+        // After processing End, the prebuffering maps must be automatically cleared
+        let guard = client.lock().unwrap();
+        assert!(
+            guard.prebuffering_flags.is_empty(),
+            "prebuffering_flags should be cleared after End"
+        );
+        assert!(
+            guard.prebuffered_responses.is_empty(),
+            "prebuffered_responses should be cleared after End"
+        );
+        assert_eq!(guard.get_remaining_response_handlers(), 0);
+    }
+
+    #[test]
+    fn prebuffering_flags_cleared_on_error() {
+        // Verify that an Error event (e.g., transport failure) clears the
+        // prebuffering state via the actual state machine, not just the helper.
+        // We use RpcDispatcher's fail_all path which synthesizes an Error event
+        // for the pending request and should clear both maps.
+        use crate::rpc::RpcDispatcher;
+        use crate::rpc::RpcRequest;
+
+        let mut dispatcher = RpcDispatcher::new();
+        let req = RpcRequest {
+            rpc_method_id: 43,
+            rpc_param_bytes: None,
+            rpc_prebuffered_payload_bytes: None,
+            is_finalized: false,
+        };
+        let _enc = dispatcher
+            .call(
+                req,
+                1024,
+                |_: &[u8]| {},
+                Some(Box::new(|_| {})),
+                true,
+            )
+            .expect("init");
+        assert_eq!(
+            dispatcher
+                .rpc_respondable_session
+                .prebuffering_flags
+                .len(),
+            1
+        );
+        dispatcher.fail_all_pending_requests(crate::frame::FrameDecodeError::Transport(
+            "test".to_string(),
+        ));
+        assert!(
+            dispatcher
+                .rpc_respondable_session
+                .prebuffering_flags
+                .is_empty(),
+            "prebuffering_flags should be cleared after Error via fail_all"
+        );
+        assert!(
+            dispatcher
+                .rpc_respondable_session
+                .prebuffered_responses
+                .is_empty(),
+            "prebuffered_responses should be cleared after Error via fail_all"
+        );
     }
 }

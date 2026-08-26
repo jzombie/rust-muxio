@@ -37,7 +37,7 @@ impl<'a> Default for RpcDispatcher<'a> {
 /// IMPORTANT: A unique dispatcher should be used per-client.
 pub struct RpcDispatcher<'a> {
     /// Core session responsible for managing stream lifecycles and handlers.
-    rpc_respondable_session: RpcRespondableSession<'a>,
+    pub(crate) rpc_respondable_session: RpcRespondableSession<'a>,
 
     /// Direction of this connection end; request ids are allocated from the
     /// matching half of the id space so client and server can never collide.
@@ -650,5 +650,90 @@ mod tests {
         enc.end_stream().expect("end");
         // This triggers the catch-all handler which tries to lock the poisoned mutex
         let _ = dispatcher.read_bytes(&rpc_bytes);
+    }
+
+    #[test]
+    fn dispatcher_fail_all_propagates_transport_error() {
+        for (msg, should_contain) in [
+            ("ConnectionReset", "ConnectionReset"),
+            ("BrokenPipe", "BrokenPipe"),
+            ("unexpected EOF (connection closed)", "unexpected EOF"),
+        ] {
+            let mut dispatcher = RpcDispatcher::new();
+            let received = Arc::new(Mutex::new(None::<FrameDecodeError>));
+            let received_clone = Arc::clone(&received);
+            let req = crate::rpc::RpcRequest {
+                rpc_method_id: 42,
+                rpc_param_bytes: None,
+                rpc_prebuffered_payload_bytes: None,
+                is_finalized: true,
+            };
+            let _encoder = dispatcher
+                .call(
+                    req,
+                    1024,
+                    |_: &[u8]| {},
+                    Some(Box::new(move |event| {
+                        if let crate::rpc::rpc_internals::RpcStreamEvent::Error {
+                            frame_decode_error,
+                            ..
+                        } = event
+                        {
+                            *received_clone.lock().unwrap() = Some(frame_decode_error.clone());
+                        }
+                    })),
+                    false,
+                )
+                .expect("call failed");
+            let err = FrameDecodeError::Transport(msg.to_string());
+            dispatcher.fail_all_pending_requests(err.clone());
+            let got = received.lock().unwrap().clone().expect("handler called");
+            assert_eq!(got, err);
+            assert!(got.to_string().contains(should_contain));
+        }
+    }
+
+    #[test]
+    fn dispatcher_fail_all_clears_prebuffering_and_queue() {
+        let mut dispatcher = RpcDispatcher::new();
+        let req = crate::rpc::RpcRequest {
+            rpc_method_id: 99,
+            rpc_param_bytes: Some(vec![1, 2, 3]),
+            rpc_prebuffered_payload_bytes: None,
+            is_finalized: false,
+        };
+        let _enc = dispatcher
+            .call(
+                req,
+                1024,
+                |_: &[u8]| {},
+                Some(Box::new(|_| {})),
+                true,
+            )
+            .expect("call with prebuffer");
+        assert_eq!(dispatcher.rpc_respondable_session.get_remaining_response_handlers(), 1);
+        let mut tmp = RpcDispatcher::new();
+        let mut rpc_bytes = Vec::new();
+        let req2 = crate::rpc::RpcRequest {
+            rpc_method_id: 100,
+            rpc_param_bytes: Some(vec![4, 5, 6]),
+            rpc_prebuffered_payload_bytes: None,
+            is_finalized: false,
+        };
+        let mut enc2 = tmp
+            .call(
+                req2,
+                1024,
+                |b: &[u8]| rpc_bytes.extend_from_slice(b),
+                None::<Box<dyn FnMut(crate::rpc::rpc_internals::RpcStreamEvent) + Send>>,
+                false,
+            )
+            .expect("tmp call");
+        enc2.end_stream().expect("end");
+        let _ = dispatcher.read_bytes(&rpc_bytes).expect("read_bytes");
+        assert!(!dispatcher.rpc_request_queue.lock().unwrap().is_empty());
+        dispatcher.fail_all_pending_requests(FrameDecodeError::Transport("test".to_string()));
+        assert_eq!(dispatcher.rpc_respondable_session.get_remaining_response_handlers(), 0);
+        assert!(dispatcher.rpc_request_queue.lock().unwrap().is_empty());
     }
 }
