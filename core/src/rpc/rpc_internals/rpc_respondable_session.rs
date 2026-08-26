@@ -178,7 +178,8 @@ impl<'a> RpcRespondableSession<'a> {
                                 cb(rpc_payload_event);
                                 cb(evt.clone());
 
-                                self.prebuffered_responses.remove(&rpc_id); // Clear the buffer after calling
+                                self.prebuffered_responses.remove(&rpc_id);
+                                self.prebuffering_flags.remove(&rpc_id);
                             }
                         }
                         _ => {
@@ -195,6 +196,8 @@ impl<'a> RpcRespondableSession<'a> {
                     RpcStreamEvent::End { .. } | RpcStreamEvent::Error { .. }
                 ) {
                     self.response_handlers.remove(&rpc_id);
+                    self.prebuffering_flags.remove(&rpc_id);
+                    self.prebuffered_responses.remove(&rpc_id);
                 }
             }
 
@@ -210,5 +213,10 @@ impl<'a> RpcRespondableSession<'a> {
 
     pub fn get_remaining_response_handlers(&self) -> usize {
         self.response_handlers.len()
+    }
+
+    pub(crate) fn clear_all_prebuffering(&mut self) {
+        self.prebuffering_flags.clear();
+        self.prebuffered_responses.clear();
     }
 }

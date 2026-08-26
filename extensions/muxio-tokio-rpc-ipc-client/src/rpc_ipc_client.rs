@@ -16,6 +16,12 @@ use tokio::{
 };
 use tracing::{self, instrument};
 
+/// Warn threshold for the unbounded client write queue (see Phase 3.5:
+/// backpressure is intentionally deferred, but depth is now visible).
+const WRITE_QUEUE_WARN_THRESHOLD: usize = 1024;
+static CLIENT_PENDING_WRITES: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+
 type RpcTransportStateChangeHandler =
     Arc<StdMutex<Option<Box<dyn Fn(RpcTransportState) + Send + Sync>>>>;
 
@@ -26,6 +32,7 @@ pub struct RpcIpcClient {
     state_change_handler: RpcTransportStateChangeHandler,
     is_connected: Arc<AtomicBool>,
     task_handles: Vec<JoinHandle<()>>,
+    disconnect_error: Arc<StdMutex<Option<String>>>,
 }
 
 impl fmt::Debug for RpcIpcClient {
@@ -69,8 +76,18 @@ impl RpcIpcClient {
         {
             handler(RpcTransportState::Disconnected);
         }
+        let err = {
+            let guard = self
+                .disconnect_error
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            match guard.clone() {
+                Some(msg) => FrameDecodeError::Transport(msg),
+                None => FrameDecodeError::ReadAfterCancel,
+            }
+        };
         let mut dispatcher = self.dispatcher.lock().await;
-        dispatcher.fail_all_pending_requests(FrameDecodeError::ReadAfterCancel);
+        dispatcher.fail_all_pending_requests(err);
     }
 
     #[instrument]
@@ -100,18 +117,38 @@ impl RpcIpcClient {
             let is_connected = Arc::new(AtomicBool::new(true));
             let dispatcher = Arc::new(TokioMutex::new(RpcDispatcher::new()));
             let endpoint = Arc::new(RpcServiceEndpoint::new());
+            let disconnect_error = Arc::new(StdMutex::new(None::<String>));
             let mut task_handles = Vec::new();
 
             task_handles.push(send_handle);
 
             let weak_for_read = weak_client.clone();
+            let disconnect_error_for_read = disconnect_error.clone();
             let read_stream = futures_util::stream::unfold(
                 (read_half, vec![0u8; 64 * 1024]),
-                |(mut r, mut buf)| async {
-                    let n = r.read(&mut buf).await.ok()?;
-                    if n == 0 {
-                        None
-                    } else {
+                move |(mut r, mut buf)| {
+                    let disconnect_error = disconnect_error_for_read.clone();
+                    async move {
+                        let n = match r.read(&mut buf).await {
+                            Ok(0) => {
+                                if let Ok(mut guard) = disconnect_error.lock()
+                                    && guard.is_none()
+                                {
+                                    *guard =
+                                        Some("unexpected EOF (connection closed)".to_string());
+                                }
+                                tracing::debug!("RPC-IPC client read EOF");
+                                return None;
+                            }
+                            Ok(n) => n,
+                            Err(e) => {
+                                tracing::warn!(error = ?e, "RPC-IPC client read failed");
+                                if let Ok(mut guard) = disconnect_error.lock() {
+                                    *guard = Some(e.to_string());
+                                }
+                                return None;
+                            }
+                        };
                         Some((bytes::Bytes::copy_from_slice(&buf[..n]), (r, buf)))
                     }
                 },
@@ -134,6 +171,7 @@ impl RpcIpcClient {
                 state_change_handler,
                 is_connected,
                 task_handles,
+                disconnect_error,
             }
         });
 
@@ -179,16 +217,28 @@ impl RpcServiceCallerInterface for RpcIpcClient {
                     return;
                 }
                 let chunk_len = chunk.len();
+                let pending = CLIENT_PENDING_WRITES.fetch_add(1, Ordering::Relaxed) + 1;
+                if pending > WRITE_QUEUE_WARN_THRESHOLD {
+                    tracing::warn!(
+                        pending_writes = pending,
+                        threshold = WRITE_QUEUE_WARN_THRESHOLD,
+                        "Client write queue depth exceeded threshold"
+                    );
+                }
                 let send_result = tx.send(chunk);
                 match send_result {
                     Ok(_) => {
                         tracing::debug!("Emitted binary chunk ({} bytes) via mpsc.", chunk_len)
                     }
-                    Err(e) => tracing::debug!(
-                        "Failed to send binary chunk ({} bytes) via mpsc: {}",
-                        chunk_len,
-                        e
-                    ),
+                    Err(e) => {
+                        // Decrement on failure to keep counter roughly accurate
+                        CLIENT_PENDING_WRITES.fetch_sub(1, Ordering::Relaxed);
+                        tracing::debug!(
+                            "Failed to send binary chunk ({} bytes) via mpsc: {}",
+                            chunk_len,
+                            e
+                        )
+                    }
                 }
             }
         })

@@ -34,6 +34,12 @@ pub enum FrameDecodeError {
     ReadAfterCancel,
 
     IncompleteHeader,
+
+    /// Transport-level I/O error carrying the real `std::io::Error` display.
+    /// Used by `fail_all_pending_requests` to surface the root cause
+    /// (e.g. `ConnectionReset`, `BrokenPipe`, `UnexpectedEof`) instead of a
+    /// static `ReadAfterCancel`.
+    Transport(String),
 }
 
 impl fmt::Display for FrameDecodeError {
@@ -47,6 +53,7 @@ impl fmt::Display for FrameDecodeError {
                 write!(f, "Attempted to read from a cancelled stream")
             }
             FrameDecodeError::IncompleteHeader => write!(f, "Incomplete frame header received"),
+            FrameDecodeError::Transport(msg) => write!(f, "Transport error: {msg}"),
         }
     }
 }

@@ -510,6 +510,13 @@ impl<'a> RpcDispatcher<'a> {
 
         // Take ownership of the handlers, leaving the map empty.
         let handlers = std::mem::take(&mut self.rpc_respondable_session.response_handlers);
+        // Clear prebuffering state and any pending inbound request queue
+        // entries that would otherwise linger for the dispatcher's lifetime
+        // (see TODOs at `rpc_request_queue` push sites).
+        self.rpc_respondable_session.clear_all_prebuffering();
+        if let Ok(mut queue) = self.rpc_request_queue.lock() {
+            queue.clear();
+        }
 
         tracing::debug!("Taken {} handlers.", handlers.len());
 
