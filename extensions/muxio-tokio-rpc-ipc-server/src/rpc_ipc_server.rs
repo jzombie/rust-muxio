@@ -13,6 +13,11 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use tokio::io::AsyncReadExt;
 use tokio::sync::{Mutex, mpsc};
 
+/// Warn threshold for the unbounded server write queue (minimal visibility,
+/// full backpressure deferred).
+#[allow(dead_code)]
+const SERVER_WRITE_QUEUE_WARN_THRESHOLD: usize = 1024;
+
 static NEXT_CONN_ID: AtomicUsize = AtomicUsize::new(1);
 
 /// Represents events that occur on the `RpcIpcServer`.
@@ -122,12 +127,17 @@ impl RpcIpcServer {
 
         let context_for_reader = context.clone();
         let self_for_reader = self.clone();
+        let server_disconnect_error = std::sync::Arc::new(std::sync::Mutex::new(None::<String>));
+        let server_disconnect_error_for_reader = server_disconnect_error.clone();
         let reader_handle = tokio::spawn(async move {
             let mut buf = vec![0u8; 64 * 1024];
             loop {
                 match read_half.read(&mut buf).await {
                     Ok(0) => {
                         tracing::info!("RPC-IPC client {} disconnected (EOF).", peer_label);
+                        if let Ok(mut guard) = server_disconnect_error_for_reader.lock() {
+                            *guard = Some("unexpected EOF (client closed)".to_string());
+                        }
                         break;
                     }
                     Ok(n) => {
@@ -168,20 +178,48 @@ impl RpcIpcServer {
                     }
                     Err(e) => {
                         tracing::error!("RPC-IPC server: read error from {}: {:?}", peer_label, e);
+                        if let Ok(mut guard) = server_disconnect_error_for_reader.lock() {
+                            *guard = Some(e.to_string());
+                        }
                         break;
                     }
                 }
             }
         });
 
+        let mut writer_handle = writer_handle;
+        let mut reader_handle = reader_handle;
         tokio::select! {
-            _ = writer_handle => {},
-            _ = reader_handle => {},
+            res = &mut writer_handle => {
+                if let Err(e) = res
+                    && e.is_panic()
+                {
+                    tracing::error!("RPC-IPC server: writer task panicked for client {conn_id}: {e:?}");
+                }
+                reader_handle.abort();
+            },
+            res = &mut reader_handle => {
+                if let Err(e) = res
+                    && e.is_panic()
+                {
+                    tracing::error!("RPC-IPC server: reader task panicked for client {conn_id}: {e:?}");
+                }
+                writer_handle.abort();
+            },
         }
 
         is_connected.store(false, Ordering::SeqCst);
+        let err = {
+            let guard = server_disconnect_error
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            match guard.clone() {
+                Some(msg) => FrameDecodeError::Transport(msg),
+                None => FrameDecodeError::ReadAfterCancel,
+            }
+        };
         let mut dg = context.dispatcher.lock().await;
-        dg.fail_all_pending_requests(FrameDecodeError::ReadAfterCancel);
+        dg.fail_all_pending_requests(err);
         if let Some(tx_event) = &self.event_tx {
             let _ = tx_event.send(RpcIpcServerEvent::ClientDisconnected(conn_id));
         }
