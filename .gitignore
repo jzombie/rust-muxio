@@ -3,3 +3,4 @@ lcov.info
 out.txt
 extensions/muxio-ext-test/tests/auto_tests.rs
 .DS_Store
+*.patch

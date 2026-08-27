@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 (or is loosely based on) Semantic Versioning.
 
+## [0.16.0-alpha] - 2026-08-26
+
+### Added
+
+- **Frame `Transport` decode error variant (`muxio-core`):** new `FrameDecodeError::Transport(String)` carries the real `std::io::Error` display for transport failures so `fail_all_pending_requests` can surface `ConnectionReset`, `BrokenPipe`, or `UnexpectedEof` instead of a static `ReadAfterCancel`.
+
+### Fixed
+
+- **IPC client/server transport error propagation:** client read loop now distinguishes `Ok(0)` (synthesized unexpected EOF) from `Err(e)` (logs `warn!` and stores the error) instead of swallowing via `ok()?`, server read loop does the same, and both shutdown paths thread the concrete error into `fail_all_pending_requests` so pending oneshots receive the root cause.
+- **Prebuffering flags leak:** `prebuffering_flags` entries were inserted per outbound call and never removed; now cleared on `End`/`Error` and via `clear_all_prebuffering` in `fail_all`.
+- **Inbound request queue leak:** `rpc_request_queue` entries for errored or non-finalized streams lingered; `fail_all_pending_requests` now drains the queue so a dead connection does not leak state.
+
+### Changed
+
+- **Panic-aware server per-connection tasks:** `handle_connection` now retains `writer_handle` and `reader_handle`, checks `JoinError::is_panic()` and logs with `conn_id` instead of silently discarding via `select!` drop, and aborts the peer task.
+- **Write queue depth visibility:** defined `WRITE_QUEUE_WARN_THRESHOLD` and `SERVER_WRITE_QUEUE_WARN_THRESHOLD` with a client-side atomic counter and `warn!` when the threshold is exceeded; full backpressure redesign remains deferred.
+- **Dependency bumps (`Cargo.lock`):** `futures 0.3.33 → 0.3.34` (#105), `async-trait 0.1.91 → 0.1.92` (#104) — patch bumps via Dependabot (`futures 0.3.34` upgrades `futures-channel`, `futures-core`, `futures-executor`, `futures-io`, `futures-sink`, `futures-task`, `futures-util`, `futures-macro` with `syn 2.0.118 → 3.0.3`).
 
 ## [0.15.0-alpha] - 2026-08-19
 

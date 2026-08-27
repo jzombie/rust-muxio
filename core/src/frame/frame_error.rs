@@ -34,6 +34,12 @@ pub enum FrameDecodeError {
     ReadAfterCancel,
 
     IncompleteHeader,
+
+    /// Transport-level I/O error carrying the real `std::io::Error` display.
+    /// Used by `fail_all_pending_requests` to surface the root cause
+    /// (e.g. `ConnectionReset`, `BrokenPipe`, `UnexpectedEof`) instead of a
+    /// static `ReadAfterCancel`.
+    Transport(String),
 }
 
 impl fmt::Display for FrameDecodeError {
@@ -47,6 +53,7 @@ impl fmt::Display for FrameDecodeError {
                 write!(f, "Attempted to read from a cancelled stream")
             }
             FrameDecodeError::IncompleteHeader => write!(f, "Incomplete frame header received"),
+            FrameDecodeError::Transport(msg) => write!(f, "Transport error: {msg}"),
         }
     }
 }
@@ -91,5 +98,29 @@ mod tests {
             "Incomplete frame header received"
         );
         let _: &dyn std::error::Error = &FrameDecodeError::CorruptFrame;
+    }
+
+    #[test]
+    fn display_frame_decode_transport_error() {
+        let err = FrameDecodeError::Transport("ConnectionReset".to_string());
+        assert_eq!(err.to_string(), "Transport error: ConnectionReset");
+        let _: &dyn std::error::Error = &err;
+
+        let empty = FrameDecodeError::Transport(String::new());
+        assert_eq!(empty.to_string(), "Transport error: ");
+        let _: &dyn std::error::Error = &empty;
+
+        let eof = FrameDecodeError::Transport("unexpected EOF (connection closed)".to_string());
+        assert!(eof.to_string().contains("unexpected EOF"));
+        let _: &dyn std::error::Error = &eof;
+
+        assert_eq!(
+            FrameDecodeError::Transport("a".to_string()),
+            FrameDecodeError::Transport("a".to_string())
+        );
+        assert_ne!(
+            FrameDecodeError::Transport("a".to_string()),
+            FrameDecodeError::CorruptFrame
+        );
     }
 }
