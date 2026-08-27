@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 
 - **Panic-aware server per-connection tasks:** `handle_connection` now retains `writer_handle` and `reader_handle`, checks `JoinError::is_panic()` and logs with `conn_id` instead of silently discarding via `select!` drop, and aborts the peer task.
 - **Write queue depth visibility:** defined `WRITE_QUEUE_WARN_THRESHOLD` and `SERVER_WRITE_QUEUE_WARN_THRESHOLD` with a client-side atomic counter and `warn!` when the threshold is exceeded; full backpressure redesign remains deferred.
+- **Dependency bumps (`Cargo.lock`):** `futures 0.3.33 → 0.3.34` (#105), `async-trait 0.1.91 → 0.1.92` (#104) — patch bumps via Dependabot (`futures 0.3.34` upgrades `futures-channel`, `futures-core`, `futures-executor`, `futures-io`, `futures-sink`, `futures-task`, `futures-util`, `futures-macro` with `syn 2.0.118 → 3.0.3`).
 
 ## [0.15.0-alpha] - 2026-08-19
 
