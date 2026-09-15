@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 (or is loosely based on) Semantic Versioning.
 
+## [0.16.1-alpha] - 2026-09-15
+
+### Changed
+
+- **Dependency bump (`Cargo.lock`):** `interprocess 2.4.3 → 2.4.4` — patch bump via Dependabot (IPC transport dependency, no API changes).
+
 ## [0.16.0-alpha] - 2026-08-26
 
 ### Added
