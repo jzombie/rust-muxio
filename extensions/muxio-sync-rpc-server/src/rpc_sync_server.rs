@@ -56,8 +56,7 @@ impl RpcSyncServer {
     ) -> ServerSetup {
         let dispatcher = Arc::new(Mutex::new(RpcDispatcher::new()));
         let endpoint = Arc::new(RpcServiceEndpoint::new());
-        let state_change_handler: RpcTransportStateChangeHandler =
-            Arc::new(Mutex::new(None));
+        let state_change_handler: RpcTransportStateChangeHandler = Arc::new(Mutex::new(None));
         let is_connected = Arc::new(AtomicBool::new(true));
         let disconnect_error = Arc::new(StdMutex::new(None::<String>));
         let (emit_tx, emit_rx) = mpsc::channel::<Vec<u8>>();

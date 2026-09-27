@@ -152,7 +152,8 @@ async fn drop_kill_chain_fires_disconnect() {
 
 #[cfg(unix)]
 #[tokio::test]
-async fn eof_from_peer_fires_disconnect() {    let ((client_read, client_write), (server_read, _server_write)) = duplex_pair();
+async fn eof_from_peer_fires_disconnect() {
+    let ((client_read, client_write), (server_read, _server_write)) = duplex_pair();
     drop(server_read);
     let client = RpcSyncClient::new(client_read, client_write);
     let fired = Arc::new(Mutex::new(false));
