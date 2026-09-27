@@ -24,6 +24,8 @@ members = [
     "extensions/muxio-rpc-service-caller",
     "extensions/muxio-rpc-service-endpoint",
     "extensions/muxio-tokio-mpsc-adapter",
+    "extensions/muxio-sync-rpc-client",
+    "extensions/muxio-sync-rpc-server",
     "extensions/muxio-tokio-rpc-client",
     "extensions/muxio-tokio-rpc-ipc-client",
     "extensions/muxio-tokio-rpc-ipc-server",
@@ -50,6 +52,7 @@ criterion = { version = "0.8.2" }
 doc-comment = "0.3.4"
 example-muxio-rpc-service-definition = { path = "examples/example-muxio-rpc-service-definition", version = "0.16.1-alpha" }
 futures = "0.3.32"
+futures-executor = "0.3.32"
 futures-util = "0.3.32"
 interprocess = { version = "2.4.2", features = ["tokio"] }
 muxio = { path = ".", version = "0.16.1-alpha" }
@@ -58,6 +61,8 @@ muxio-rpc-service = { path = "extensions/muxio-rpc-service", version = "0.16.1-a
 muxio-rpc-service-caller = { path = "extensions/muxio-rpc-service-caller", version = "0.16.1-alpha" }
 muxio-rpc-service-endpoint = { path = "extensions/muxio-rpc-service-endpoint", version = "0.16.1-alpha" }
 muxio-tokio-mpsc-adapter = { path = "extensions/muxio-tokio-mpsc-adapter", version = "0.16.1-alpha" }
+muxio-sync-rpc-client = { path = "extensions/muxio-sync-rpc-client", version = "0.16.1-alpha" }
+muxio-sync-rpc-server = { path = "extensions/muxio-sync-rpc-server", version = "0.16.1-alpha" }
 muxio-tokio-rpc-client = { path = "extensions/muxio-tokio-rpc-client", version = "0.16.1-alpha" }
 muxio-tokio-rpc-ipc-client = { path = "extensions/muxio-tokio-rpc-ipc-client", version = "0.16.1-alpha" }
 muxio-tokio-rpc-ipc-server = { path = "extensions/muxio-tokio-rpc-ipc-server", version = "0.16.1-alpha" }

@@ -871,6 +871,8 @@ dependencies = [
  "muxio-rpc-service",
  "muxio-rpc-service-caller",
  "muxio-rpc-service-endpoint",
+ "muxio-sync-rpc-client",
+ "muxio-sync-rpc-server",
  "muxio-tokio-mpsc-adapter",
  "muxio-tokio-rpc-client",
  "muxio-tokio-rpc-ipc-client",
@@ -914,6 +916,37 @@ dependencies = [
  "futures",
  "muxio-core",
  "muxio-rpc-service",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "muxio-sync-rpc-client"
+version = "0.16.1-alpha"
+dependencies = [
+ "async-trait",
+ "example-muxio-rpc-service-definition",
+ "futures-executor",
+ "muxio-core",
+ "muxio-rpc-service",
+ "muxio-rpc-service-caller",
+ "muxio-rpc-service-endpoint",
+ "muxio-sync-rpc-server",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "muxio-sync-rpc-server"
+version = "0.16.1-alpha"
+dependencies = [
+ "async-trait",
+ "example-muxio-rpc-service-definition",
+ "futures-executor",
+ "muxio-core",
+ "muxio-rpc-service",
+ "muxio-rpc-service-caller",
+ "muxio-rpc-service-endpoint",
  "tokio",
  "tracing",
 ]
