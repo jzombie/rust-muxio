@@ -11,7 +11,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 - **Sync RPC transport crates (`muxio-sync-rpc-client`, `muxio-sync-rpc-server`):** protocol over owned blocking `Read`/`Write` byte halves, driven by std threads with no async runtime inside (only `futures_executor::block_on` in the reader thread plus tokio `sync::Mutex` types the shared traits require). Any halves qualify, not just process stdio: child pipes, sockets, or in-memory duplexes. Client offers `new()`, `spawn()` (piped child, killed on drop), and `stdio()`; server offers `setup()`, `start()`, `stdio()`, `join_reader`, and `RpcSyncServerHandle` for server-initiated calls.
 - **`ServerSetup` construct-then-start split:** building the server starts no threads, so consumers register every stream handler on `endpoint()` before `start()` begins pumping, and no byte can arrive before its handler exists.
 - **Server-side transport state callbacks:** `RpcSyncServer::set_state_change_handler` stores the handler and the reader fires `Disconnected` on EOF, `Connected` on registration while live. Late registration on a dead transport reports the terminal state at once. The client gains the same late-registration reporting. Reader teardown is sole-owned and unconditional; `Drop` performs no teardown of its own since it cannot block and cannot interrupt a generic blocking read.
-- **READMEs** for both sync crates, following the adjacent-crate template.
 
 ## [0.16.1-alpha] - 2026-09-15
 
