@@ -1,0 +1,24 @@
+[package]
+name = "muxio-sync-rpc-client"
+description = "A sync (no async runtime) Muxio RPC client over blocking byte halves."
+authors.workspace = true
+edition.workspace = true
+version.workspace = true
+repository.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+async-trait = { workspace = true }
+futures-executor = { workspace = true }
+muxio-core = { workspace = true }
+muxio-rpc-service = { workspace = true }
+muxio-rpc-service-caller = { workspace = true }
+muxio-rpc-service-endpoint = { workspace = true }
+tokio = { workspace = true, features = ["sync"] }
+tracing = { workspace = true }
+
+[dev-dependencies]
+example-muxio-rpc-service-definition = { workspace = true }
+muxio-sync-rpc-server = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
