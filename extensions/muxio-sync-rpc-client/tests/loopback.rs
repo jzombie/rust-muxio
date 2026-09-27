@@ -81,8 +81,8 @@ impl Write for DuplexWriter {
 
 async fn echo_pair() -> Arc<RpcSyncClient> {
     let ((client_read, client_write), (server_read, server_write)) = duplex_pair();
-    let unstarted = RpcSyncServer::unstarted(server_read, server_write);
-    unstarted
+    let setup = RpcSyncServer::setup(server_read, server_write);
+    setup
         .endpoint()
         .register_prebuffered(Echo::METHOD_ID, |request_bytes, _ctx| async move {
             let request_params = Echo::decode_request(&request_bytes)?;
@@ -91,7 +91,7 @@ async fn echo_pair() -> Arc<RpcSyncClient> {
         })
         .await
         .expect("register Echo");
-    let server = unstarted.start();
+    let server = setup.start();
     std::mem::forget(server);
     RpcSyncClient::new(client_read, client_write)
 }
@@ -177,7 +177,7 @@ async fn server_disconnect_handler_fires_on_peer_eof() {
     // their halves. Real teardown kills the child; here we drop the
     // raw halves directly, which the test owns until then.)
     let ((client_read, client_write), (server_read, server_write)) = duplex_pair();
-    let server = RpcSyncServer::unstarted(server_read, server_write).start();
+    let server = RpcSyncServer::setup(server_read, server_write).start();
     let fired = Arc::new(Mutex::new(false));
     let fired_clone = Arc::clone(&fired);
     server
@@ -200,7 +200,7 @@ async fn server_late_handler_gets_terminal_state() {
     // Registering after transport death reports Disconnected
     // immediately instead of waiting for an EOF that already happened.
     let ((client_read, client_write), (server_read, server_write)) = duplex_pair();
-    let server = RpcSyncServer::unstarted(server_read, server_write).start();
+    let server = RpcSyncServer::setup(server_read, server_write).start();
     drop((client_read, client_write));
     tokio::time::sleep(std::time::Duration::from_millis(300)).await;
     let fired = Arc::new(Mutex::new(false));

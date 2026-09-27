@@ -89,7 +89,7 @@ impl Write for DuplexWriter {
 }
 
 /// Serve one fixture connection: register standard handlers on the
-/// unstarted server endpoint. The caller starts pumping afterwards, so
+/// setup-phase server endpoint. The caller starts pumping afterwards, so
 /// no byte routes before handlers exist.
 async fn serve_fixture(endpoint: &Arc<RpcServiceEndpoint<()>>) {
     endpoint_helpers::register_standard_handlers(&**endpoint).await;
@@ -107,9 +107,9 @@ impl TestTransport for RpcSyncClient {
 
     async fn connect() -> (Arc<Self::Client>, Arc<RpcServiceEndpoint<()>>) {
         let ((client_read, client_write), (server_read, server_write)) = duplex_pair();
-        let unstarted = RpcSyncServer::unstarted(server_read, server_write);
-        serve_fixture(&unstarted.endpoint()).await;
-        let server = unstarted.start();
+        let setup = RpcSyncServer::setup(server_read, server_write);
+        serve_fixture(&setup.endpoint()).await;
+        let server = setup.start();
         let client = RpcSyncClient::new(client_read, client_write);
         // The server has no socket to outlive the test: its pump threads
         // die on EOF when the client drops. Forgetting here mirrors the
@@ -142,9 +142,9 @@ impl TestTransport for RpcSyncClient {
         Self::S2cHandle,
     ) {
         let ((client_read, client_write), (server_read, server_write)) = duplex_pair();
-        let unstarted = RpcSyncServer::unstarted(server_read, server_write);
-        serve_fixture(&unstarted.endpoint()).await;
-        let server = unstarted.start();
+        let setup = RpcSyncServer::setup(server_read, server_write);
+        serve_fixture(&setup.endpoint()).await;
+        let server = setup.start();
         let client = RpcSyncClient::new(client_read, client_write);
         let endpoint = client.get_endpoint();
         (
@@ -160,12 +160,12 @@ impl TestTransport for RpcSyncClient {
         Arc<Mutex<Vec<RpcStreamEvent>>>,
     ) {
         let ((client_read, client_write), (server_read, server_write)) = duplex_pair();
-        let unstarted = RpcSyncServer::unstarted(server_read, server_write);
-        let endpoint = unstarted.endpoint();
+        let setup = RpcSyncServer::setup(server_read, server_write);
+        let endpoint = setup.endpoint();
         endpoint_helpers::register_standard_handlers(&*endpoint).await;
         endpoint_helpers::register_error_handler(&*endpoint).await;
         let captured = endpoint_helpers::register_stream_capture_handler(&*endpoint).await;
-        let server = unstarted.start();
+        let server = setup.start();
         std::mem::forget(server);
         let client = RpcSyncClient::new(client_read, client_write);
         let client_endpoint = client.get_endpoint();

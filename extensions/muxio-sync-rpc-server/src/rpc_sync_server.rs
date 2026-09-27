@@ -49,11 +49,11 @@ impl RpcSyncServer {
     /// inbound bytes arriving before handler registration would route to
     /// "method not found", so the consumer registers handlers on
     /// [`endpoint`](Self::endpoint) first and then calls
-    /// [`start`](UnstartedServer::start).
-    pub fn unstarted(
+    /// [`start`](ServerSetup::start).
+    pub fn setup(
         reader: Box<dyn Read + Send + 'static>,
         writer: Box<dyn Write + Send + 'static>,
-    ) -> UnstartedServer {
+    ) -> ServerSetup {
         let dispatcher = Arc::new(Mutex::new(RpcDispatcher::new()));
         let endpoint = Arc::new(RpcServiceEndpoint::new());
         let state_change_handler: RpcTransportStateChangeHandler =
@@ -62,7 +62,7 @@ impl RpcSyncServer {
         let disconnect_error = Arc::new(StdMutex::new(None::<String>));
         let (emit_tx, emit_rx) = mpsc::channel::<Vec<u8>>();
         let (disconnected_tx, disconnected_rx) = mpsc::channel::<()>();
-        UnstartedServer {
+        ServerSetup {
             reader: Some(reader),
             writer: Some(writer),
             dispatcher,
@@ -79,16 +79,15 @@ impl RpcSyncServer {
 
     /// Bind the current process stdio: the guest shape, where this
     /// process IS the server and the host parents its stdin/stdout.
-    pub fn stdio() -> UnstartedServer {
-        Self::unstarted(Box::new(std::io::stdin()), Box::new(std::io::stdout()))
+    pub fn stdio() -> ServerSetup {
+        Self::setup(Box::new(std::io::stdin()), Box::new(std::io::stdout()))
     }
 }
 
-/// A constructed but unstarted server: endpoint and dispatcher ready for
-/// handler registration, pipe halves held, no threads running, no bytes
-/// routed. Call [`start`](UnstartedServer::start) once every handler is
-/// registered.
-pub struct UnstartedServer {
+/// A server under setup: endpoint and dispatcher ready for handler
+/// registration, pipe halves held, no threads running, no bytes routed.
+/// Call [`start`](ServerSetup::start) once every handler is registered.
+pub struct ServerSetup {
     reader: Option<Box<dyn Read + Send + 'static>>,
     writer: Option<Box<dyn Write + Send + 'static>>,
     dispatcher: Arc<tokio::sync::Mutex<RpcDispatcher<'static>>>,
@@ -102,7 +101,7 @@ pub struct UnstartedServer {
     disconnected_rx: mpsc::Receiver<()>,
 }
 
-impl UnstartedServer {
+impl ServerSetup {
     /// The endpoint to register handlers on before starting.
     pub fn endpoint(&self) -> Arc<RpcServiceEndpoint<()>> {
         Arc::clone(&self.endpoint)

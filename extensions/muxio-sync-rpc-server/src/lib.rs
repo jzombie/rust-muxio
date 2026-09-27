@@ -5,4 +5,4 @@
 
 mod rpc_sync_server;
 
-pub use rpc_sync_server::{RpcSyncServer, RpcSyncServerHandle, UnstartedServer};
+pub use rpc_sync_server::{RpcSyncServer, RpcSyncServerHandle, ServerSetup};
