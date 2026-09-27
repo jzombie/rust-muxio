@@ -941,7 +941,6 @@ name = "muxio-sync-rpc-server"
 version = "0.16.1-alpha"
 dependencies = [
  "async-trait",
- "example-muxio-rpc-service-definition",
  "futures-executor",
  "muxio-core",
  "muxio-rpc-service",
