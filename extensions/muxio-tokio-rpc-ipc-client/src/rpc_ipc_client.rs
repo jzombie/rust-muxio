@@ -111,7 +111,7 @@ impl RpcIpcClient {
                     // Decrement pending counter after the frame is flushed or dropped,
                     // guarding against underflow if the counter was already zero
                     // (e.g. after a failed send that already undid its increment).
-                    let _ = CLIENT_PENDING_WRITES.fetch_update(
+                    let _ = CLIENT_PENDING_WRITES.try_update(
                         Ordering::Relaxed,
                         Ordering::Relaxed,
                         |v| if v == 0 { None } else { Some(v - 1) },
@@ -243,7 +243,7 @@ impl RpcServiceCallerInterface for RpcIpcClient {
                     Err(e) => {
                         // Decrement on failure to keep counter roughly accurate,
                         // guarding against underflow.
-                        let _ = CLIENT_PENDING_WRITES.fetch_update(
+                        let _ = CLIENT_PENDING_WRITES.try_update(
                             Ordering::Relaxed,
                             Ordering::Relaxed,
                             |v| if v == 0 { None } else { Some(v - 1) },

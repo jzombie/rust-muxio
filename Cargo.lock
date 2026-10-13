@@ -440,7 +440,7 @@ dependencies = [
 
 [[package]]
 name = "example-muxio-rpc-service-definition"
-version = "0.17.0-alpha"
+version = "0.17.1-alpha"
 dependencies = [
  "bitcode",
  "muxio-rpc-service",
@@ -448,7 +448,7 @@ dependencies = [
 
 [[package]]
 name = "example-muxio-ws-rpc-app"
-version = "0.17.0-alpha"
+version = "0.17.1-alpha"
 dependencies = [
  "async-trait",
  "criterion",
@@ -830,7 +830,7 @@ dependencies = [
 
 [[package]]
 name = "muxio"
-version = "0.17.0-alpha"
+version = "0.17.1-alpha"
 dependencies = [
  "bitcode",
  "example-muxio-rpc-service-definition",
@@ -844,7 +844,7 @@ dependencies = [
  "muxio-tokio-rpc-ipc-server",
  "muxio-tokio-rpc-server",
  "muxio-wasm-rpc-client",
- "rand 0.10.2",
+ "rand 0.10.3",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -852,7 +852,7 @@ dependencies = [
 
 [[package]]
 name = "muxio-core"
-version = "0.17.0-alpha"
+version = "0.17.1-alpha"
 dependencies = [
  "once_cell",
  "tracing",
@@ -860,7 +860,7 @@ dependencies = [
 
 [[package]]
 name = "muxio-ext-test"
-version = "0.17.0-alpha"
+version = "0.17.1-alpha"
 dependencies = [
  "async-trait",
  "bytemuck",
@@ -887,7 +887,7 @@ dependencies = [
 
 [[package]]
 name = "muxio-rpc-service"
-version = "0.17.0-alpha"
+version = "0.17.1-alpha"
 dependencies = [
  "bitcode",
  "num_enum",
@@ -896,7 +896,7 @@ dependencies = [
 
 [[package]]
 name = "muxio-rpc-service-caller"
-version = "0.17.0-alpha"
+version = "0.17.1-alpha"
 dependencies = [
  "async-trait",
  "futures",
@@ -908,7 +908,7 @@ dependencies = [
 
 [[package]]
 name = "muxio-rpc-service-endpoint"
-version = "0.17.0-alpha"
+version = "0.17.1-alpha"
 dependencies = [
  "async-trait",
  "bitcode",
@@ -922,7 +922,7 @@ dependencies = [
 
 [[package]]
 name = "muxio-sync-rpc-client"
-version = "0.17.0-alpha"
+version = "0.17.1-alpha"
 dependencies = [
  "async-trait",
  "example-muxio-rpc-service-definition",
@@ -938,7 +938,7 @@ dependencies = [
 
 [[package]]
 name = "muxio-sync-rpc-server"
-version = "0.17.0-alpha"
+version = "0.17.1-alpha"
 dependencies = [
  "async-trait",
  "futures-executor",
@@ -952,7 +952,7 @@ dependencies = [
 
 [[package]]
 name = "muxio-tokio-mpsc-adapter"
-version = "0.17.0-alpha"
+version = "0.17.1-alpha"
 dependencies = [
  "async-trait",
  "muxio-core",
@@ -965,7 +965,7 @@ dependencies = [
 
 [[package]]
 name = "muxio-tokio-rpc-client"
-version = "0.17.0-alpha"
+version = "0.17.1-alpha"
 dependencies = [
  "async-trait",
  "axum",
@@ -984,7 +984,7 @@ dependencies = [
 
 [[package]]
 name = "muxio-tokio-rpc-ipc-client"
-version = "0.17.0-alpha"
+version = "0.17.1-alpha"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1000,7 +1000,7 @@ dependencies = [
 
 [[package]]
 name = "muxio-tokio-rpc-ipc-server"
-version = "0.17.0-alpha"
+version = "0.17.1-alpha"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1016,7 +1016,7 @@ dependencies = [
 
 [[package]]
 name = "muxio-tokio-rpc-server"
-version = "0.17.0-alpha"
+version = "0.17.1-alpha"
 dependencies = [
  "async-trait",
  "axum",
@@ -1032,7 +1032,7 @@ dependencies = [
 
 [[package]]
 name = "muxio-wasm-rpc-client"
-version = "0.17.0-alpha"
+version = "0.17.1-alpha"
 dependencies = [
  "async-trait",
  "futures",
@@ -1233,9 +1233,9 @@ dependencies = [
 
 [[package]]
 name = "rand"
-version = "0.10.2"
+version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7f5fa3a058cd35567ef9bfa5e75732bee0f9e4c55fa90477bef2dfcdbc4be80"
+checksum = "65c9fb96cbc91e3478eaae79a69fcd3f1ae4ad052e471fe6732fff548984b4af"
 dependencies = [
  "chacha20",
  "getrandom 0.4.3",
@@ -1562,9 +1562,9 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "1.53.1"
+version = "1.53.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "202caea871b69668250d242070849eb495be178ed697a3e98aebce5bc81a0bed"
+checksum = "e95f91fcc7a621e8b030f6aa23c71fe9838ae2fb4d8118b75602a328f5144044"
 dependencies = [
  "bytes",
  "libc",
@@ -1759,7 +1759,7 @@ dependencies = [
  "http",
  "httparse",
  "log",
- "rand 0.10.2",
+ "rand 0.10.3",
  "sha1 0.11.0",
  "thiserror",
 ]
@@ -1947,9 +1947,9 @@ checksum = "1ebf944e87a7c253233ad6766e082e3cd714b5d03812acc24c318f549614536e"
 
 [[package]]
 name = "xxhash-rust"
-version = "0.8.18"
+version = "0.8.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aee1b19627c7c60102ab80d3a9cbe18de90bfe03bfa6c3715447681f0e8c8af6"
+checksum = "550a2b930b62486a393c52d5c3b84bff264b28aa437ed64694d31e93b1757af7"
 
 [[package]]
 name = "zerocopy"
