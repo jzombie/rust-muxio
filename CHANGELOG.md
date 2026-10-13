@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
  (or is loosely based on) Semantic Versioning.
 
+## [0.17.1-alpha] - 2026-10-13
+
+### Changed
+
+- **Dependency bumps (`Cargo.lock`):** `rand 0.10.2 → 0.10.3` (#113), `xxhash-rust 0.8.18 → 0.8.19` (#114), `tokio 1.53.1 → 1.53.2` (#115) — patch bumps via Dependabot (no API changes).
+
 ## [0.17.0-alpha] - 2026-09-27
 
 ### Added
