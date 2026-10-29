@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
  (or is loosely based on) Semantic Versioning.
 
+## [UNRELEASED]
+
+### Changed
+
+- **Dependency bumps (`Cargo.lock`):** `tokio 1.53.2 → 1.54.1` (#120), `interprocess 2.4.4 → 2.4.7` (#121) — patch bumps via Dependabot (no API changes).
+
 ## [0.17.1-alpha] - 2026-10-13
 
 ### Changed
