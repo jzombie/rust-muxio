@@ -25,3 +25,6 @@ futures = { workspace = true }
 [[bench]]
 name = "roundtrip"
 harness = false
+
+[lints]
+workspace = true

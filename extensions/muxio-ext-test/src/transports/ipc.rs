@@ -1,16 +1,14 @@
-use crate::endpoint_helpers;
 use crate::test_transport::TestTransport;
 use async_trait::async_trait;
 use interprocess::local_socket::{GenericNamespaced, ListenerOptions, ToNsName, tokio::prelude::*};
 use muxio_core::rpc::rpc_internals::RpcStreamEvent;
 
-use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface};
+use muxio_rpc_service_endpoint::RpcServiceEndpoint;
 use muxio_tokio_rpc_ipc_client::RpcIpcClient;
-use muxio_tokio_rpc_ipc_server::{RpcIpcConnectionContextHandle, RpcIpcServer, RpcIpcServerEvent};
+use muxio_tokio_rpc_ipc_server::{RpcIpcConnectionContextHandle, RpcIpcServerEvent};
 use std::sync::{Arc, Mutex};
 
 use tokio::sync::oneshot;
-use tokio::time::{Duration, sleep};
 
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -31,18 +29,8 @@ impl TestTransport for RpcIpcClient {
     }
 
     async fn connect() -> (Arc<Self::Client>, Arc<RpcServiceEndpoint<()>>) {
-        let socket_name = temp_name("roundtrip");
-        let server = RpcIpcServer::new(None);
-        let endpoint = server.endpoint();
-        endpoint_helpers::register_standard_handlers(&*endpoint).await;
-        endpoint_helpers::register_error_handler(&*endpoint).await;
-        drop(endpoint);
-        let name = socket_name.clone();
-        tokio::spawn(async move {
-            let _ = server.serve(&name).await;
-        });
-        sleep(Duration::from_millis(200)).await;
-        let client = RpcIpcClient::new(&socket_name).await.unwrap();
+        let socket_name = crate::ipc_helpers::setup_ipc_server("roundtrip").await;
+        let client = crate::ipc_helpers::connect_ipc_client(&socket_name).await;
         let client_endpoint = client.get_endpoint();
         (client, client_endpoint)
     }
@@ -59,6 +47,8 @@ impl TestTransport for RpcIpcClient {
             .clone()
             .to_ns_name::<GenericNamespaced>()
             .unwrap();
+        // Bound synchronously here, so the client below connects
+        // deterministically — no readiness sleep required.
         let listener = ListenerOptions::new()
             .name(ns_name)
             .try_overwrite(true)
@@ -71,8 +61,7 @@ impl TestTransport for RpcIpcClient {
             }
         });
 
-        sleep(Duration::from_millis(100)).await;
-        let client = RpcIpcClient::new(&socket_name).await.unwrap();
+        let client = crate::ipc_helpers::connect_ipc_client(&socket_name).await;
         (client, tx)
     }
 
@@ -81,25 +70,17 @@ impl TestTransport for RpcIpcClient {
         Arc<RpcServiceEndpoint<()>>,
         Self::S2cHandle,
     ) {
-        let socket_name = temp_name("s2c");
-        let (event_tx, mut event_rx) = tokio::sync::mpsc::unbounded_channel();
-        let server = RpcIpcServer::new(Some(event_tx));
-        // Register standard handlers on the server endpoint so client-initiated calls work
-        endpoint_helpers::register_standard_handlers(&*server.endpoint()).await;
-        let name = socket_name.clone();
-        tokio::spawn(async move {
-            let _ = server.serve(&name).await;
-        });
-        sleep(Duration::from_millis(200)).await;
+        let (mut event_rx, socket_name) =
+            crate::ipc_helpers::setup_ipc_server_with_events("s2c").await;
 
-        let client = RpcIpcClient::new(&socket_name).await.unwrap();
+        let client = crate::ipc_helpers::connect_ipc_client(&socket_name).await;
         let endpoint = client.get_endpoint();
 
+        // `recv()` already waits for the next event; no polling sleep needed.
         let ctx_handle = loop {
             if let Some(RpcIpcServerEvent::ClientConnected(handle)) = event_rx.recv().await {
                 break handle;
             }
-            sleep(Duration::from_millis(10)).await;
         };
 
         (client, endpoint, ctx_handle)
@@ -110,46 +91,9 @@ impl TestTransport for RpcIpcClient {
         Arc<RpcServiceEndpoint<()>>,
         Arc<Mutex<Vec<RpcStreamEvent>>>,
     ) {
-        let socket_name = temp_name("streaming");
-        let server = RpcIpcServer::new(None);
-        let endpoint = server.endpoint();
-
-        // Register standard prebuffered handlers (Add, Mult, Echo, error test)
-        endpoint_helpers::register_standard_handlers(&*endpoint).await;
-        endpoint_helpers::register_error_handler(&*endpoint).await;
-
-        // Register streaming capture handler with shared events buffer.
-        // Chunks are buffered locally and only emitted as a single response
-        // when End arrives, so the response is always properly framed
-        // regardless of transport batching.
-        let events: Arc<Mutex<Vec<RpcStreamEvent>>> = Arc::new(Mutex::new(Vec::new()));
-        let captured = events.clone();
-        endpoint
-            .register_stream_handler(
-                endpoint_helpers::STREAMING_CAPTURE_METHOD_ID,
-                move |event, respond, _ctx| {
-                    captured.lock().unwrap().push(event.clone());
-                    match &event {
-                        RpcStreamEvent::PayloadChunk { bytes, .. } => {
-                            respond.respond(bytes.clone(), false);
-                        }
-                        RpcStreamEvent::End { .. } => {
-                            respond.respond(Vec::new(), true);
-                        }
-                        _ => {}
-                    }
-                },
-            )
-            .await
-            .expect("Failed to register streaming capture handler");
-
-        drop(endpoint);
-        let name = socket_name.clone();
-        tokio::spawn(async move {
-            let _ = server.serve(&name).await;
-        });
-        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-        let client = RpcIpcClient::new(&socket_name).await.unwrap();
+        let (socket_name, events) =
+            crate::ipc_helpers::setup_ipc_streaming_server("streaming").await;
+        let client = crate::ipc_helpers::connect_ipc_client(&socket_name).await;
         let client_endpoint = client.get_endpoint();
         (client, client_endpoint, events)
     }

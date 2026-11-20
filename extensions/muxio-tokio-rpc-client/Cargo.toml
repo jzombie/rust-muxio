@@ -27,3 +27,6 @@ futures-util = { workspace = true }
 muxio-tokio-rpc-server = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tokio-tungstenite = { workspace = true }
+
+[lints]
+workspace = true

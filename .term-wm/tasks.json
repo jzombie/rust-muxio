@@ -1,0 +1,38 @@
+[
+    {
+        "label": "dev: git diff (unstaged)",
+        "command": "bash -c 'git diff > diff.patch'"
+    },
+    {
+        "label": "dev: cargo pkg --help",
+        "command": "cargo run -- --help"
+    },
+    {
+        "label": "dev: cargo udeps",
+        "command": "cargo udeps --workspace --all-targets --all-features"
+    },
+    {
+        "label": "dev: cargo clippy",
+        "command": "cargo clippy --workspace --all-targets --all-features -- -D warnings"
+    },
+    {
+        "label": "dev: cargo fmt",
+        "command": "cargo fmt --all"
+    },
+    {
+        "label": "dev: cargo test all features",
+        "command": "cargo test --workspace --all-features"
+    },
+    {
+        "label": "ox: playground copy diff",
+        "command": "\"{wm.exe}\" --util oxdock .term-wm/.oxdock/playground_copy.oxfile",
+        "env": { "TERM_WM_EXE": "{wm.exe}", "TERM_WM_PID": "{wm.pid}", "WITH_MAIN": "0" },
+        "background": true
+    },
+    {
+        "label": "ox: playground copy diff [compare main]",
+        "command": "\"{wm.exe}\" --util oxdock .term-wm/.oxdock/playground_copy.oxfile",
+        "env": { "TERM_WM_EXE": "{wm.exe}", "TERM_WM_PID": "{wm.pid}", "WITH_MAIN": "1" },
+        "background": true
+    }
+]

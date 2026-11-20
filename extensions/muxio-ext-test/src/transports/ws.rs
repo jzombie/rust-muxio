@@ -4,7 +4,7 @@ use crate::ws_helpers;
 use async_trait::async_trait;
 use muxio_core::rpc::rpc_internals::RpcStreamEvent;
 
-use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface};
+use muxio_rpc_service_endpoint::RpcServiceEndpoint;
 use muxio_tokio_rpc_client::RpcClient;
 use muxio_tokio_rpc_server::{
     ConnectionContextHandle, RpcServerEvent, utils::tcp_listener_to_host_port,
@@ -93,11 +93,11 @@ impl TestTransport for RpcClient {
         let client = ws_helpers::connect_ws_client(&host, port).await;
         let endpoint = client.get_endpoint();
 
+        // `recv()` already waits for the next event; no polling sleep needed.
         let ctx_handle = loop {
             if let Some(RpcServerEvent::ClientConnected(handle)) = event_rx.recv().await {
                 break handle;
             }
-            sleep(Duration::from_millis(10)).await;
         };
 
         (client, endpoint, ctx_handle)
@@ -113,26 +113,7 @@ impl TestTransport for RpcClient {
         endpoint_helpers::register_standard_handlers(&*server_endpoint).await;
         endpoint_helpers::register_error_handler(&*server_endpoint).await;
 
-        let events: Arc<Mutex<Vec<RpcStreamEvent>>> = Arc::new(Mutex::new(Vec::new()));
-        let captured = events.clone();
-        server_endpoint
-            .register_stream_handler(
-                endpoint_helpers::STREAMING_CAPTURE_METHOD_ID,
-                move |event, respond, _ctx| {
-                    captured.lock().unwrap().push(event.clone());
-                    match &event {
-                        RpcStreamEvent::PayloadChunk { bytes, .. } => {
-                            respond.respond(bytes.clone(), false);
-                        }
-                        RpcStreamEvent::End { .. } => {
-                            respond.respond(Vec::new(), true);
-                        }
-                        _ => {}
-                    }
-                },
-            )
-            .await
-            .expect("Failed to register streaming capture handler");
+        let events = endpoint_helpers::register_stream_capture_handler(&*server_endpoint).await;
 
         let client = ws_helpers::connect_ws_client(&host, port).await;
         let endpoint = client.get_endpoint();

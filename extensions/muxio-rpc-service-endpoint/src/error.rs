@@ -69,3 +69,88 @@ impl From<io::Error> for RpcServiceEndpointHandlerError {
         RpcServiceEndpointHandlerError(payload)
     }
 }
+
+#[cfg(test)]
+mod error_tests {
+    use super::*;
+
+    #[test]
+    fn handler_error_display_and_source() {
+        let err = RpcServiceEndpointHandlerError(RpcServiceErrorPayload {
+            code: RpcServiceErrorCode::Fail,
+            message: "bad input".to_string(),
+        });
+        assert_eq!(format!("{err}"), "Handler failed with code Fail: bad input");
+        assert!(std::error::Error::source(&err).is_none());
+    }
+
+    #[test]
+    fn handler_error_from_io_error_defaults_to_fail() {
+        let err = RpcServiceEndpointHandlerError::from(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "nope",
+        ));
+        assert_eq!(err.0.code, RpcServiceErrorCode::Fail);
+        assert_eq!(err.0.message, "nope");
+    }
+
+    #[test]
+    fn endpoint_error_display_covers_all_variants() {
+        use std::fmt;
+
+        #[derive(Debug)]
+        struct Leaf;
+        impl fmt::Display for Leaf {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "leaf")
+            }
+        }
+        impl std::error::Error for Leaf {}
+
+        #[derive(Debug)]
+        struct Mid;
+        impl fmt::Display for Mid {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "mid")
+            }
+        }
+        impl std::error::Error for Mid {
+            fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+                static LEAF: Leaf = Leaf;
+                Some(&LEAF)
+            }
+        }
+
+        let decode = RpcServiceEndpointError::Decode(FrameDecodeError::IncompleteHeader);
+        assert_eq!(
+            format!("{decode}"),
+            "decode error: Incomplete frame header received"
+        );
+        assert!(std::error::Error::source(&decode).is_some());
+
+        let encode = RpcServiceEndpointError::Encode(FrameEncodeError::WriteAfterEnd);
+        assert_eq!(
+            format!("{encode}"),
+            "encode error: Write after stream ended"
+        );
+        assert!(std::error::Error::source(&encode).is_some());
+
+        // The boxed handler error must propagate its inner source, provable
+        // by downcasting back to the concrete leaf type.
+        let handler = RpcServiceEndpointError::Handler(Box::new(Mid));
+        assert_eq!(format!("{handler}"), "handler error: mid");
+        let src = std::error::Error::source(&handler).expect("handler has source");
+        assert!(
+            src.downcast_ref::<Leaf>().is_some(),
+            "expected Leaf source, got {src:?}"
+        );
+    }
+
+    #[test]
+    fn endpoint_error_from_impls() {
+        let decode: RpcServiceEndpointError = FrameDecodeError::IncompleteHeader.into();
+        assert!(matches!(decode, RpcServiceEndpointError::Decode(_)));
+        let encode: RpcServiceEndpointError = FrameEncodeError::WriteAfterEnd.into();
+        assert!(matches!(encode, RpcServiceEndpointError::Encode(_)));
+    }
+}
