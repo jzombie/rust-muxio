@@ -10,12 +10,12 @@ publish.workspace = true # Inherit from workspace
 
 [features]
 default = []
-tokio_support = ["dep:tokio"]
+tokio_support = ["dep:bytes", "dep:tokio"]
 
 [dependencies]
 async-trait = { workspace = true }
 bitcode = { workspace = true }
-bytes = { workspace = true }
+bytes = { workspace = true, optional = true }
 futures = { workspace = true }
 muxio-core = { workspace = true }
 muxio-rpc-service = { workspace = true }
