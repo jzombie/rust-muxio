@@ -56,3 +56,44 @@ impl From<io::Error> for RpcServiceError {
         RpcServiceError::Transport(e)
     }
 }
+
+#[cfg(test)]
+mod error_tests {
+    use super::*;
+
+    #[test]
+    fn transport_display_and_source() {
+        let err = RpcServiceError::Transport(io::Error::new(io::ErrorKind::BrokenPipe, "boom"));
+        assert_eq!(format!("{err}"), "Transport error: boom");
+        let src = std::error::Error::source(&err).expect("transport has source");
+        let io_err = src
+            .downcast_ref::<io::Error>()
+            .expect("source is io::Error");
+        assert_eq!(io_err.kind(), io::ErrorKind::BrokenPipe);
+        assert_eq!(io_err.to_string(), "boom");
+    }
+
+    #[test]
+    fn rpc_payload_display_has_code_and_message() {
+        let err = RpcServiceError::Rpc(RpcServiceErrorPayload {
+            code: RpcServiceErrorCode::NotFound,
+            message: "no such method".to_string(),
+        });
+        assert_eq!(format!("{err}"), "[NotFound] no such method");
+        assert!(std::error::Error::source(&err).is_none());
+    }
+
+    #[test]
+    fn aborted_display_and_no_source() {
+        let err = RpcServiceError::Aborted;
+        assert_eq!(format!("{err}"), "RPC was aborted");
+        assert!(std::error::Error::source(&err).is_none());
+    }
+
+    #[test]
+    fn from_io_error_yields_transport() {
+        let err = RpcServiceError::from(io::Error::new(io::ErrorKind::TimedOut, "slow"));
+        assert!(matches!(err, RpcServiceError::Transport(_)));
+        assert_eq!(format!("{err}"), "Transport error: slow");
+    }
+}

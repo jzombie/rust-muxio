@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
  (or is loosely based on) Semantic Versioning.
 
+## [0.17.3-alpha] - 2026-11-19
+
+### Changed
+
+- **Dependency bump (`Cargo.lock`):** `interprocess 2.4.7 → 2.4.8` (#124) — patch bump via Dependabot (no API changes).
+
+### Fixed
+
+- **Test-helper coverage:** `muxio-ext-test` transport impls now reuse the shared `ipc_helpers` / `wasm_helpers` setup functions instead of private duplicates, and `test_suites` roundtrip assertions go through the shared `test_assertions` helpers — previously dead code dragging line coverage down.
+- **Error-type unit tests:** added `Display` / `source` / `From` coverage for `RpcServiceError` (`muxio-rpc-service`) and `RpcServiceEndpointError` / `RpcServiceEndpointHandlerError` (`muxio-rpc-service-endpoint`).
+
 ## [0.17.2-alpha] - 2026-10-31
 
 ### Changed

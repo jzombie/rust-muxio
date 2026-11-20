@@ -49,9 +49,27 @@ pub async fn setup_wasm_client_bridge(
     let ws_recv_handle = tokio::spawn({
         let client = client.clone();
         async move {
-            while let Some(Ok(WsMessage::Binary(bytes))) = ws_receiver.next().await {
-                client.read_bytes(&bytes).await;
+            loop {
+                match ws_receiver.next().await {
+                    Some(Ok(WsMessage::Binary(bytes))) => {
+                        client.read_bytes(&bytes).await;
+                    }
+                    Some(Ok(_)) => {
+                        // Protocol-level frames (Ping/Pong/Close) need no
+                        // application handling; keep draining.
+                    }
+                    Some(Err(e)) => {
+                        // A transport error (e.g. reset without close handshake
+                        // when the peer goes away) IS the disconnect signal for
+                        // a client: log it so it is never silent, then fall
+                        // through to `handle_disconnect` below.
+                        tracing::warn!("WASM bridge WebSocket error: {e:?}");
+                        break;
+                    }
+                    None => break,
+                }
             }
+            client.handle_disconnect().await;
         }
     });
 

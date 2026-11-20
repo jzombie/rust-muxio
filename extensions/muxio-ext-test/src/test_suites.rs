@@ -6,7 +6,7 @@ use example_muxio_rpc_service_definition::prebuffered::{Add, Echo, Mult};
 use futures_util::StreamExt;
 use muxio_core::rpc::RpcRequest;
 use muxio_core::rpc::rpc_internals::RpcStreamEvent;
-use muxio_rpc_service::error::{RpcServiceError, RpcServiceErrorCode};
+use muxio_rpc_service::error::RpcServiceErrorCode;
 use muxio_rpc_service::prebuffered::RpcMethodPrebuffered;
 use muxio_rpc_service_caller::dynamic_channel::DynamicChannelType;
 use muxio_rpc_service_caller::prebuffered::RpcCallPrebuffered;
@@ -49,17 +49,7 @@ pub async fn roundtrip_error<C: RpcServiceCallerInterface>(client: &C) {
         .await
         .unwrap();
     let (_encoder, inner) = result;
-    let err = inner.unwrap_err();
-    match err {
-        RpcServiceError::Rpc(payload) => {
-            assert!(
-                payload.message.contains("test error"),
-                "Expected 'test error' in '{}'",
-                payload.message
-            );
-        }
-        other => panic!("Expected RpcServiceError::Rpc, got {:?}", other),
-    }
+    crate::test_assertions::assert_rpc_error(inner, RpcServiceErrorCode::System, "test error");
 }
 
 /// Run the large payload roundtrip test.
@@ -82,18 +72,7 @@ pub async fn roundtrip_method_not_found<C: RpcServiceCallerInterface>(client: &C
         .await
         .unwrap();
     let (_encoder, inner) = result;
-    let err = inner.unwrap_err();
-    match err {
-        RpcServiceError::Rpc(payload) => {
-            assert_eq!(
-                payload.code,
-                RpcServiceErrorCode::NotFound,
-                "Expected NotFound, got {:?}",
-                payload.code
-            );
-        }
-        other => panic!("Expected RpcServiceError::Rpc, got {:?}", other),
-    }
+    crate::test_assertions::assert_method_not_found_error(inner);
 }
 
 // ------------------------------------------------------------------

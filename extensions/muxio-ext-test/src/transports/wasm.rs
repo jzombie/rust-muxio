@@ -1,10 +1,9 @@
 use crate::endpoint_helpers;
 use crate::test_transport::TestTransport;
 use async_trait::async_trait;
-use futures_util::{SinkExt, StreamExt};
 use muxio_core::rpc::rpc_internals::RpcStreamEvent;
 
-use muxio_rpc_service_endpoint::{RpcServiceEndpoint, RpcServiceEndpointInterface};
+use muxio_rpc_service_endpoint::RpcServiceEndpoint;
 use muxio_tokio_rpc_server::{ConnectionContextHandle, RpcServer, RpcServerEvent};
 use muxio_wasm_rpc_client::RpcWasmClient;
 use std::sync::{Arc, Mutex};
@@ -12,7 +11,7 @@ use tokio::net::TcpListener;
 
 use tokio::sync::oneshot;
 use tokio::time::{Duration, sleep};
-use tokio_tungstenite::{connect_async, tungstenite::protocol::Message as WsMessage};
+use tokio_tungstenite::connect_async;
 
 #[async_trait]
 impl TestTransport for RpcWasmClient {
@@ -37,7 +36,8 @@ impl TestTransport for RpcWasmClient {
         });
         sleep(Duration::from_millis(200)).await;
 
-        let (client, _send, _recv) = setup_wasm_bridge(&server_url).await;
+        let (client, _send, _recv) =
+            crate::wasm_helpers::setup_wasm_client_bridge(&server_url).await;
         let endpoint = client.get_endpoint();
         (client, endpoint)
     }
@@ -66,7 +66,8 @@ impl TestTransport for RpcWasmClient {
         });
 
         sleep(Duration::from_millis(200)).await;
-        let (client, _send_h, recv_h) = setup_wasm_bridge(&server_url).await;
+        let (client, _send_h, recv_h) =
+            crate::wasm_helpers::setup_wasm_client_bridge(&server_url).await;
 
         let (tx, rx) = oneshot::channel();
         tokio::spawn(async move {
@@ -95,14 +96,15 @@ impl TestTransport for RpcWasmClient {
         });
         sleep(Duration::from_millis(200)).await;
 
-        let (client, _send, _recv) = setup_wasm_bridge(&server_url).await;
+        let (client, _send, _recv) =
+            crate::wasm_helpers::setup_wasm_client_bridge(&server_url).await;
         let endpoint = client.get_endpoint();
 
+        // `recv()` already waits for the next event; no polling sleep needed.
         let ctx_handle = loop {
             if let Some(RpcServerEvent::ClientConnected(handle)) = event_rx.recv().await {
                 break handle;
             }
-            sleep(Duration::from_millis(10)).await;
         };
 
         (client, endpoint, ctx_handle)
@@ -121,26 +123,7 @@ impl TestTransport for RpcWasmClient {
         endpoint_helpers::register_standard_handlers(&*server_endpoint).await;
         endpoint_helpers::register_error_handler(&*server_endpoint).await;
 
-        let events: Arc<Mutex<Vec<RpcStreamEvent>>> = Arc::new(Mutex::new(Vec::new()));
-        let captured = events.clone();
-        server_endpoint
-            .register_stream_handler(
-                endpoint_helpers::STREAMING_CAPTURE_METHOD_ID,
-                move |event, respond, _ctx| {
-                    captured.lock().unwrap().push(event.clone());
-                    match &event {
-                        RpcStreamEvent::PayloadChunk { bytes, .. } => {
-                            respond.respond(bytes.clone(), false);
-                        }
-                        RpcStreamEvent::End { .. } => {
-                            respond.respond(Vec::new(), true);
-                        }
-                        _ => {}
-                    }
-                },
-            )
-            .await
-            .expect("Failed to register streaming capture handler");
+        let events = endpoint_helpers::register_stream_capture_handler(&*server_endpoint).await;
 
         let server_clone = server.clone();
         tokio::spawn(async move {
@@ -148,50 +131,9 @@ impl TestTransport for RpcWasmClient {
         });
         sleep(Duration::from_millis(200)).await;
 
-        let (client, _send, _recv) = setup_wasm_bridge(&server_url).await;
+        let (client, _send, _recv) =
+            crate::wasm_helpers::setup_wasm_client_bridge(&server_url).await;
         let endpoint = client.get_endpoint();
         (client, endpoint, events)
     }
-}
-
-async fn setup_wasm_bridge(
-    server_url: &str,
-) -> (
-    Arc<RpcWasmClient>,
-    tokio::task::JoinHandle<()>,
-    tokio::task::JoinHandle<()>,
-) {
-    let (to_bridge_tx, mut to_bridge_rx) = tokio::sync::mpsc::unbounded_channel::<Vec<u8>>();
-    let client = Arc::new(RpcWasmClient::new(move |bytes| {
-        let _ = to_bridge_tx.send(bytes);
-    }));
-
-    let (ws_stream, _) = connect_async(server_url).await.unwrap();
-    let (mut ws_sender, mut ws_receiver) = ws_stream.split();
-
-    client.handle_connect().await;
-
-    let ws_send_handle = tokio::spawn(async move {
-        while let Some(bytes) = to_bridge_rx.recv().await {
-            if ws_sender
-                .send(WsMessage::Binary(bytes.into()))
-                .await
-                .is_err()
-            {
-                break;
-            }
-        }
-    });
-
-    let ws_recv_handle = tokio::spawn({
-        let client = client.clone();
-        async move {
-            while let Some(Ok(WsMessage::Binary(bytes))) = ws_receiver.next().await {
-                client.read_bytes(&bytes).await;
-            }
-            client.handle_disconnect().await;
-        }
-    });
-
-    (client, ws_send_handle, ws_recv_handle)
 }
