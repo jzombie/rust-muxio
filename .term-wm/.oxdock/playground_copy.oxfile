@@ -3,8 +3,6 @@
 # Run via the "ox: playground copy diff" task, or directly:
 #   term-wm --util oxdock .term-wm/.oxdock/playground_copy.oxfile
 # Tweak the middle step, then check the paste buffer.
-# NOTE: the consumer lines are platform-guarded because RUN executes through
-# the platform shell, so the env-var reference spelling differs per platform.
 INHERIT_ENV [TERM_WM_EXE, TERM_WM_PID, WITH_MAIN]
 WORKSPACE LOCAL
 
