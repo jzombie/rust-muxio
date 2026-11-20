@@ -1,0 +1,25 @@
+# Playground copy flow: producer -> transform -> `--util copy` consumer,
+# all routed through internal WITH_IO pipes (no host shell pipes).
+# Run via the "ox: playground copy diff" task, or directly:
+#   term-wm --util oxdock .term-wm/.oxdock/playground_copy.oxfile
+# Tweak the middle step, then check the paste buffer.
+# NOTE: the consumer lines are platform-guarded because RUN executes through
+# the platform shell, so the env-var reference spelling differs per platform.
+INHERIT_ENV [TERM_WM_EXE, TERM_WM_PID, WITH_MAIN]
+WORKSPACE LOCAL
+
+# Include untracked files without staging them
+RUN git add -N .
+
+# Select the diff target under guard, then capture unconditionally so the
+# downstream read is covered on every path (two disjoint-guarded LETs of the
+# same variable leave WITH_MAIN=other paths unbound and fail static coverage).
+LET $target: STRING = "HEAD"
+[eq(env:WITH_MAIN, "1")] $target = "main"
+LET $body: STRING = RUN git diff $target
+
+# Apply template around `git diff` body
+LET $out: PIPE
+WITH_IO [stdout=$out] EXPAND .term-wm/.oxdock/code_reviewer.template CODE_PLAN=$body
+
+WITH_IO [stdin=$out] RUN ["{{ env:TERM_WM_EXE }}", "--util", "copy", "--", "--force-osc52"]
