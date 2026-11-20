@@ -12,3 +12,6 @@ publish.workspace = true # Inherit from workspace
 bitcode = { workspace = true }
 num_enum = { workspace = true }
 xxhash-rust = { workspace = true }
+
+[lints]
+workspace = true

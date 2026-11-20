@@ -79,6 +79,11 @@ tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 xxhash-rust = { version = "0.8.15", features = ["xxh3", "const_xxh3"] }
 
+[workspace.lints.cargo]
+# Auto-fail the build if a package declares a dependency it never uses.
+# (Supersedes ad-hoc `cargo-udeps` triage with a compiler-enforced rule.)
+unused_dependencies = "deny"
+
 [features]
 default = []
 rpc-service = ["dep:muxio-rpc-service"]
@@ -128,3 +133,6 @@ rand.workspace = true
 tokio = { workspace = true, features = ["full"] }
 tracing.workspace = true
 tracing-subscriber.workspace = true
+
+[lints]
+workspace = true

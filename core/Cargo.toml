@@ -12,3 +12,5 @@ publish.workspace = true
 once_cell.workspace = true
 tracing.workspace = true
 
+[lints]
+workspace = true

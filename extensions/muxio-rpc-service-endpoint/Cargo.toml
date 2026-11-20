@@ -26,3 +26,6 @@ tracing = { workspace = true }
 [dev-dependencies]
 # doc-comment = { workspace = true } # TODO: Re-enable
 tokio = { workspace = true, features = ["full"] }
+
+[lints]
+workspace = true

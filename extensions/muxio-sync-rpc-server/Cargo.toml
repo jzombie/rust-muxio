@@ -20,3 +20,6 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }
+
+[lints]
+workspace = true

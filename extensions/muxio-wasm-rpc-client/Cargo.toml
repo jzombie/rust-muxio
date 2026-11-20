@@ -24,3 +24,6 @@ wasm-bindgen-futures = "0.4.64"
 [dev-dependencies]
 futures-util = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
+
+[lints]
+workspace = true

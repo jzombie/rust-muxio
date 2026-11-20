@@ -22,3 +22,6 @@ tracing = { workspace = true }
 example-muxio-rpc-service-definition = { workspace = true }
 muxio-sync-rpc-server = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
+
+[lints]
+workspace = true
